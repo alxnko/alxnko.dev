@@ -1,0 +1,137 @@
+---
+---
+
+<div class="terminal" id="terminal-root">
+  <div class="terminal-header">
+    <div class="terminal-dots">
+      <span class="terminal-dot dot-red"></span>
+      <span class="terminal-dot dot-yellow"></span>
+      <span class="terminal-dot dot-green"></span>
+    </div>
+    <div class="terminal-title">bash — 80×24 — alxnko@dev:~</div>
+    <div style="width: 42px;"></div>
+  </div>
+  
+  <div class="terminal-body" id="term-body">
+    <!-- Initial History -->
+    <div class="term-line">
+      <span class="term-prompt">alxnko@dev:~$</span> <span class="term-cmd">cat profile.json</span>
+    </div>
+    <div class="term-output">
+      &#123;<br>
+      &nbsp;&nbsp;<span class="term-key">"name"</span>: <span class="term-highlight">"Alex Neko"</span>,<br>
+      &nbsp;&nbsp;<span class="term-key">"handle"</span>: <span class="term-highlight">"alxnko"</span>,<br>
+      &nbsp;&nbsp;<span class="term-key">"role"</span>: <span class="term-highlight">"software engineer & systems architect"</span>,<br>
+      &nbsp;&nbsp;<span class="term-key">"location"</span>: <span class="term-highlight">"earth // remote"</span>,<br>
+      &nbsp;&nbsp;<span class="term-key">"status"</span>: <span class="term-highlight">"online & shipping code"</span><br>
+      &#125;
+    </div>
+
+    <!-- Output container for user-run commands -->
+    <div id="term-history"></div>
+
+    <!-- Live Command Input -->
+    <form id="term-form" class="term-input-line" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+      <span class="term-prompt" style="white-space: nowrap;">alxnko@dev:~$</span>
+      <input
+        type="text"
+        id="term-input"
+        class="mono"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="type 'help' or click a chip below..."
+        style="flex: 1; background: transparent; border: none; outline: none; color: var(--text); font-size: 0.875rem; font-family: var(--font-mono); padding: 0;"
+      />
+    </form>
+
+    <!-- Quick Command Chips -->
+    <div class="term-chips">
+      <span style="font-size: 0.75rem; color: var(--text-subtle); align-self: center; margin-right: 4px;">try:</span>
+      <button type="button" class="term-chip" data-cmd="whoami">whoami</button>
+      <button type="button" class="term-chip" data-cmd="contact">contact</button>
+      <button type="button" class="term-chip" data-cmd="clear">clear</button>
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+  (function() {
+    var form = document.getElementById('term-form');
+    var input = document.getElementById('term-input');
+    var history = document.getElementById('term-history');
+    var root = document.getElementById('terminal-root');
+
+    // 'cat profile.json' is the command shown in the pre-rendered history above,
+    // so it has to actually work when someone types it back.
+    var PROFILE = '{\n  "name": "Alex Neko",\n  "handle": "alxnko",\n  "role": "software engineer & systems architect",\n  "location": "earth // remote",\n  "status": "online & shipping code"\n}';
+
+    var COMMANDS = {
+      help: 'available commands: whoami, contact, socials, cat profile.json, date, clear',
+      whoami: 'alxnko — Alex Neko. Software engineer & systems architect building distributed edge software and modern web platforms.',
+      contact: '• GitHub: https://github.com/alxnko (/gh)\n• Telegram: https://t.me/ALXNK0 (/tg)\n• LinkedIn: https://linkedin.com/in/alxnko (/in)\n• Instagram: https://instagram.com/alxnko (/ig)\n• Email: mailto:aleksandrnyrko@gmail.com (/mail)',
+      socials: 'Shortcuts: /gh (GitHub), /tg (Telegram), /in (LinkedIn), /ig (Instagram), /mail (Email)',
+      date: new Date().toISOString() + ' (system time)',
+      'cat profile.json': PROFILE,
+      'cat profile': PROFILE
+    };
+
+    function runCmd(rawCmd) {
+      var cmd = (rawCmd || '').trim().toLowerCase();
+      if (!cmd) return;
+
+      if (cmd === 'clear') {
+        history.innerHTML = '';
+        input.value = '';
+        return;
+      }
+
+      var entry = document.createElement('div');
+      entry.className = 'term-entry';
+      entry.style.marginBottom = '12px';
+
+      var promptLine = document.createElement('div');
+      promptLine.className = 'term-line';
+      promptLine.innerHTML = '<span class="term-prompt">alxnko@dev:~$</span> <span class="term-cmd">' + escapeHtml(cmd) + '</span>';
+      entry.appendChild(promptLine);
+
+      var outputLine = document.createElement('div');
+      outputLine.className = 'term-output';
+
+      if (COMMANDS[cmd]) {
+        outputLine.innerText = COMMANDS[cmd];
+      } else {
+        outputLine.innerHTML = '<span style="color: #ef4444;">command not found: ' + escapeHtml(cmd) + '</span>. Type <span class="term-highlight">help</span> for available commands.';
+      }
+
+      entry.appendChild(outputLine);
+      history.appendChild(entry);
+      input.value = '';
+
+      // Scroll to bottom of terminal
+      var body = document.getElementById('term-body');
+      if (body) body.scrollTop = body.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    if (form && input) {
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        runCmd(input.value);
+      });
+    }
+
+    // Click on quick chips
+    if (root) {
+      root.addEventListener('click', function(e) {
+        var chip = e.target.closest('.term-chip');
+        if (chip && chip.dataset.cmd) {
+          runCmd(chip.dataset.cmd);
+          if (input) input.focus();
+        }
+      });
+    }
+  })();
+</script>

@@ -1,0 +1,5 @@
+Contact: mailto:aleksandrnyrko@gmail.com
+Expires: 2027-09-19T00:00:00.000Z
+Preferred-Languages: en, ru
+Canonical: https://alxnko.dev/.well-known/security.txt
+Policy: https://alxnko.dev/security

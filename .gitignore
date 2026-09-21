@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+.astro/
+.turbo/
+
+# Environment and local files
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
