@@ -702,7 +702,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   canvas.addEventListener('webglcontextrestored', onRestored);
 
   o.stage.after(canvas); // above the pinned screens (they show through its windows)
-  if (new URLSearchParams(location.search).has('test')) (window as any).__scene = { scene, camera, renderer, rail, flight, dest: () => dest, orbit, invalidate, world: () => world, hold: () => hold };
+  if (new URLSearchParams(location.search).has('test')) (window as any).__scene = { scene, camera, renderer, rail, flight, dest: () => dest, orbit, invalidate, world: () => world, hold: () => hold, pan };
   sizeOverlays();
   applySize();
   // first frame, then reveal (the app fades the poster out)
