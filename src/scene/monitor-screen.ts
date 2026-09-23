@@ -2,19 +2,11 @@
 // again only on the minute tick (clock) and on ring colour changes.
 import { CanvasTexture, LinearFilter, SRGBColorSpace } from 'three';
 import { CONTACTS, SITE } from '../content/site';
+import { CAT_MARK } from '../content/mark';
 import { ansi, TERM_BG, TOKENS } from '../lib/tokens';
 
 const W = 2048, H = 858; // 21:9
-const CAT = [
-  '   /\\    /\\ ',
-  '  /  \\__/  \\',
-  '  \\   /\\   /',
-  '   \\ /  \\ / ',
-  '   /|    |\\ ',
-  '  / |    | \\',
-  ' /  |    |  >',
-  '/___|____|_/ ',
-];
+const CAT = CAT_MARK;
 
 export class MonitorScreen {
   readonly texture: CanvasTexture;

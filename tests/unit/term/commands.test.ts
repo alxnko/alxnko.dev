@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { CAT_MARK } from '../../../src/content/mark';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { bootLines } from '../../../src/term/boot';
 import { PALETTE, text } from '../../../src/term/format';
@@ -48,7 +49,7 @@ describe('info commands', () => {
     tick(3 * 60_000 + 5000);
     const lines = await run('fastfetch');
     const t = lines.map(text);
-    for (let i = 0; i < 8; i++) expect(lines[i][0].fg).toBe('green');
+    for (let i = 0; i < CAT_MARK.length; i++) expect(lines[i][0].fg).toBe('green');
     const all = t.join('\n');
     expect(all).toContain('alxnko@nitro');
     for (const re of [

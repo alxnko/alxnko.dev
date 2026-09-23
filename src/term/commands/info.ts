@@ -1,5 +1,6 @@
 // help, man, whoami, fastfetch, uname, uptime, date, echo, hostname.
 import { CONTACTS, SITE } from '../../content/site';
+import { CAT_MARK } from '../../content/mark';
 import { b, fg, link, pad, PALETTE } from '../format';
 import { fail, flags, type ShellEnv } from '../registry';
 import type { Command, Line } from '../types';
@@ -47,18 +48,8 @@ function shortUptime(env: ShellEnv): string {
   return parts.join(', ');
 }
 
-// The cat mark: faceted, 8 rows, 17 columns.
-const CAT = String.raw`
-  /\         /\  
- /  \_______/  \ 
-/   /       \   \
-|  |  o   o  |  |
-|   \   v   /   |
- \   \_____/   / 
-  \           /  
-   \_________/   `
-  .split('\n')
-  .slice(1);
+// The cat mark (shared with the monitor screen), padded to a fixed width.
+const CAT = CAT_MARK.map((l) => l.padEnd(17, ' '));
 
 const MAN: Record<string, string> = {
   help: 'Lists the commands on this machine, grouped. Hidden ones stay hidden.',
