@@ -726,14 +726,23 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       // stay inside the room: past a wall, the window or the ceiling, the camera slides in
       // toward what it looks at (the desk side stays free), and the dolly follows so zooming
       // back in answers at once instead of unwinding the overshoot first
-      // never below (or skimming) the desk top: its underside is not meant to be seen
-      ROOM_MIN.y = Math.max(0.12, rigDy + manifest.deskBase + 0.15);
-      const t = roomFit(tgt.clamp(ROOM_MIN, ROOM_MAX), off);
-      if (t < 1) {
-        off.multiplyScalar(t);
-        const d = orbit.dolly.value * t;
+      const capDolly = (k: number) => {
+        const d = orbit.dolly.value * k;
         if (orbit.dolly.target > d) orbit.dolly.target = d;
         if (orbit.dolly.value > d) orbit.dolly.snap(d);
+      };
+      const t = roomFit(tgt.clamp(ROOM_MIN, ROOM_MAX), off);
+      if (t < 1) { off.multiplyScalar(t); capDolly(t); }
+      // looking around never takes the eye under (or skimming) the desk top, whose underside
+      // is not meant to be seen. Only the eye is held (the look point stays put), and never
+      // above where the preset view itself puts it, so the landmark views are unchanged
+      const floorY = Math.min(rigDy + manifest.deskBase + 0.15, p.pos[1]);
+      if (tgt.y + off.y < floorY) {
+        if (off.y < 0 && tgt.y > floorY + 1e-3) {
+          const k = (floorY - tgt.y) / off.y; // slide in toward the look point
+          off.multiplyScalar(k);
+          capDolly(k);
+        } else off.y = floorY - tgt.y; // look point at or below the floor: raise the eye
       }
       camera.position.copy(tgt).add(off);
       camera.lookAt(tgt);
