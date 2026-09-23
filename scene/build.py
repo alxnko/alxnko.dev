@@ -1375,14 +1375,17 @@ def build_cat(m):
         bm.faces.new((rings[0][(j + 1) % n], rings[0][j], rump))
         bm.faces.new((rings[-1][j], rings[-1][(j + 1) % n], chest))
     # front legs: from the chest over the front edge, draping down the bezel, paws at the end
+    # pass 8: every limb starts with an extra root ring deep inside the loaf, so no piece of a
+    # root ring / cap sits just under or through the flank (it baked as a dark speck)
     for phi in (27.0, 14.0):
         top = A(phi, -0.026, 0.016)
-        pts = [top, A(phi + 1, -0.042, 0.010), A(phi + 2, -0.049, -0.004), A(phi + 2, -0.051, -0.013)]
-        tube(bm, [Vector(p) for p in pts], [(0.011, 0.012), (0.0105, 0.010), (0.010, 0.0095), (0.0115, 0.010)],
-             n=6, tip=A(phi + 2.5, -0.057, -0.019))
+        pts = [A(phi, -0.010, 0.022), top, A(phi + 1, -0.042, 0.010), A(phi + 2, -0.049, -0.004),
+               A(phi + 2, -0.051, -0.013)]
+        tube(bm, [Vector(p) for p in pts], [(0.009, 0.010), (0.011, 0.012), (0.0105, 0.010), (0.010, 0.0095),
+                                           (0.0115, 0.010)], n=6, tip=A(phi + 2.5, -0.057, -0.019))
     # hind leg: faceted haunch on the front flank at the hips, foot tucked in above the tail
-    tube(bm, [A(-37, -0.028, 0.027), A(-31, -0.039, 0.021)], [(0.016, 0.014), (0.011, 0.009)], n=6,
-         tip=A(-25, -0.044, 0.018))
+    tube(bm, [A(-38, -0.010, 0.022), A(-37, -0.028, 0.027), A(-31, -0.039, 0.021)],
+         [(0.013, 0.011), (0.016, 0.014), (0.011, 0.009)], n=6, tip=A(-25, -0.044, 0.018))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     body = obj_from_bm("cat_body", bm, m["cat"])
     C.set_origin(body, W((0.0, 0.0, 0.0)))
