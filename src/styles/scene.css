@@ -650,6 +650,8 @@
 [data-mode="scene"] .identity .facts {
   margin-top: var(--sp-2);
   display: grid;
+  grid-template-columns: 1fr;
+  justify-items: start;
   gap: var(--sp-1);
   font-size: var(--fs-2);
   line-height: 20px;
