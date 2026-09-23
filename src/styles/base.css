@@ -9,6 +9,21 @@
   descent-override: 30%;
 }
 
+/* JetBrains Mono's arrows, math operators, box drawing, block elements and geometric shapes
+   (the fontsource files are Latin-only). Without it, phones draw the terminal's block-art cat
+   and box lines in a fallback font of another width and every column after them shifts.
+   Every glyph here is one 600-unit cell. Built from JetBrains Mono 2.304 (OFL):
+   pyftsubset JetBrainsMono-Regular.ttf --unicodes="U+2190-21FF,U+2200-22FF,U+2500-259F,U+25A0-25FF"
+     --flavor=woff2 --layout-features='' --no-hinting --desubroutinize */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  src: url("../assets/fonts/jetbrains-mono-symbols-400.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+2190-21FF, U+2200-22FF, U+2500-259F, U+25A0-25FF;
+}
+
 /* VT323, subset to the seven glyphs of the mark `alxnko_` (664 bytes, preloaded). */
 @font-face {
   font-family: "VT323";

@@ -24,6 +24,31 @@ test.describe('terminal', () => {
     await expect(page.locator('#term-overlay')).toHaveAttribute('aria-hidden', 'true');
   });
 
+  test('block-art lines stay on the monospace grid (our font draws the blocks)', async ({ page }) => {
+    await run(page, 'fastfetch');
+    await expect(lines(page)).toContainText('tech lead');
+    await page.evaluate(() => document.fonts.ready);
+    // the block characters come from our JetBrains Mono subset, not a system fallback
+    const art = page.locator('#term-lines [aria-hidden="true"]', { hasText: '█' }).first();
+    const cdp = await page.context().newCDPSession(page);
+    const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
+    const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#term-lines [aria-hidden="true"]' });
+    await cdp.send('CSS.enable');
+    const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+    expect(fonts.map((f: { familyName: string }) => f.familyName)).toEqual(['JetBrains Mono']);
+    // and every art span is exactly one cell per character
+    const off = await page.evaluate(() => {
+      const probe = document.createElement('span'); probe.textContent = 'x'.repeat(20);
+      document.getElementById('term-lines')!.append(probe);
+      const cell = probe.getBoundingClientRect().width / 20; probe.remove();
+      return [...document.querySelectorAll('#term-lines [aria-hidden="true"]')]
+        .map((e) => Math.abs(e.getBoundingClientRect().width - cell * (e.textContent ?? '').length))
+        .reduce((m, d) => Math.max(m, d), 0);
+    });
+    expect(off).toBeLessThan(0.5);
+    await expect(art).toBeVisible();
+  });
+
   test('filesystem, pipes and did-you-mean', async ({ page }) => {
     await run(page, 'ls ~/monitor | grep git');
     await expect(lines(page)).toContainText('github.lnk');
