@@ -349,7 +349,7 @@
 
 /* the hint already shows under the loader: the visitor learns how to move while the desk
    loads, and it stays put when the loader fades (it is the same line either way) */
-[data-boot="3d"] body:not([data-scene="ready"]) > .hint {
+[data-boot="3d"] body:not([data-scene="ready"]) > #hint {
   display: block;
   position: fixed;
   z-index: var(--z-skip);
@@ -743,5 +743,5 @@
   [data-mode="scene"] .identity .name { font-size: var(--fs-5); line-height: 26px; }
   [data-mode="scene"] .identity .facts { font-size: var(--fs-4); line-height: 24px; gap: var(--sp-1); }
   [data-mode="scene"] :is(.toggle, .back:not([hidden]), .nav button) { font-size: 0.9375rem; }
-  [data-mode="scene"] .hint, [data-boot="3d"] body:not([data-scene="ready"]) > .hint { font-size: var(--fs-2); }
+  [data-mode="scene"] .hint, [data-boot="3d"] body:not([data-scene="ready"]) > #hint { font-size: var(--fs-2); }
 }
