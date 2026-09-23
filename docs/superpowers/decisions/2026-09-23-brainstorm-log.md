@@ -153,3 +153,6 @@ Changed:
 - **Keyboard backlights** (96 % keyboard + laptop keyboard): additive glow between the keys, same tint as the ring; brighter at night, subtle by day; off with `ring off`.
 - **LEDs**: paddle LED amber while the desk moves; server LEDs change pattern every 2–6 s; keyboard indicator steady.
 - **Day/night**: baked atlases cross-fade in 600 ms; window sky switches; screens stay dark in both.
+| R28 | Desk doesn't move when clicking the paddle buttons | Tap hits landed on quantised `<name>__geo` children, so the target name was wrong (`desk 1__geo`); also silently broke laptop/monitor taps. Pure `resolveTarget` + unit test. Verified in Chrome: click on "3" → `desk 3`, desk at 112 cm. **Fixed.** |
+| R29 | Laptop is on a stand (new photos in `3d-table-references/new`), not flat | Blender pass 3: black foldable stand, deck tilted ~15° up to the back, lid near vertical. **Model pending.** |
+| R30 | Live terminal floats in front of the fan from a side angle | The `screen_laptop` quad was not coplanar with the lid; pass 3 parents it to the lid, ≤1 mm off the panel, side-angle verified. **Model pending.** |
