@@ -1,5 +1,6 @@
 // Shell: runs a parsed line against the registry (pipes, &&, ||, ;), owns busy + Ctrl+C.
 import { SITE } from '../content/site';
+import { catspeak } from './catspeak';
 import { text } from './format';
 import { expand, parse, ParseError, type Pipeline } from './parse';
 import { AbortedError, Registry, didYouMean, type ShellEnv } from './registry';
@@ -87,6 +88,20 @@ export class Shell {
     this.store.setInput('');
     if (!src.trim()) return;
     this.store.pushHistory(src);
+
+    // Catspeak: a line that isn't a command but is all cat sounds / faces gets a cat reply
+    // (and the cat reacts) instead of "command not found".
+    const first = src.trim().split(/\s+/)[0] ?? '';
+    if (!this.registry.get(first)) {
+      const cat = catspeak(src, this.env.random);
+      if (cat) {
+        this.store.print([{ text: '=^..^=  ', fg: 'green' }, { text: cat.text }]);
+        this.world.meow();
+        if (cat.excited) setTimeout(() => this.world.meow(), 450);
+        this.status = 0;
+        return;
+      }
+    }
 
     let chains;
     try {
