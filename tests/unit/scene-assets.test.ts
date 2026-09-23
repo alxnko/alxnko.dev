@@ -14,7 +14,9 @@ const NODES = [
   'static', 'desk_rig', 'desk_baked', 'screen_laptop', 'screen_monitor', 'fan_blades',
   'cat_body', 'cat_head', 'cat_tail', 'ring', 'ring_glow', 'led_paddle', 'led_kbd',
   'led_srv_0', 'led_srv_1', 'led_srv_2', 'led_srv_3', 'led_srv_4', 'led_srv_5',
-  'cable_drop', 'window_sky', 'hit_laptop', 'hit_monitor', 'cam_wide', 'cam_desk',
+  'window_sky', 'hit_laptop', 'hit_monitor', 'cam_wide', 'cam_desk',
+  'fan_ring', 'fan_display', 'kbd_glow', 'laptop_kbd_glow',
+  'hit_paddle_1', 'hit_paddle_2', 'hit_paddle_3', 'hit_paddle_up', 'hit_paddle_down',
 ];
 
 function glbJson(path: string) {

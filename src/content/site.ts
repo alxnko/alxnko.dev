@@ -5,7 +5,6 @@ export const SITE = {
   name: 'Alex Neko',
   handle: 'alxnko',
   role: 'tech lead',
-  company: 'AIT Solutions',
   country: 'Kyrgyzstan',
   countryCode: 'KG',
   host: 'nitro',

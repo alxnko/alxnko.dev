@@ -133,7 +133,7 @@ export function infoCommands(env: ShellEnv): Command[] {
       const f = flags(ctx, 'whoami', 'v');
       if (!f.short.has('v')) return ctx.out(SITE.handle);
       ctx.out([
-        { text: `${SITE.name} (${SITE.handle}) · ${SITE.role} @ ${SITE.company} · ${SITE.country} · ` },
+        { text: `${SITE.name} (${SITE.handle}) · ${SITE.role} · ${SITE.country} · ` },
         link(SITE.rank.text, SITE.rank.href),
       ]);
     },
@@ -155,7 +155,7 @@ export function infoCommands(env: ShellEnv): Command[] {
         kv('kernel', KERNEL),
         kv('uptime', shortUptime(env)),
         kv('shell', 'bash 5.3'),
-        kv('role', `${SITE.role} @ ${SITE.company}`),
+        kv('role', SITE.role),
         kv('loc', SITE.country),
         kv('rank', [link(SITE.rank.short, SITE.rank.href)]),
       ];

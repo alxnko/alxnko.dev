@@ -6,7 +6,8 @@ test.describe('page (no 3D)', () => {
     const g = await guard(page);
     await page.goto('/?lite');
     await expect(page.locator('h1')).toContainText('alxnko');
-    await expect(page.locator('#identity')).toContainText('ait solutions');
+    await expect(page.locator('#identity')).toContainText('tech lead');
+    expect((await page.locator('body').innerText()).toLowerCase()).not.toContain('ait solutions');
     await expect(page.locator('#identity')).toContainText('kyrgyzstan');
     await expect(page.locator('#contacts a')).toHaveCount(5);
     for (const href of ['https://github.com/alxnko', 'https://t.me/ALXNK0', 'https://linkedin.com/in/alxnko', 'https://instagram.com/alxnko', 'mailto:aleksandrnyrko@gmail.com'])

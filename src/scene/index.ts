@@ -31,6 +31,8 @@ export interface SceneOptions {
   mobile: boolean;
   termEl: HTMLElement;
   contactsEl: HTMLElement;
+  /** The monitor's right pane (role, location, rank link), pinned like the contacts. */
+  infoEl?: HTMLElement;
   onLandmark(l: Landmark): void;
   /** True whenever the view is anywhere but the resting desk view (flown or looked around). */
   onAway?(away: boolean): void;
@@ -245,7 +247,9 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   // the live contacts panel covers the middle of the curved monitor (a short arc, so the flat
   // DOM panel sits on the curve within a few mm); the canvas draws the side panes around it
   const CONTACTS_UV = [0.24, 0.76, 0.12, 0.92] as const;
+  const INFO_UV = [0.765, 0.995, 0.12, 0.92] as const;
   const contactsCorners = () => screenCorners(monitorScreen, ...CONTACTS_UV);
+  const infoCorners = () => screenCorners(monitorScreen, ...INFO_UV);
 
   const adaptFov = (vfov: number, refAspect: number) => {
     const hfov = 2 * Math.atan(Math.tan((vfov * DEG) / 2) * refAspect);
@@ -326,7 +330,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     raf = requestAnimationFrame(frame);
   }
 
-  const dock = new Dock({ termEl: o.termEl, contactsEl: o.contactsEl });
+  const dock = new Dock([o.termEl, o.contactsEl, ...(o.infoEl ? [o.infoEl] : [])]);
   // logical overlay sizes: the laptop terminal is a 16:10 grid (fewer columns on phones so
   // text stays readable when the screen fills the view); contacts match their arc's aspect
   const sizeOverlays = () => {
@@ -337,6 +341,12 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     const cw = 1120;
     o.contactsEl.style.setProperty('--contacts-w', `${cw}px`);
     o.contactsEl.style.setProperty('--contacts-h', `${Math.round((cw * tl.distanceTo(bl)) / tl.distanceTo(tr))}px`);
+    if (o.infoEl) {
+      const [a, b, , d] = infoCorners();
+      const iw = 480;
+      o.infoEl.style.setProperty('--info-w', `${iw}px`);
+      o.infoEl.style.setProperty('--info-h', `${Math.round((iw * a.distanceTo(d)) / a.distanceTo(b))}px`);
+    }
   };
   const q = new Quaternion(), q2 = new Quaternion(), v = new Vector3(), v2 = new Vector3();
   const upWorld = new Vector3(0, 1, 0);
@@ -491,7 +501,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       }
       return { quad: out, facing };
     };
-    dock.update(quad(screenCorners(laptopScreen)), quad(contactsCorners()));
+    dock.update([quad(screenCorners(laptopScreen)), quad(contactsCorners()), ...(o.infoEl ? [quad(infoCorners())] : [])]);
 
     const t0 = performance.now();
     renderer.render(scene, camera);
@@ -595,7 +605,8 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     orbit(dx, dy) {
       lastInput = performance.now();
       orbit.yaw.target = clamp(orbit.yaw.target - dx * 0.005, -YAW, YAW);
-      orbit.pitch.target = clamp(orbit.pitch.target + dy * 0.004, -PITCH_DOWN, PITCH_UP);
+      // grab-the-scene: moving the pointer up tilts the view down, like dragging right turns left
+      orbit.pitch.target = clamp(orbit.pitch.target - dy * 0.004, -PITCH_DOWN, PITCH_UP);
       if (o.reducedMotion) { orbit.yaw.snap(orbit.yaw.target); orbit.pitch.snap(orbit.pitch.target); }
       invalidate();
     },

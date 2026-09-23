@@ -87,23 +87,7 @@ export class MonitorScreen {
     ctx.fillText(`${SITE.handle}@${SITE.host}`, LEFT / 2, TOP + 150 + CAT_MARK.length * 38 + 50);
     ctx.textAlign = 'left';
 
-    // right pane: status
-    const rx = RIGHT + 48;
-    const rows: [string, string][] = [
-      ['role', SITE.role],
-      ['at', SITE.company],
-      ['loc', SITE.country],
-      ['rank', SITE.rank.short],
-    ];
-    rows.forEach(([k, v], i) => {
-      const y = TOP + 120 + i * 96;
-      ctx.fillStyle = ansi('dim');
-      ctx.font = mono(400, 24);
-      ctx.fillText(k, rx, y);
-      ctx.fillStyle = k === 'rank' ? ansi('amber') : ansi('fg');
-      ctx.font = mono(400, 28);
-      ctx.fillText(v, rx, y + 36);
-    });
+    // the right pane is the live #mon-info panel (pinned DOM, with the rank link)
   }
 
   dispose() {

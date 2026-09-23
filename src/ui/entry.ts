@@ -125,6 +125,7 @@ function enter3d() {
         mobile: matchMedia('(pointer: coarse)').matches || innerWidth < 720,
         termEl,
         contactsEl,
+        infoEl: $('mon-info') ?? undefined,
         onLandmark(l) {
           document.body.dataset.view = l; // scene.css: only the screen you're at is selectable
           for (const b of document.querySelectorAll<HTMLButtonElement>('#nav [data-landmark]')) {
@@ -195,6 +196,21 @@ function afterIdle() {
   btn?.addEventListener('click', enter3d);
   if (gate === 'auto' && !booting3d) enter3d();
   else if (gate === 'offer' && btn) btn.hidden = false;
+}
+
+// A pinned screen seen from afar is one big button: the first click flies you there (links
+// don't fire, text doesn't select); once you're at it, it behaves like a normal screen.
+const SCREENS: [string, Landmark][] = [['term', 'laptop'], ['contacts', 'monitor'], ['mon-info', 'monitor']];
+for (const [id, l] of SCREENS) {
+  const el = $(id);
+  if (!el) continue;
+  el.addEventListener('click', (e) => {
+    if (!world.scene || document.body.dataset.view === l) return;
+    e.preventDefault();
+    e.stopPropagation();
+    world.fly(l);
+    if (l === 'laptop') (document.getElementById('term-input') as HTMLInputElement | null)?.focus({ preventScroll: true });
+  }, { capture: true });
 }
 
 // camera nav, back to desk (button or Esc), focus → fly, theme → scene

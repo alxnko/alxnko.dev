@@ -68,7 +68,7 @@ describe('vfs', () => {
     const a = lookup(root, HOME + '/about.md')!.read!(W);
     expect(a).toContain('Alex Neko');
     expect(a).toContain('tech lead');
-    expect(a).toContain('AIT Solutions');
+    expect(a).not.toContain('AIT');
     expect(a).toContain('Kyrgyzstan');
     expect(a).toContain('#1 committer in Kyrgyzstan');
     expect(a).toContain('i build systems and ship. meow.');

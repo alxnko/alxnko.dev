@@ -39,7 +39,7 @@ describe('info commands', () => {
   it('whoami and whoami -v', async () => {
     const { out, run } = setup();
     expect(await out('whoami')).toBe('alxnko');
-    expect(await out('whoami -v')).toBe('Alex Neko (alxnko) · tech lead @ AIT Solutions · Kyrgyzstan · #1 committer in Kyrgyzstan');
+    expect(await out('whoami -v')).toBe('Alex Neko (alxnko) · tech lead · Kyrgyzstan · #1 committer in Kyrgyzstan');
     const [line] = await run('whoami -v');
     expect(line.find((s) => s.href)?.href).toBe('https://committers.top/kyrgyzstan_private');
   });
@@ -58,7 +58,7 @@ describe('info commands', () => {
       /kernel\s+7\.2\.6-meow/,
       /uptime\s+3 mins/,
       /shell\s+bash 5\.3/,
-      /role\s+tech lead @ AIT Solutions/,
+      /role\s+tech lead$/m,
       /loc\s+Kyrgyzstan$/m,
       /rank\s+#1 committer in KG/,
       /gh\s+github\.com\/alxnko/,

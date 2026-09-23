@@ -13,7 +13,7 @@ export interface ScreenQuad {
 export class Dock {
   private last = new Map<HTMLElement, string>();
 
-  constructor(private o: { termEl: HTMLElement; contactsEl: HTMLElement }) {}
+  constructor(private els: HTMLElement[]) {}
 
   /** Logical (untransformed) size of each overlay, in CSS px. */
   size(el: HTMLElement): [number, number] {
@@ -32,13 +32,13 @@ export class Dock {
     }
   }
 
-  update(term: ScreenQuad, contacts: ScreenQuad) {
-    this.pin(this.o.termEl, term);
-    this.pin(this.o.contactsEl, contacts);
+  /** One quad per element, in constructor order. */
+  update(quads: ScreenQuad[]) {
+    this.els.forEach((el, i) => this.pin(el, quads[i]));
   }
 
   destroy() {
-    for (const el of [this.o.termEl, this.o.contactsEl]) {
+    for (const el of this.els) {
       delete el.dataset.dock;
       el.style.removeProperty('transform');
     }

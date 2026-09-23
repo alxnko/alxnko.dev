@@ -84,6 +84,7 @@
 }
 
 [data-mode="scene"] .sheet {
+  pointer-events: none; /* click-through: only real controls and the pinned screens take input */
   position: static;
   display: block;
   padding: 0;
@@ -103,8 +104,7 @@
 }
 
 [data-mode="scene"] .identity .eyebrow,
-[data-mode="scene"] .identity .facts dt,
-[data-mode="scene"] .identity .facts > div:nth-child(4) {
+[data-mode="scene"] .identity .facts dt {
   display: none;
 }
 
@@ -401,6 +401,63 @@
 
 [data-mode="scene"][data-view="laptop"] .term,
 [data-mode="scene"][data-view="monitor"] .contacts {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* the pinned screens take input; every other part of the scene container lets clicks
+   through to the canvas and the chrome */
+[data-mode="scene"] .term,
+[data-mode="scene"] .contacts,
+[data-mode="scene"] .mon-info {
+  pointer-events: auto;
+}
+
+/* the monitor's right pane (role, location, rank link), pinned like the contacts */
+.mon-info {
+  display: none;
+}
+
+[data-mode="scene"] .mon-info {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--z-dock);
+  width: var(--info-w, 480px);
+  height: var(--info-h, 740px);
+  margin: 0;
+  padding: 96px 48px 0;
+  transform-origin: 0 0;
+  backface-visibility: hidden;
+  background: var(--ansi-bg);
+  color: var(--ansi-fg);
+  font-size: 30px;
+  line-height: 1.35;
+}
+
+[data-mode="scene"] .mon-info[data-dock="off"],
+[data-mode="scene"] .mon-info:not([data-dock]) {
+  visibility: hidden;
+}
+
+.mon-info dl { margin: 0; }
+.mon-info div { margin-bottom: 44px; }
+.mon-info dt { color: var(--ansi-dim); font-size: 24px; }
+.mon-info dd { margin: 0; }
+
+.mon-info a {
+  color: var(--ansi-amber);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--ansi-amber) 40%, transparent);
+  text-underline-offset: 6px;
+}
+
+.mon-info a:hover {
+  text-decoration-color: currentColor;
+}
+
+[data-mode="scene"][data-view="monitor"] .mon-info {
   -webkit-user-select: text;
   user-select: text;
 }

@@ -10,7 +10,7 @@ import { readPosters } from '../lib/poster';
 const posters = readPosters();
 const title = `alex neko (${SITE.handle}) · ${SITE.role}`;
 const description =
-  `${SITE.name} (${SITE.handle}): ${SITE.role} at ${SITE.company}, ${SITE.country}, ` +
+  `${SITE.name} (${SITE.handle}): ${SITE.role} in ${SITE.country}, ` +
   `${SITE.rank.text}. A working terminal on a model of the desk: type help.`;
 const tset = (k: 'wide' | 'tall', f: 'avif' | 'webp') =>
   posters ? JSON.stringify({ day: posters.day[k][f], night: posters.night[k][f] }) : '';
@@ -23,6 +23,13 @@ const PORTRAIT = '(max-width: 719px)';
     <Identity />
     <Terminal />
     <Contacts />
+    <aside id="mon-info" class="mon-info" aria-hidden="true">
+      <dl>
+        <div><dt>role</dt><dd>{SITE.role}</dd></div>
+        <div><dt>loc</dt><dd>{SITE.country}</dd></div>
+        <div><dt>rank</dt><dd><a href={SITE.rank.href} rel="noopener noreferrer" tabindex="-1">{SITE.rank.short}</a></dd></div>
+      </dl>
+    </aside>
     {posters && (
       <figure class="poster">
         <picture id="poster">

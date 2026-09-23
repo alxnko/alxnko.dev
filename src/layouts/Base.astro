@@ -31,7 +31,6 @@ const person = {
   name: SITE.name,
   alternateName: SITE.handle,
   jobTitle: 'Tech Lead',
-  worksFor: { '@type': 'Organization', name: SITE.company },
   address: { '@type': 'PostalAddress', addressCountry: SITE.countryCode },
   url: `${SITE.url}/`,
   sameAs: CONTACTS.filter((c) => c.href.startsWith('https:')).map((c) => c.href),

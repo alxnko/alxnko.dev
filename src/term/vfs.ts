@@ -32,7 +32,7 @@ export const themeName = (w: WorldState): 'day' | 'night' => (w.theme === 'light
 const ABOUT = [
   `# ${SITE.name} (${SITE.handle})`,
   '',
-  `${SITE.role} @ ${SITE.company}`,
+  SITE.role,
   SITE.country,
   `${SITE.rank.text} · ${SITE.rank.href}`,
   '',
