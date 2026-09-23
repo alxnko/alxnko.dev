@@ -937,7 +937,9 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   applySize();
   // first frame, then reveal (the app fades the poster out)
   await document.fonts?.load('400 24px "JetBrains Mono"').catch(() => {});
-  await new Promise<void>((done) => requestAnimationFrame(() => { frame(performance.now()); done(); }));
+  // drawn directly, not in a rAF: a covered or background window gets no animation frames,
+  // and the desk must still finish loading there (it simply paints once shown)
+  frame(performance.now());
   step('screens', 'ok');
   o.onProgress?.(1);
   // warm the other theme's atlas in idle time so toggling is instant

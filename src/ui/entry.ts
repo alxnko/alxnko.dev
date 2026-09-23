@@ -175,7 +175,19 @@ function enter3d() {
         },
       }));
   let timedOut = false;
-  const timeout = new Promise<never>((_, reject) => setTimeout(() => { timedOut = true; reject(new Error('3d load timed out')); }, MOUNT_TIMEOUT_MS));
+  // the deadline only counts time the page is actually shown (a background tab loads slowly
+  // and that is fine; it must not fall back to the page for it)
+  const timeout = new Promise<never>((_, reject) => {
+    let left = MOUNT_TIMEOUT_MS, since = performance.now();
+    const tick = () => {
+      const now = performance.now();
+      if (!document.hidden) left -= now - since;
+      since = now;
+      if (left <= 0) { timedOut = true; reject(new Error('3d load timed out')); }
+      else setTimeout(tick, Math.min(1000, left));
+    };
+    setTimeout(tick, 1000);
+  });
   // a mount that finishes after the timeout cleans up after itself
   mounting.then((h) => { if (timedOut) h.destroy(); }, () => {});
   Promise.race([mounting, timeout])
