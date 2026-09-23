@@ -12,7 +12,7 @@ import { TERM_BG } from '../lib/tokens';
 import { shadowMaterial, windowMaterial, bakedMaterial, ghostMaterial, emissiveMaterial, glowMaterial, screenMaterial, skyMaterial } from './materials';
 import { lerpPose, Rail, Spring, type Pose, type Vec3 } from './rail';
 import { FanDisplay, MonitorScreen } from './monitor-screen';
-import { catStep, constrainGaze, clamp, easeOut, frameInterval, nextFlickIn, Tween, type CatState } from './anim';
+import { catStep, constrainGaze, clamp, easeOut, frameInterval, nextFlickIn, SPIN_FRAME_MS, Tween, type CatState } from './anim';
 import { attachInput } from './input';
 import { Dock } from './dock';
 import { resolveTarget, type Named } from './pick';
@@ -500,7 +500,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   let raf = 0, timer = 0, last = performance.now();
   undo.push(() => { disposed = true; cancelAnimationFrame(raf); clearTimeout(timer); });
   const frameTimes: number[] = [];
-  let chained = false; // this frame follows the last one directly (no idle sleep in its dt)
+  let slept = -1; // ms this frame was deliberately delayed by (-1: it was not scheduled as a paced frame)
   const hidden = () => document.visibilityState === 'hidden';
   function invalidate() {
     if (disposed || raf) return;
@@ -725,11 +725,12 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     dock.update([quad(screenCorners(laptopScreen)), quad(contactsCorners()), ...(o.infoEl ? [quad(infoCorners())] : [])]);
 
     renderer.render(scene, camera);
-    // adaptive resolution while continuously animating: only back-to-back frames count (a
-    // frame after an idle sleep would read as slow). rAF is capped at vsync, so "fast" means
-    // keeping up with a 60 Hz display (~16.7 ms); anything well past it steps down
-    if (animating && chained) {
-      frameTimes.push(dt * 1000);
+    const spinning = fanSpeed > 0.05 && !o.reducedMotion && fanInView();
+    // adaptive resolution while moving (camera, desk, or the fan's paced 30 fps): each frame's
+    // interval minus the pause we asked for is what it really cost. rAF is capped at vsync, so
+    // "fast" means keeping up with a 60 Hz display (~16.7 ms); well past that steps down
+    if ((animating || spinning) && slept >= 0) {
+      frameTimes.push(Math.max(0, dt * 1000 - slept));
       if (frameTimes.length >= 30) {
         const avg = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
         frameTimes.length = 0;
@@ -738,9 +739,8 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       }
     }
 
-    const spinning = fanSpeed > 0.05 && !o.reducedMotion && fanInView();
     const interval = frameInterval({ animating, hidden: hidden(), reducedMotion: o.reducedMotion, idleMs: now - lastInput, spinning });
-    chained = interval === 0;
+    slept = interval === 0 ? 0 : interval === SPIN_FRAME_MS ? SPIN_FRAME_MS : -1;
     if (interval === 0) raf = requestAnimationFrame(frame);
     else if (interval !== null) timer = window.setTimeout(() => { timer = 0; raf = requestAnimationFrame(frame); }, interval);
   }
