@@ -1,7 +1,10 @@
 """UV-atlas + light bake for the day and night rigs (spec §6.1, plan Task 3).
 
 blender -b --factory-startup -P scene/bake.py -- --in desk.blend --out desk_uv.blend
-        [--size 4096] [--samples 512] [--reuse]   (--reuse: skip Cycles, recompose cached bakes)
+        [--size 4096] [--samples 512] [--reuse] [--draft]
+  --reuse: skip Cycles, recompose cached bakes
+  --draft: iteration defaults (2048 px, 128 samples) unless --size / --samples are given;
+           commits always use the full 4096 / 512
 
 Passes (all into one shared UV0 atlas):
   light-{day,night}  DIFFUSE direct+indirect (no colour), denoised with OIDN RTLightmap
@@ -20,6 +23,7 @@ from __future__ import annotations
 import math
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.dont_write_bytecode = True  # no __pycache__ in the repo
@@ -32,8 +36,9 @@ from mathutils import Vector  # noqa: E402
 import common as C  # noqa: E402
 
 A = C.args()
-SIZE = int(A.get("size", "4096"))
-SAMPLES = int(A.get("samples", "512"))
+DRAFT = "draft" in A
+SIZE = int(A.get("size", "2048" if DRAFT else "4096"))
+SAMPLES = int(A.get("samples", "128" if DRAFT else "512"))
 CACHE = C.WORK / "bake"
 POS_OFF, POS_SCALE = 4.0, 8.0
 
@@ -337,12 +342,71 @@ def point_nodes(objs, img):
 
 
 def run_bake(objs, kind, passes, margin=8):
+    """Bake `objs` into the shared target. Blender bakes a multi-object selection one object
+    at a time, re-syncing the whole scene for each (the GPU idles most of the time), so the
+    targets are first merged into world-space proxies, one per ray-visibility signature
+    (same geometry, materials, UVs and attributes: the result is the same bake), and
+    each proxy is baked once. Proxies with different signatures share the image
+    (use_clear only on the first)."""
+    t0 = time.perf_counter()
+    proxies, hidden = make_proxies(objs)
     ctx = bpy.context
-    for o in ctx.view_layer.objects:
-        o.select_set(o in objs)
-    ctx.view_layer.objects.active = objs[0]
-    bpy.ops.object.bake(type=kind, pass_filter=passes, margin=margin, margin_type="EXTEND",
-                        use_clear=True, target="IMAGE_TEXTURES")
+    try:
+        for i, px in enumerate(proxies):
+            for o in ctx.view_layer.objects:
+                o.select_set(o is px)
+            ctx.view_layer.objects.active = px
+            bpy.ops.object.bake(type=kind, pass_filter=passes, margin=margin, margin_type="EXTEND",
+                                use_clear=i == 0, target="IMAGE_TEXTURES")
+    finally:
+        drop_proxies(proxies, hidden)
+    TIMES.append((kind, len(objs), len(proxies), time.perf_counter() - t0))
+    print(f"[bake] {kind:7s} {len(objs)} objects in {len(proxies)} calls: {TIMES[-1][-1]:.1f} s")
+
+
+TIMES = []
+
+
+def ray_sig(o):
+    return tuple(bool(getattr(o, a)) for a in RAYS)
+
+
+def make_proxies(objs):
+    ctx = bpy.context
+    ctx.view_layer.update()
+    dg = ctx.evaluated_depsgraph_get()
+    groups = {}
+    for o in objs:
+        groups.setdefault(ray_sig(o), []).append(o)
+    proxies = []
+    for sig, members in groups.items():
+        parts = []
+        for o in members:
+            me = bpy.data.meshes.new_from_object(o.evaluated_get(dg), preserve_all_data_layers=True, depsgraph=dg)
+            assert [m.name for m in me.materials] == [s.material.name for s in o.material_slots], o.name
+            me.transform(o.matrix_world)
+            if o.matrix_world.determinant() < 0:
+                me.flip_normals()
+            p = bpy.data.objects.new("__px_" + o.name, me)
+            ctx.scene.collection.objects.link(p)
+            parts.append(p)
+        px = parts[0] if len(parts) == 1 else C.join(parts, f"__px{len(proxies)}")
+        for a, v in zip(RAYS, sig):
+            setattr(px, a, v)
+        proxies.append(px)
+    hidden = [o for o in objs if not o.hide_render]
+    for o in hidden:
+        o.hide_render = True
+    return proxies, hidden
+
+
+def drop_proxies(proxies, hidden):
+    for px in proxies:
+        me = px.data
+        bpy.data.objects.remove(px)
+        bpy.data.meshes.remove(me)
+    for o in hidden:
+        o.hide_render = False
 
 
 def pixels(img, ch=3):
@@ -553,6 +617,28 @@ def save_png(path, rgb):
     bpy.data.images.remove(img)
 
 
+OIDN_DEVICE = A.get("oidn", "cuda")
+
+
+def denoise(stem, device=None):
+    """OIDN RTLightmap on the GPU (CUDA) when available, else the CPU. Asynchronous."""
+    device = device or OIDN_DEVICE
+    cmd = ["oidnDenoise", "-d", device, "-f", "RTLightmap", "--hdr", str(CACHE / f"{stem}.pfm"),
+           "-o", str(CACHE / f"{stem}-dn.pfm")]
+    return device, subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+
+def finish_denoise(stem, job):
+    device, proc = job
+    _, err = proc.communicate()
+    if proc.returncode != 0:
+        if device == "cpu":
+            raise RuntimeError(f"oidnDenoise failed for {stem}: {err.decode()[-400:]}")
+        print(f"[bake] oidn {device} failed for {stem}, falling back to cpu")
+        return finish_denoise(stem, denoise(stem, "cpu"))
+    np.save(CACHE / f"{stem}.npy", read_pfm(CACHE / f"{stem}-dn.pfm").astype(np.float16))
+
+
 # ------------------------------------------------------------------ main
 
 def main():
@@ -587,6 +673,8 @@ def main():
     passes = {"with": rig_objs + decals, "room": room_objs + decals}
     names = ["color", "pos", "flag", "nrm", "ao-with", "ao-room"] + [f"light-{r}-{p}" for r in ("day", "night") for p in passes]
     if "reuse" not in A or not all((CACHE / f"{n}.npy").exists() for n in names):
+        t_bake = time.perf_counter()
+        jobs = []
         img = target_image("bake_target")
         point_nodes(objs, img)
         sc.cycles.samples = 64
@@ -624,11 +712,12 @@ def main():
                 raw = pixels(img)
                 stem = f"light-{rig}-{pname}"
                 write_pfm(CACHE / f"{stem}.pfm", raw)
-                subprocess.run(["oidnDenoise", "-d", "cpu", "-f", "RTLightmap", "--hdr",
-                                str(CACHE / f"{stem}.pfm"), "-o", str(CACHE / f"{stem}-dn.pfm")],
-                               check=True, stdout=subprocess.DEVNULL)
-                np.save(CACHE / f"{stem}.npy", read_pfm(CACHE / f"{stem}-dn.pfm").astype(np.float16))
+                jobs.append((stem, denoise(stem)))   # runs while the next pass bakes
             print("[bake] baked", rig)
+        for stem, job in jobs:
+            finish_denoise(stem, job)
+        print(f"[bake] cycles+denoise {time.perf_counter() - t_bake:.1f} s "
+              f"(bake calls {sum(t[-1] for t in TIMES):.1f} s)")
 
     color = np.load(CACHE / "color.npy").astype(np.float32)
     pos = np.load(CACHE / "pos.npy").astype(np.float32) * POS_SCALE - POS_OFF
