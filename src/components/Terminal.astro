@@ -17,9 +17,6 @@ const post = ']$ ';
     <div id="term-comp" class="term-comp" hidden></div>
     <div id="term-overlay" class="term-overlay" hidden></div>
   </div>
-  <div id="term-chips" class="term-chips" role="group" aria-label="suggested commands">
-    {CHIPS.map((c) => <button type="button" class="chip" data-cmd={c}>{c}</button>)}
-  </div>
   <form id="term-form" class="term-form" data-busy="false">
     <label class="visually-hidden" for="term-input">terminal command</label>
     <span id="term-prompt" class="term-prompt" aria-hidden="true"></span>
@@ -37,4 +34,7 @@ const post = ']$ ';
       />
     </div>
   </form>
+  <div id="term-chips" class="term-chips" role="group" aria-label="suggested commands">
+    {CHIPS.map((c) => <button type="button" class="chip" data-cmd={c}>{c}</button>)}
+  </div>
 </section>

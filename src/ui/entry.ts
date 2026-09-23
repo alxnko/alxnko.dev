@@ -1,130 +1,207 @@
-// Page entry. ISOLATED ON PURPOSE: `localShell` is a small self-contained shell so the page
-// is complete on its own; at integration this file is swapped to wire the real terminal core
-// (src/term/store.ts, exec.ts, complete.ts). Nothing else imports from here.
-import type { Color, Line, TermState } from '../term/types';
-import { CONTACTS, SITE } from '../content/site';
+// Page entry: wires the real terminal core to the DOM, composes the world the terminal
+// talks to (page theme + sound + the lazy 3D desk), and runs the 3D gate after load.
+import type { FanSpeed, Landmark, Ring, SoundLevel, Theme, WorldPort, WorldState } from '../term/types';
+import { TermStore } from '../term/store';
+import { Shell } from '../term/exec';
+import { complete } from '../term/complete';
+import { createFs } from '../term/vfs';
+import { bootLines } from '../term/boot';
+import { DEFAULT_WORLD } from '../term/world';
+import { createSound } from '../audio/sound';
+import { decide3D } from '../scene/gate';
+import type { SceneWorld } from '../scene/index';
 import * as prefs from '../lib/prefs';
-import { start } from './app';
-import type { TermDeps } from './terminal-dom';
-import { setTheme } from './theme';
+import { SOUND_EVENT, soundLevel, start } from './app';
+import { currentTheme, setTheme, THEME_EVENT } from './theme';
 
-const t = (text: string, fg?: Color): Line => [{ text, fg }];
-const kv = (k: string, v: string): Line => [{ text: k.padEnd(8), fg: 'muted' }, { text: v }];
-const CAT = [' /\\_/\\ ', '( o.o )', ' > ^ < '];
+const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const narrow = () => innerWidth < 640;
+const RINGS: readonly Ring[] = ['green', 'purple', 'off'];
 
-function localShell(): TermDeps & { boot(first: boolean): Promise<void> } {
-  const subs = new Set<(s: TermState) => void>();
-  let history: string[] = [];
-  try {
-    history = (JSON.parse(prefs.get('history') ?? '[]') as unknown[]).filter((x): x is string => typeof x === 'string');
-  } catch { /* fresh history */ }
-  let state: TermState = {
-    lines: [], input: '', cursor: 0, cwd: `/home/${SITE.handle}`, busy: false, history, overlay: null, version: 0,
-  };
-  let desk = 0.74;
-  let abort: AbortController | null = null;
-  const set = (p: Partial<TermState>) => {
-    state = { ...state, ...p, version: state.version + 1 };
-    subs.forEach((f) => f(state));
-  };
-  const out = (...ls: Line[]) => set({ lines: [...state.lines, ...ls].slice(-500) });
-  const prompt = (): Line => [{ text: `[${SITE.handle}@${SITE.host} ` }, { text: '~', fg: 'green' }, { text: ']$ ' }];
-  const m = (h: number) => `${h.toFixed(2)} m`;
+/** The world the terminal talks to. Works without 3D; the scene attaches when it loads. */
+class AppWorld implements WorldPort {
+  scene: SceneWorld | null = null;
+  readonly sound = createSound();
+  private s: WorldState;
 
-  const CMDS: Record<string, [string, (a: string[]) => Line[]]> = {
-    help: ['this list', () => [
-      t('commands:', 'muted'),
-      ...Object.entries(CMDS).map(([k, [d]]) => [{ text: '  ' + k.padEnd(11), fg: 'white' as Color }, { text: d, fg: 'muted' as Color }]),
-    ]],
-    whoami: ['who is at the desk', () => [t(SITE.handle)]],
-    ls: ['list files (try: ls monitor)', (a) => (a[0] ?? '').replace(/\/$/, '') === 'monitor'
-      ? CONTACTS.map((c) => [{ text: `${c.label}.lnk`.padEnd(15), fg: 'cyan' as Color }, { text: c.display, href: c.href }])
-      : [[{ text: 'about.md  ' }, { text: 'desk/  laptop/  monitor/', fg: 'blue' }]]],
-    fastfetch: ['system summary', () => {
-      const rows = [
-        [{ text: `${SITE.handle}@${SITE.host}`, bold: true }],
-        t('-------------', 'dim'),
-        kv('os', `${SITE.os} rolling`),
-        kv('role', `${SITE.role} · ${SITE.company}`),
-        kv('locale', `${SITE.country} · ${SITE.coords}`),
-        kv('rank', SITE.rank.short),
-      ];
-      return rows.map((r, i) => [{ text: (CAT[i] ?? '').padEnd(10), fg: 'green' as Color }, ...r]);
-    }],
-    desk: ['raise/lower the desk: up, down, 1, 2, 3', (a) => {
-      const was = desk;
-      const preset = { '1': 0.74, '2': 0.95, '3': 1.12 }[a[0] ?? ''];
-      if (a[0] === 'up') desk = Math.min(1.2, desk + 0.05);
-      else if (a[0] === 'down') desk = Math.max(0.7, desk - 0.05);
-      else if (preset) desk = preset;
-      else return [t(`desk: height ${m(desk)}`)];
-      return [t(`desk: ${m(was)} → ${m(desk)}`)];
-    }],
-    theme: ['day | night', (a) => {
-      if (a[0] !== 'day' && a[0] !== 'night') return [t('usage: theme day|night', 'muted')];
-      setTheme(a[0] === 'day' ? 'light' : 'dark');
-      return [t(`theme: ${a[0]}`)];
-    }],
-    echo: ['print text', (a) => [t(a.join(' '))]],
-    clear: ['clear the screen (ctrl+l)', () => []],
-  };
+  constructor() {
+    const ring = prefs.get('ring');
+    this.s = {
+      ...DEFAULT_WORLD,
+      theme: currentTheme(),
+      sound: soundLevel(),
+      ring: RINGS.includes(ring as Ring) ? (ring as Ring) : 'green',
+    };
+  }
 
-  const shell = {
-    store: {
-      get state() { return state; },
-      subscribe(fn: (s: TermState) => void) { subs.add(fn); return () => void subs.delete(fn); },
-      setInput(text: string, cursor = text.length) { set({ input: text.slice(0, 256), cursor: Math.min(cursor, 256) }); },
-      prompt,
-    },
-    async run(line: string) {
-      const echo: Line = [...prompt(), { text: line }];
-      const [name, ...args] = line.trim().split(/\s+/);
-      if (line.trim()) {
-        const h = [...state.history.filter((x) => x !== line.trim()), line.trim()].slice(-100);
-        prefs.set('history', JSON.stringify(h));
-        set({ history: h });
-      }
-      if (name === 'clear') return set({ lines: [] });
-      if (!name) return out(echo);
-      const cmd = CMDS[name];
-      out(echo, ...(cmd ? cmd[1](args) : [t(`bash: ${name}: command not found`)]));
-    },
-    interrupt() {
-      if (abort) return abort.abort();
-      out([...prompt(), { text: state.input }, { text: '^C', fg: 'muted' }]);
-      set({ input: '', cursor: 0 });
-    },
-    clear() { set({ lines: [] }); },
-    complete(line: string, cursor: number) {
-      const head = line.slice(0, cursor);
-      const word = /\S*$/.exec(head)![0];
-      const start = cursor - word.length;
-      const pool = head.trimStart().includes(' ') ? ['desk/', 'laptop/', 'monitor/', 'about.md'] : Object.keys(CMDS);
-      const candidates = pool.filter((c) => c.startsWith(word));
-      if (!candidates.length) return { replace: [start, cursor] as [number, number], candidates, insert: null };
-      let p = candidates[0];
-      for (const c of candidates) while (!c.startsWith(p)) p = p.slice(0, -1);
-      const insert = candidates.length === 1 ? p + (p.endsWith('/') ? '' : ' ') : p;
-      return { replace: [start, cursor] as [number, number], candidates, insert };
-    },
-    async boot(first: boolean) {
-      const motd = [t(`${SITE.os} rolling · ${SITE.host} tty1`, 'muted'), t('type help, or pick a command below.', 'muted'), []];
-      if (!first) return out(...motd);
-      abort = new AbortController();
-      const { signal } = abort;
-      set({ busy: true });
-      for (const s of [`Mounted /home/${SITE.handle}.`, 'Started fan speed controller.', `Reached target desk (${m(desk)}).`, 'Started getty on tty1.']) {
-        await new Promise((r) => setTimeout(r, 260));
-        if (signal.aborted) break;
-        out([{ text: '[' }, { text: '  OK  ', fg: 'green' }, { text: '] ' + s }]);
-      }
-      abort = null;
-      set({ busy: false });
-      out([], ...motd);
-    },
-  };
-  return shell;
+  get(): WorldState {
+    return { ...this.s, theme: currentTheme(), landmark: this.scene?.landmark() ?? this.s.landmark };
+  }
+  fly(to: Landmark): void {
+    this.s.landmark = to;
+    this.scene?.fly(to);
+  }
+  setDesk(h: number): Promise<void> {
+    this.s.desk = h;
+    this.sound.motor(reducedMotion() || !this.scene ? 200 : 1500);
+    return this.scene ? this.scene.setDesk(h) : Promise.resolve();
+  }
+  setTheme(t: Theme): void {
+    setTheme(t); // page tokens + persistence; the THEME_EVENT listener updates the scene
+  }
+  setRing(r: Ring): void {
+    this.s.ring = r;
+    prefs.set('ring', r);
+    this.scene?.setRing(r);
+  }
+  setFan(f: FanSpeed): void {
+    this.s.fan = f;
+    this.sound.fan(f);
+    this.scene?.setFan(f);
+  }
+  setSound(l: SoundLevel): void {
+    this.s.sound = l;
+    prefs.set('sound', l);
+    this.sound.setLevel(l);
+    document.dispatchEvent(new CustomEvent<SoundLevel>(SOUND_EVENT, { detail: l }));
+  }
+  meow(): void {
+    this.sound.meow();
+    this.scene?.meow();
+  }
+  stare(): void {
+    this.scene?.stare();
+  }
+  sfx(kind: 'key' | 'enter' | 'tick'): void {
+    this.sound[kind]();
+  }
 }
 
-const shell = localShell();
-start({ createTerm: () => shell, boot: (first) => shell.boot(first) });
+const world = new AppWorld();
+const store = new TermStore();
+const fs = createFs();
+const shell = new Shell(store, world, fs);
+let booting: AbortController | null = null;
+
+async function boot(first: boolean) {
+  if (first) {
+    booting = new AbortController();
+    const { signal } = booting;
+    const lines = bootLines();
+    const step = reducedMotion() ? 0 : 1200 / lines.length;
+    for (const l of lines) {
+      if (signal.aborted) break;
+      store.print(l);
+      if (step) await new Promise((r) => setTimeout(r, step));
+    }
+    booting = null;
+  }
+  await shell.run(first && !narrow() ? 'fastfetch' : 'fastfetch --compact');
+}
+
+function hasWebGL2(): boolean {
+  try {
+    return !!document.createElement('canvas').getContext('webgl2');
+  } catch {
+    return false;
+  }
+}
+
+const $ = (id: string) => document.getElementById(id);
+
+function enter3d() {
+  const stage = $('stage'), termEl = $('term'), contactsEl = $('contacts');
+  const btn = $('enter3d') as HTMLButtonElement | null;
+  if (!stage || !termEl || !contactsEl) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'loading 3d'; }
+  document.body.dataset.scene = 'loading';
+  import('../scene/index')
+    .then((m) =>
+      m.mount({
+        stage,
+        store,
+        initial: world.get(),
+        reducedMotion: reducedMotion(),
+        mobile: matchMedia('(pointer: coarse)').matches || innerWidth < 720,
+        termEl,
+        contactsEl,
+        onLandmark(l) {
+          for (const b of document.querySelectorAll<HTMLButtonElement>('#nav [data-landmark]')) {
+            if (b.dataset.landmark === l) b.setAttribute('aria-current', 'true');
+            else b.removeAttribute('aria-current');
+          }
+        },
+        onFallback: () => leave3d(),
+      }),
+    )
+    .then((handle) => {
+      handle3d = handle;
+      world.scene = handle.world;
+      document.body.dataset.mode = 'scene';
+      document.body.dataset.scene = 'ready';
+      if (btn) btn.hidden = true;
+    })
+    .catch(() => leave3d());
+}
+
+let handle3d: { destroy(): void } | null = null;
+function leave3d() {
+  handle3d?.destroy();
+  handle3d = null;
+  world.scene = null;
+  document.body.dataset.mode = 'page';
+  delete document.body.dataset.scene;
+  const btn = $('enter3d') as HTMLButtonElement | null;
+  if (btn && hasWebGL2()) { btn.hidden = false; btn.disabled = false; btn.textContent = 'enter 3d'; }
+}
+
+function afterIdle() {
+  const nav = navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string }; deviceMemory?: number };
+  const gate = decide3D({
+    url: location.href,
+    webgl2: hasWebGL2(),
+    saveData: nav.connection?.saveData,
+    effectiveType: nav.connection?.effectiveType,
+    cores: nav.hardwareConcurrency || undefined,
+    memory: nav.deviceMemory,
+  });
+  const btn = $('enter3d') as HTMLButtonElement | null;
+  btn?.addEventListener('click', enter3d);
+  if (gate === 'auto') enter3d();
+  else if (gate === 'offer' && btn) btn.hidden = false;
+}
+
+// camera nav, focus → fly, theme → scene
+for (const b of document.querySelectorAll<HTMLButtonElement>('#nav [data-landmark]'))
+  b.addEventListener('click', () => world.fly(b.dataset.landmark as Landmark));
+$('term')?.addEventListener('focusin', () => { if (world.scene) world.fly('laptop'); });
+$('contacts')?.addEventListener('focusin', () => { if (world.scene) world.fly('monitor'); });
+document.addEventListener(THEME_EVENT, () => world.scene?.setTheme(currentTheme()));
+
+// sound: a saved "on" resumes at the first gesture (autoplay rules)
+if (soundLevel() !== 'off') {
+  const resume = () => world.sound.setLevel(soundLevel());
+  addEventListener('pointerdown', resume, { once: true, capture: true });
+  addEventListener('keydown', resume, { once: true, capture: true });
+}
+
+start({
+  createTerm: () => ({
+    store,
+    run: async (line) => {
+      world.sfx('enter');
+      await shell.run(line);
+    },
+    interrupt: () => (booting ? booting.abort() : shell.interrupt()),
+    complete: (line, cursor) => complete(line, cursor, store.state.cwd, shell.registry, fs),
+    clear: () => store.clear(),
+    onActivity: () => {
+      world.sfx('key');
+      world.scene?.activity();
+    },
+    onFocus: () => world.fly('laptop'),
+  }),
+  boot,
+  afterIdle,
+  onSound: (l) => world.setSound(l),
+});

@@ -124,7 +124,8 @@
   text-decoration-color: currentColor;
 }
 
-/* suggestion chips: above the input so they stay visible over a phone keyboard ---------- */
+/* suggestion chips: under the prompt on desktop (a tty's prompt follows its output);
+   above the input on phones so they stay visible over the on-screen keyboard ---------- */
 .term-chips {
   display: flex;
   flex-wrap: wrap;
@@ -166,9 +167,13 @@
 .term-form {
   display: flex;
   align-items: baseline;
-  padding: var(--sp-2) var(--sp-3) var(--sp-3);
-  border-top: 1px solid var(--term-rule);
+  padding: 0 var(--sp-3) var(--sp-3);
   cursor: text;
+}
+
+@media (max-width: 719px) {
+  .term-chips { order: 2; }
+  .term-form { order: 3; padding-top: var(--sp-2); border-top: 1px solid var(--term-rule); }
 }
 
 .term-form:has(input:focus-visible) {
