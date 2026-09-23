@@ -125,6 +125,27 @@ test.describe('3D desk', () => {
     expect(await page.evaluate(() => history.state?.away ?? null)).toBeNull();
   });
 
+  test('the camera never goes under (or skims) the desk top', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    for (const [pitch, panY, dolly] of [[0.6, 0, 1.5], [0.3, -0.5, 2.5], [0.6, -0.9, 0.4]]) {
+      await page.evaluate(({ pitch, panY, dolly }) => {
+        const s = (window as any).__scene;
+        s.orbit.pitch.target = pitch; s.pan[1].target = panY; s.orbit.dolly.target = dolly; s.invalidate();
+      }, { pitch, panY, dolly });
+      await page.waitForTimeout(2000);
+      expect(await page.evaluate(() => (window as any).__scene.camera.position.y)).toBeGreaterThanOrEqual(0.74 + 0.15 - 1e-3);
+    }
+  });
+
+  test('the skip link stays out of sight until focused', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    const box = await page.locator('.skip').boundingBox();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(0);
+    await expect(page.locator('.skip')).toHaveCSS('opacity', '0');
+  });
+
   test('cd monitor flies there, docks contacts, updates the nav', async ({ page }) => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
