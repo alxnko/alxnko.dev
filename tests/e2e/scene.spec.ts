@@ -76,6 +76,18 @@ test.describe('3D desk', () => {
     for (const a of above) expect(a.panelFirst, a.id).toBeLessThan(a.canvasFirst);
   });
 
+  test('focusing a contact never scrolls the pinned panel', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await page.locator('#nav [data-landmark="monitor"]').click();
+    await page.waitForTimeout(1500);
+    await page.locator('#contacts a[data-contact="email"]').focus();
+    for (const id of ['#contacts', '#term', '#mon-info']) {
+      const top = await page.locator(id).evaluate((e) => e.scrollTop);
+      expect(top, id).toBe(0);
+    }
+  });
+
   test('cd monitor flies there, docks contacts, updates the nav', async ({ page }) => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });

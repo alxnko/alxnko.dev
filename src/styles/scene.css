@@ -521,3 +521,12 @@
 [data-mode="scene"] .nav button[aria-current="true"] {
   box-shadow: 0 1px 3px var(--halo-soft);
 }
+
+/* Pinned panels must never scroll as a whole: focusing a link inside a clipped box would
+   otherwise scroll it and slide rows under the monitor bar. `clip` (unlike `hidden`) is not
+   a scroll container. The terminal's own output area (.term-screen) still scrolls. */
+[data-mode="scene"] .term,
+[data-mode="scene"] .contacts,
+[data-mode="scene"] .mon-info {
+  overflow: clip;
+}
