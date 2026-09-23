@@ -1,0 +1,11 @@
+---
+// Landmark nav (scene mode). Every camera gesture has this button alternative (spec §11).
+const LANDMARKS = ['wide', 'desk', 'laptop', 'monitor'] as const;
+---
+<nav id="nav" class="nav" aria-label="camera">
+  <ul>
+    {LANDMARKS.map((l) => (
+      <li><button type="button" data-landmark={l} aria-current={l === 'desk' ? 'true' : undefined}>{l}</button></li>
+    ))}
+  </ul>
+</nav>
