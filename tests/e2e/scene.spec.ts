@@ -134,6 +134,8 @@ test.describe('3D desk', () => {
   });
 
   test('world commands run without errors', async ({ page }) => {
+    // software GL (CI, headless) renders every frame on the CPU while the fan spins
+    test.slow();
     const g = await guard(page);
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
