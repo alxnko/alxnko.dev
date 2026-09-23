@@ -287,7 +287,27 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   };
   const withRig = (p: Pose, dy: number): Pose => ({ pos: [p.pos[0], p.pos[1] + dy, p.pos[2]], target: [p.target[0], p.target[1] + dy, p.target[2]], fov: p.fov });
 
-  const fitScreen = (corners: Vector3[], margin: number, fov: number): Pose => {
+  // Things that can stand between the viewer and a screen (the cat, the fan, the laptop lid).
+  const occluders: Object3D[] = ['static', 'desk_baked', 'cat_body', 'fan_blades'].map(node);
+  const occlusionRay = new Raycaster();
+  /** True if nothing solid sits between `eye` and the screen (centre + inset corners). */
+  const clearView = (eye: Vector3, corners: Vector3[]) => {
+    const c = corners.reduce((acc, q) => acc.add(q), new Vector3()).multiplyScalar(0.25);
+    const samples = [c, ...corners.map((q) => q.clone().lerp(c, 0.12))];
+    return samples.every((p) => {
+      const dir = p.clone().sub(eye);
+      const dist = dir.length();
+      occlusionRay.set(eye, dir.normalize());
+      occlusionRay.far = dist - 0.01;
+      return occlusionRay.intersectObjects(occluders, true).length === 0;
+    });
+  };
+  // The first unobstructed view around the screen's normal, in order of how little it tilts:
+  // straight on, then slightly raised or turned. Chosen once per screen and aspect (resize),
+  // then reused while the desk moves.
+  const ANGLES: [number, number][] = [[0, 0], [0, 10], [12, 0], [-12, 0], [12, 10], [-12, 10], [0, 20], [20, 12], [-20, 12], [0, 30], [25, 25], [-25, 25]];
+  const viewChoice = new Map<string, [number, number]>();
+  const fitScreen = (key: string, corners: Vector3[], margin: number, fov: number): Pose => {
     const [tl, tr, , bl] = corners;
     const c = corners.reduce((acc, v) => acc.add(v), new Vector3()).multiplyScalar(0.25);
     const w = tl.distanceTo(tr), h = tl.distanceTo(bl);
@@ -296,8 +316,20 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     if (n.dot(new Vector3(...deskRef.pose.pos).sub(c)) < 0) n.negate();
     const t = Math.tan((fov * DEG) / 2);
     const d = Math.max(h / margin, w / (margin * camera.aspect)) / (2 * t);
-    return { pos: c.clone().add(n.multiplyScalar(d)).toArray() as Vec3, target: c.toArray() as Vec3, fov };
+    const eyeFor = ([yaw, up]: [number, number]) => {
+      const dir = n.clone().applyAxisAngle(upWorldConst, yaw * DEG);
+      const right = new Vector3().crossVectors(dir, upWorldConst).normalize();
+      return c.clone().add(dir.applyAxisAngle(right, up * DEG).multiplyScalar(d));
+    };
+    const ck = `${key}:${camera.aspect.toFixed(3)}`;
+    let choice = viewChoice.get(ck);
+    if (!choice) {
+      choice = ANGLES.find((a) => clearView(eyeFor(a), corners)) ?? [0, 0];
+      viewChoice.set(ck, choice);
+    }
+    return { pos: eyeFor(choice).toArray() as Vec3, target: c.toArray() as Vec3, fov };
   };
+  const upWorldConst = new Vector3(0, 1, 0);
 
   let rigDy = 0;
   const rail = new Rail({ wide: wideRef.pose, desk: deskRef.pose, laptop: deskRef.pose, monitor: deskRef.pose });
@@ -306,10 +338,10 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     const wide = { ...wideRef.pose, fov: adaptFov(wideRef.pose.fov, wideRef.refAspect) };
     wide.target = [wide.target[0], wide.target[1] + rigDy, wide.target[2]];
     const desk = withRig({ ...deskRef.pose, fov: adaptFov(deskRef.pose.fov, deskRef.refAspect) }, rigDy);
-    const laptop = fitScreen(screenCorners(laptopScreen), 0.94, 34);
+    const laptop = fitScreen('laptop', screenCorners(laptopScreen), 0.94, 34);
     // the whole ultrawide on landscape screens; on portrait phones the live contacts panel fills
     // the width (readable), and the side panes are a drag away
-    const mon = camera.aspect < 1 ? fitScreen(contactsCorners(), 0.96, 34) : fitScreen(screenCorners(monitorScreen), 0.94, 34);
+    const mon = camera.aspect < 1 ? fitScreen('contacts', contactsCorners(), 0.96, 34) : fitScreen('monitor', screenCorners(monitorScreen), 0.94, 34);
     rail.setPoses({ wide, desk, laptop, monitor: mon });
   }
 
