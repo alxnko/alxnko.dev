@@ -490,3 +490,30 @@
 [data-scene="ready"] #stage {
   background: var(--ansi-bg);
 }
+
+/* Chrome over the 3D: no fills, no boxes. A soft halo in the room's own colour hugs every
+   glyph and icon, so each letter separates from whatever is behind it (bright keyboard,
+   dark monitor, lit wall) while staying invisible over empty wall. Per-glyph by nature,
+   theme-aware, and never a glow. */
+[data-mode="scene"] {
+  --halo: color-mix(in srgb, var(--c-bg) 78%, transparent);
+  --halo-soft: color-mix(in srgb, var(--c-bg) 45%, transparent);
+}
+
+[data-mode="scene"] .identity,
+[data-mode="scene"] .toggles,
+[data-mode="scene"] .nav,
+[data-mode="scene"] .hint,
+[data-mode="scene"] .back {
+  text-shadow: 0 0 1px var(--halo), 0 0 3px var(--halo), 0 0 10px var(--halo-soft);
+}
+
+[data-mode="scene"] .toggles .icon,
+[data-mode="scene"] .nav .icon {
+  filter: drop-shadow(0 0 1px var(--halo)) drop-shadow(0 0 4px var(--halo-soft));
+}
+
+/* the mark's blinking underscore and the active-tab rule keep their colour, just lifted */
+[data-mode="scene"] .nav button[aria-current="true"] {
+  box-shadow: 0 1px 3px var(--halo-soft);
+}
