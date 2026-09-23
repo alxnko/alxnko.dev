@@ -238,7 +238,35 @@ for (const [id, l] of SCREENS) {
 
 // camera nav, back to desk (button or Esc), focus → fly, theme → scene
 $('back')?.addEventListener('click', () => world.fly('desk'));
+// View mode: the interface fades away and the camera gets wider (bounded) free-look. Leave it
+// with the eye button, Esc, or the phone's Back (an extra history entry catches it).
+const viewBtn = $('t-view') as HTMLButtonElement | null;
+const exitBtn = $('noui-exit') as HTMLButtonElement | null;
+const inViewMode = () => document.body.dataset.noui !== undefined;
+function setViewMode(on: boolean, fromHistory = false) {
+  if (on === inViewMode() || (on && !world.scene)) return;
+  if (on) {
+    document.body.dataset.noui = '';
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    if (!fromHistory) history.pushState({ noui: true }, '');
+    if (exitBtn) exitBtn.hidden = false;
+    viewBtn?.setAttribute('aria-pressed', 'true');
+    exitBtn?.focus({ preventScroll: true });
+  } else {
+    delete document.body.dataset.noui;
+    if (exitBtn) exitBtn.hidden = true;
+    viewBtn?.setAttribute('aria-pressed', 'false');
+    if (!fromHistory && history.state?.noui) history.back();
+    viewBtn?.focus({ preventScroll: true });
+  }
+  world.scene?.setFreeLook(on);
+}
+viewBtn?.addEventListener('click', () => setViewMode(true));
+exitBtn?.addEventListener('click', () => setViewMode(false));
+addEventListener('popstate', () => { if (inViewMode()) setViewMode(false, true); });
+
 addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && inViewMode()) { e.preventDefault(); setViewMode(false); return; }
   // the terminal claims Esc first (completions, history search, a running toy)
   if (e.key === 'Escape' && world.scene && !e.defaultPrevented) {
     (document.activeElement as HTMLElement | null)?.blur?.();

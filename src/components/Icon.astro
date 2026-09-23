@@ -2,7 +2,7 @@
 // One icon family: 16px grid, 1.5px stroke, currentColor, decorative (aria-hidden).
 // `cat` is the brand mark (filled pixel cat, same geometry as favicon.svg).
 interface Props {
-  name: 'sun' | 'sound' | 'arrow' | 'cat';
+  name: 'sun' | 'sound' | 'arrow' | 'cat' | 'view' | 'eye';
   size?: number;
   class?: string;
 }
@@ -40,5 +40,12 @@ const CAT =
       </>
     )}
     {name === 'arrow' && <path d="M5 11l6-6M6 5h5v5" />}
+    {name === 'view' && <path d="M2 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5" />}
+    {name === 'eye' && (
+      <>
+        <path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" stroke-linejoin="round" />
+        <circle cx="8" cy="8" r="1.75" />
+      </>
+    )}
   </svg>
 )}

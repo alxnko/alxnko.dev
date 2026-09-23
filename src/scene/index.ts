@@ -56,6 +56,8 @@ export interface SceneWorld {
   stare(): void;
   activity(): void;
   landmark(): Landmark;
+  /** View mode: wider (still bounded) free-look; turning it off glides back inside the normal limits. */
+  setFreeLook(on: boolean): void;
 }
 
 export type LoadStep = 'manifest' | 'geometry' | 'lighting' | 'screens';
@@ -375,8 +377,11 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   orbit.dolly.snap(1);
   // zoom-to-cursor shifts what you orbit around toward the point under the cursor
   const pan = [new Spring(160), new Spring(160), new Spring(160)];
-  const PAN_MAX = 0.9;
-  const YAW = 40 * DEG, PITCH_UP = 22 * DEG, PITCH_DOWN = 10 * DEG, DOLLY: [number, number] = [0.35, 1.9];
+
+  // normal limits; view mode widens them (still bounded to the front of the models)
+  const LIM = { normal: { yaw: 40, up: 22, down: 10, dolly: [0.35, 1.9], pan: 0.9 }, free: { yaw: 75, up: 38, down: 12, dolly: [0.25, 2.6], pan: 1.3 } } as const;
+  let lim: { yaw: number; up: number; down: number; dolly: readonly [number, number]; pan: number } = LIM.normal;
+  const YAW = () => lim.yaw * DEG, PITCH_UP = () => lim.up * DEG, PITCH_DOWN = () => lim.down * DEG;
   let deskTween: Tween | null = null, deskDone: (() => void) | null = null;
   let mixTween: Tween | null = null;
   let ringTween: { from: Color; to: Color; start: number } | null = null;
@@ -700,6 +705,15 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       invalidate();
     },
     landmark: () => currentLandmark,
+    setFreeLook(on) {
+      lim = on ? LIM.free : LIM.normal;
+      orbit.yaw.target = clamp(orbit.yaw.target, -YAW(), YAW());
+      orbit.pitch.target = clamp(orbit.pitch.target, -PITCH_DOWN(), PITCH_UP());
+      orbit.dolly.target = clamp(orbit.dolly.target, lim.dolly[0], lim.dolly[1]);
+      const p = new Vector3(pan[0].target, pan[1].target, pan[2].target);
+      if (p.length() > lim.pan) { p.setLength(lim.pan); pan[0].target = p.x; pan[1].target = p.y; pan[2].target = p.z; }
+      invalidate();
+    },
   };
 
   // ---------- input ----------
@@ -708,7 +722,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     reducedMotion: o.reducedMotion,
     zoom(f, x, y) {
       lastInput = performance.now();
-      const nd = clamp(orbit.dolly.target * f, DOLLY[0], DOLLY[1]);
+      const nd = clamp(orbit.dolly.target * f, lim.dolly[0], lim.dolly[1]);
       const k = nd / orbit.dolly.target; // the factor actually applied after clamping
       // the point under the cursor: first surface hit, else a point at the orbit distance
       const r = o.stage.getBoundingClientRect();
@@ -718,7 +732,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       const at = surf?.point ?? raycaster.ray.at(camera.position.distanceTo(cur), new Vector3());
       // moving the pivot by (1 - k) of the way to that point keeps it fixed on screen
       const next = new Vector3(pan[0].target, pan[1].target, pan[2].target).addScaledVector(at.sub(cur), 1 - k);
-      if (next.length() > PAN_MAX) next.setLength(PAN_MAX);
+      if (next.length() > lim.pan) next.setLength(lim.pan);
       pan[0].target = next.x; pan[1].target = next.y; pan[2].target = next.z;
       orbit.dolly.target = nd;
       if (o.reducedMotion) { orbit.dolly.snap(nd); for (const s of pan) s.snap(s.target); }
@@ -727,9 +741,9 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     },
     orbit(dx, dy) {
       lastInput = performance.now();
-      orbit.yaw.target = clamp(orbit.yaw.target - dx * 0.005, -YAW, YAW);
+      orbit.yaw.target = clamp(orbit.yaw.target - dx * 0.005, -YAW(), YAW());
       // grab-the-scene: moving the pointer up tilts the view down, like dragging right turns left
-      orbit.pitch.target = clamp(orbit.pitch.target - dy * 0.004, -PITCH_DOWN, PITCH_UP);
+      orbit.pitch.target = clamp(orbit.pitch.target - dy * 0.004, -PITCH_DOWN(), PITCH_UP());
       if (o.reducedMotion) { orbit.yaw.snap(orbit.yaw.target); orbit.pitch.snap(orbit.pitch.target); }
       invalidate();
     },

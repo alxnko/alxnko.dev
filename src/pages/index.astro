@@ -4,6 +4,7 @@ import Identity from '../components/Identity.astro';
 import Terminal from '../components/Terminal.astro';
 import Contacts from '../components/Contacts.astro';
 import Nav from '../components/Nav.astro';
+import Icon from '../components/Icon.astro';
 import { SITE } from '../content/site';
 import { readPosters } from '../lib/poster';
 
@@ -55,6 +56,9 @@ const PORTRAIT = '(max-width: 719px)';
   </main>
   <button id="back" class="back" type="button" hidden aria-keyshortcuts="Escape">
     <span aria-hidden="true">←</span> desk <kbd>esc</kbd>
+  </button>
+  <button id="noui-exit" class="noui-exit" type="button" aria-label="show the interface (Esc)" hidden>
+    <Icon name="eye" size={18} />
   </button>
   <Nav />
   <p id="hint" class="hint"><span class="hint-fine">type anywhere · drag to look around · scroll to zoom</span><span class="hint-touch">tap a screen · drag to look around · pinch to zoom</span></p>

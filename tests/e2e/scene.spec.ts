@@ -88,6 +88,21 @@ test.describe('3D desk', () => {
     }
   });
 
+  test('view mode hides the interface and Esc brings it back', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await page.locator('#t-view').click();
+    await expect(page.locator('#noui-exit')).toBeVisible();
+    await expect(page.locator('#nav')).toBeHidden();
+    await expect(page.locator('#identity')).toBeHidden();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#noui-exit')).toBeHidden();
+    await expect(page.locator('#nav')).toBeVisible();
+    await page.locator('#t-view').click();
+    await page.locator('#noui-exit').click();
+    await expect(page.locator('#identity')).toBeVisible();
+  });
+
   test('cd monitor flies there, docks contacts, updates the nav', async ({ page }) => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });

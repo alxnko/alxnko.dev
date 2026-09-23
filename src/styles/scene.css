@@ -568,3 +568,40 @@
 .nav button {
   transition: color var(--d-fast) var(--ease), border-color var(--d-base) var(--ease);
 }
+
+/* ---- view mode (no UI): the interface fades out, one quiet eye button brings it back ---- */
+.toggle-view { display: none; }
+[data-mode="scene"] .toggle-view { display: inline-flex; }
+
+[data-mode="scene"][data-noui] :is(.identity, .bar, .nav, .hint, .back) {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--d-base) var(--ease), visibility 0s linear var(--d-base);
+}
+
+.noui-exit { display: none; }
+
+[data-mode="scene"] .noui-exit:not([hidden]) {
+  display: grid;
+  place-items: center;
+  position: fixed;
+  z-index: var(--z-chrome);
+  right: calc(env(safe-area-inset-right) + var(--sp-4));
+  bottom: calc(env(safe-area-inset-bottom) + var(--sp-4));
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-l);
+  color: var(--c-fg-muted);
+  opacity: 0.55;
+  transition: opacity var(--d-base) var(--ease), color var(--d-base) var(--ease);
+  filter: drop-shadow(0 0 1px var(--halo)) drop-shadow(0 0 4px var(--halo-soft));
+}
+
+[data-mode="scene"] .noui-exit:not([hidden]):is(:hover, :focus-visible) {
+  opacity: 1;
+  color: var(--c-fg);
+}
+
+@starting-style {
+  [data-mode="scene"] .noui-exit:not([hidden]) { opacity: 0; }
+}
