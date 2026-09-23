@@ -583,9 +583,10 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     // tail flicks every 15–40 s, and on meow
     if (!o.reducedMotion && now >= flickAt) { flickStart = now; flickAt = now + nextFlickIn() * 1000; }
     const ft = (now - flickStart) / 700;
+    // the tail flicks outward only: swinging inward it would cut into the body and the fan
     if (ft >= 0 && ft < 1) {
       const upLocal = tail.parent!.worldToLocal(tail.getWorldPosition(v).add(upWorld)).sub(tail.position).normalize();
-      tail.quaternion.copy(q.setFromAxisAngle(upLocal, Math.sin(ft * Math.PI * 3) * (1 - ft) * 28 * DEG)).multiply(tailQ0);
+      tail.quaternion.copy(q.setFromAxisAngle(upLocal, -Math.abs(Math.sin(ft * Math.PI * 3)) * (1 - ft) * 28 * DEG)).multiply(tailQ0);
       animating = true;
     } else tail.quaternion.copy(tailQ0);
 
