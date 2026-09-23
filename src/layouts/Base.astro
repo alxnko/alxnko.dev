@@ -104,7 +104,7 @@ const ld = JSON.stringify(person).replace(/</g, '\\u003c');
     )}
     <link rel="preload" href={jbRegular} as="font" type="font/woff2" crossorigin />
     <link rel="preload" href={markFont} as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href={symbolsFont} as="font" type="font/woff2" crossorigin />
+    {desk && <link rel="preload" href={symbolsFont} as="font" type="font/woff2" crossorigin />}
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

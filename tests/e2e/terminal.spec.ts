@@ -29,10 +29,15 @@ test.describe('terminal', () => {
     await expect(lines(page)).toContainText('tech lead');
     await page.evaluate(() => document.fonts.ready);
     // the block characters come from our JetBrains Mono subset, not a system fallback
-    const art = page.locator('#term-lines [aria-hidden="true"]', { hasText: '█' }).first();
+    // (both projects run Chromium: WebKit/iOS font matching is not covered here)
+    await page.evaluate(() => {
+      const el = [...document.querySelectorAll('#term-lines [aria-hidden="true"]')].find((e) => /[█▀▄]/.test(e.textContent ?? ''));
+      el?.setAttribute('data-probe', '');
+    });
+    await expect(page.locator('#term-lines [data-probe]')).toHaveCount(1);
     const cdp = await page.context().newCDPSession(page);
     const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
-    const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#term-lines [aria-hidden="true"]' });
+    const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#term-lines [data-probe]' });
     await cdp.send('CSS.enable');
     const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
     expect(fonts.map((f: { familyName: string }) => f.familyName)).toEqual(['JetBrains Mono']);
@@ -46,7 +51,19 @@ test.describe('terminal', () => {
         .reduce((m, d) => Math.max(m, d), 0);
     });
     expect(off).toBeLessThan(0.5);
-    await expect(art).toBeVisible();
+  });
+
+  test('Russian replies are drawn by JetBrains Mono too', async ({ page }) => {
+    await run(page, 'echo мяу');
+    await expect(lines(page)).toContainText('мяу');
+    await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(() => [...document.querySelectorAll('#term-lines .ln')].reverse().find((e) => e.textContent === 'мяу')?.setAttribute('data-probe', ''));
+    const cdp = await page.context().newCDPSession(page);
+    const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
+    const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#term-lines [data-probe]' });
+    await cdp.send('CSS.enable');
+    const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+    expect(fonts.map((f: { familyName: string }) => f.familyName)).toEqual(['JetBrains Mono']);
   });
 
   test('filesystem, pipes and did-you-mean', async ({ page }) => {

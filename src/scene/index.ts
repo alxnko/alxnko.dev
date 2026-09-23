@@ -809,7 +809,6 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     else if (interval !== null) timer = window.setTimeout(() => { timer = 0; raf = requestAnimationFrame(frame); }, interval);
   }
 
-  // head's resting look direction = towards the laptop screen (how it is posed in Blender)
   // the head's resting look direction as posed in Blender: every gaze turn starts from it, so
   // a wrong one twists the head (older builds without it: towards the laptop screen)
   head.parent!.updateWorldMatrix(true, true);

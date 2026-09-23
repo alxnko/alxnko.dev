@@ -81,13 +81,17 @@ export class MonitorScreen {
     // left pane: the mark, drawn as the half-block cells it is made of (18×38 px, a 30 px mono
     // cell) rather than as text, so it is exact whatever fonts the device has or has loaded
     ctx.fillStyle = ansi('green');
-    const CW = 18, CH = 38, x0 = (LEFT - CAT_MARK[0].length * CW) / 2, y0 = TOP + 150 - 30;
+    // (y0: where the text rows used to sit with the 'middle' baseline; one path, filled once,
+    // so neighbouring cells meet without anti-aliased seams)
+    const CW = 18, CH = 38, x0 = (LEFT - CAT_MARK[0].length * CW) / 2, y0 = TOP + 150 - 22;
+    ctx.beginPath();
     CAT_MARK.forEach((l, row) => [...l].forEach((ch, col) => {
       const x = x0 + col * CW, y = y0 + row * CH;
-      if (ch === '█') ctx.fillRect(x, y, CW, CH);
-      else if (ch === '▀') ctx.fillRect(x, y, CW, CH / 2);
-      else if (ch === '▄') ctx.fillRect(x, y + CH / 2, CW, CH / 2);
+      if (ch === '█') ctx.rect(x, y, CW, CH);
+      else if (ch === '▀') ctx.rect(x, y, CW, CH / 2);
+      else if (ch === '▄') ctx.rect(x, y + CH / 2, CW, CH / 2);
     }));
+    ctx.fill();
     ctx.fillStyle = ansi('white');
     ctx.font = mono(700, 28);
     ctx.textAlign = 'center';
