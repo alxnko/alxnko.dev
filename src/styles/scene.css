@@ -605,3 +605,94 @@
 @starting-style {
   [data-mode="scene"] .noui-exit:not([hidden]) { opacity: 0; }
 }
+
+/* ---- top row (scene): one 44px row under the safe area, three aligned zones ----------------
+   left: the mark · centre: ← desk · right: day / view / sound. Every control is a flat 44px
+   target in the same type size; the identity details hang under the mark on the same left
+   edge, on the 4/8 spacing grid. */
+[data-mode="scene"] {
+  --top-row: 44px;
+  --top-y: max(env(safe-area-inset-top), var(--sp-2));
+}
+
+[data-mode="scene"] .bar {
+  top: var(--top-y);
+  height: var(--top-row);
+  min-height: 0;
+  padding: 0 calc(var(--gutter-r) - var(--sp-2)) 0 var(--gutter);
+  align-items: center;
+  background: none;
+  border: 0;
+}
+
+[data-mode="scene"] .identity {
+  top: var(--top-y);
+  left: var(--gutter);
+}
+
+[data-mode="scene"] .identity .mark-h {
+  display: flex;
+  align-items: center;
+  height: var(--top-row);
+  margin: 0;
+}
+
+[data-mode="scene"] .identity .mark {
+  font-size: 32px;
+  line-height: 1;
+  transform: none;
+}
+
+[data-mode="scene"] .identity .name {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-3);
+  line-height: 20px;
+}
+
+[data-mode="scene"] .identity .facts {
+  margin-top: var(--sp-2);
+  display: grid;
+  gap: var(--sp-1);
+  font-size: var(--fs-2);
+  line-height: 20px;
+}
+
+[data-mode="scene"] .identity .facts dd { padding: 0; }
+
+[data-mode="scene"] .toggles {
+  height: var(--top-row);
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+[data-mode="scene"] .toggle {
+  height: var(--top-row);
+  min-height: var(--top-row);
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-2);
+}
+
+/* ← desk: centred in the same row, flat like the toggles (no box) */
+[data-mode="scene"] .back:not([hidden]) {
+  top: var(--top-y);
+  height: var(--top-row);
+  min-height: 0;
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: var(--r-s);
+  background: none;
+  color: var(--c-fg);
+  font-size: var(--fs-2);
+  gap: var(--sp-2);
+}
+
+[data-mode="scene"] .back:not([hidden]):hover {
+  color: var(--c-fg);
+  background: color-mix(in srgb, var(--c-bg) 35%, transparent);
+}
+
+@media (max-width: 719px) {
+  [data-mode="scene"] .identity .mark { font-size: 26px; }
+  [data-mode="scene"] .toggle { padding: 0; min-width: 44px; justify-content: center; }
+  [data-mode="scene"] .toggle-label { display: none; }
+}
