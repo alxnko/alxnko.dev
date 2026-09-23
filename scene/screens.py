@@ -4,8 +4,9 @@ python3 scene/screens.py  ->  $WORK/screen-laptop.png (1600x1000, 16:10)
                               $WORK/screen-monitor.png (2560x1072, 0.80:0.335)
                               $WORK/fonts/*.ttf (JetBrains Mono / VT323 from @fontsource woff2)
 
-The laptop shows the terminal (`fastfetch` with the ASCII cat), the monitor the
-contacts screen from spec §6.5. Content = public facts only (plan, global constraints).
+The laptop shows the docked terminal after boot (`fastfetch --compact` beside the
+ASCII cat mark from src/content/mark.ts), the monitor mirrors src/scene/monitor-screen.ts
+plus the contacts panel, $WORK/fan-display.png the fan readout ("100"). Content = public facts only (plan, global constraints).
 """
 from __future__ import annotations
 
@@ -56,108 +57,150 @@ def text_cmds(lines, x0, y0, size, lh, cw):
     return args
 
 
-def laptop(path: Path):
-    W, H = 1600, 1000
-    size, lh = 30, 44
-    cw = size * 0.6
-    p = [("[alxnko@nitro ", ANSI["green"], True), ("~", ANSI["blue"], True), ("]$ ", ANSI["green"], True)]
-    cat = ["", "    /\\_/\\", "   ( o.o )", "    > ^ <", "   /     \\", "  (|     |)", "   \\_/-\\_/"]
-    cat = [c.ljust(16) for c in cat]
-    info = [
-        [("alxnko", ANSI["green"], True), ("@", ANSI["fg"], False), ("nitro", ANSI["green"], True)],
-        [("------------", ANSI["dim"], False)],
-        [("name   ", ANSI["blue"], True), ("Alex Neko", ANSI["fg"], False)],
-        [("role   ", ANSI["blue"], True), ("tech lead @ AIT Solutions", ANSI["fg"], False)],
-        [("os     ", ANSI["blue"], True), ("meowOS x86_64", ANSI["fg"], False)],
-        [("host   ", ANSI["blue"], True), ("nitro", ANSI["fg"], False)],
-        [("shell  ", ANSI["blue"], True), ("bash", ANSI["fg"], False)],
-        [("loc    ", ANSI["blue"], True), ("Kyrgyzstan 42.87N 74.59E", ANSI["fg"], False)],
-        [("rank   ", ANSI["blue"], True), ("#1 committer in Kyrgyzstan", ANSI["amber"], False)],
-    ]
-    lines = [p + [("fastfetch", ANSI["fg"], False)], []]
-    for i in range(max(len(cat), len(info))):
-        left = [(cat[i] if i < len(cat) else " " * 16, ANSI["muted"], False), ("   ", ANSI["fg"], False)]
-        lines.append(left + (info[i] if i < len(info) else []))
-    lines.append([])
-    blocks = [("   ", c, False) for c in ()]  # colour row drawn as rectangles below
-    del blocks
-    lines += [[], p + [("ls ~/monitor", ANSI["fg"], False)],
-              [("github.lnk  telegram.lnk  linkedin.lnk  instagram.lnk  email.lnk", ANSI["cyan"], False)],
-              p]
-    x0, y0 = 56, 92
-    args = ["magick", "-size", f"{W}x{H}", f"xc:{ANSI['bg']}"]
-    # thin title bar like a tiling-WM terminal (no traffic lights)
-    args += ["-fill", G["900"], "-draw", f"rectangle 0,0 {W},40",
-             "-fill", G["750"], "-draw", f"rectangle 0,40 {W},41"]
-    args += ["-font", str(MONO), "-fill", ANSI["dim"], "-pointsize", "20", "-annotate", "+24+27",
-             "alxnko@nitro: ~"]
-    args += text_cmds(lines, x0, y0 + 20, size, lh, cw)
-    # palette row under the facts
-    by = y0 + 20 + 11 * lh - 26
-    bx = x0 + cw * 19
-    for i, c in enumerate(["black", "red", "green", "amber", "blue", "magenta", "cyan", "white"]):
-        args += ["-fill", ANSI[c], "-draw", f"rectangle {bx + i * 44:.0f},{by} {bx + i * 44 + 38:.0f},{by + 26}"]
-    # cursor after the last prompt
-    last = len(lines) - 1
-    cx = x0 + cw * len("[alxnko@nitro ~]$ ")
-    cy = y0 + 20 + last * lh
-    args += ["-fill", ANSI["green"], "-draw", f"rectangle {cx:.0f},{cy - 26} {cx + cw:.0f},{cy + 6}"]
-    args += [str(path)]
-    subprocess.run(args, check=True)
-
-
-MARK = {  # brand mark polygons on the 256 px grid (catuser.png)
-    "head": [(67, 75), (128, 23), (189, 75), (128, 120)],
-    "earL": [(67, 20), (67, 55), (92, 33)],
-    "earR": [(189, 20), (189, 55), (164, 33)],
-    "bodyL": [(89, 112), (122, 131), (122, 251), (52, 200)],
-    "bodyR": [(166, 112), (134, 131), (134, 251), (203, 200)],
-    "tail": [(190, 100), (237, 157), (213, 187), (190, 133)],
-}
-
-
-def mark_draw(x, y, scale, col):
-    out = ["-fill", col, "-stroke", "none"]
-    for poly in MARK.values():
-        pts = " ".join(f"{x + px * scale:.1f},{y + py * scale:.1f}" for px, py in poly)
-        out += ["-draw", f"polygon {pts}"]
+def cat_mark() -> list[str]:
+    """The half-block brand mark, read from src/content/mark.ts (single source of truth)."""
+    import re
+    src = (ROOT / "src" / "content" / "mark.ts").read_text(encoding="utf-8")
+    body = src[src.index("CAT_MARK"):]
+    body = body[body.index("[") + 1:body.index("];")]
+    out = [m.group(1).replace("\\\\", "\\").replace("\\'", "'")
+           for m in re.finditer(r"'((?:[^'\\]|\\.)*)'", body)]
+    assert len(out) >= 8, out
     return out
 
 
-def monitor(path: Path):
-    W, H = 2560, 1072
-    bar = 44
-    args = ["magick", "-size", f"{W}x{H}", f"xc:{ANSI['bg']}"]
-    # top bar: workspaces 1 2 3 (1 active, green underline), clock, kg
-    args += ["-fill", G["900"], "-draw", f"rectangle 0,0 {W},{bar}", "-fill", G["750"],
-             "-draw", f"rectangle 0,{bar} {W},{bar + 1}"]
-    for i, ws in enumerate("123"):
-        x = 28 + i * 52
-        args += ["-font", str(MONO_B if i == 0 else MONO), "-pointsize", "24",
-                 "-fill", ANSI["fg"] if i == 0 else ANSI["dim"], "-annotate", f"+{x}+31", ws]
-    args += ["-fill", GREEN, "-draw", "rectangle 22,39 50,42"]
-    args += ["-font", str(MONO), "-pointsize", "24", "-fill", ANSI["muted"],
-             "-annotate", f"+{W - 420}+31", "42.87N 74.59E   kg   13:37"]
-    # panes
-    split = 1340
-    args += ["-fill", G["750"], "-draw", f"rectangle {split},{bar + 24} {split + 1},{H - 24}"]
-    size, lh = 34, 58
+def blocks(lines, x0, top0, cw, ch, col):
+    """Draw half-block art as exact rectangles (what the terminal shows): one cell is
+    cw x ch, '█' fills it, '▀' the top half, '▄' the bottom half."""
+    args = ["-fill", col, "-stroke", "none"]
+    for i, ln in enumerate(lines):
+        for j, c in enumerate(ln):
+            x, y = x0 + j * cw, top0 + i * ch
+            span = {"█": (0, 1), "▀": (0, 0.5), "▄": (0.5, 1)}.get(c)
+            if span:
+                args += ["-draw", f"rectangle {x:.1f},{y + span[0] * ch:.1f} {x + cw - 0.01:.1f},"
+                                  f"{y + span[1] * ch - 0.01:.1f}"]
+    return args
+
+
+def prompt(cmd=None):
+    p = [("[", ANSI["fg"], False), ("alxnko@nitro", ANSI["fg"], True), (" ", ANSI["fg"], False),
+         ("~", ANSI["green"], False), ("]$ ", ANSI["fg"], False)]
+    return p + ([(cmd, ANSI["fg"], False)] if cmd else [])
+
+
+def laptop(path: Path):
+    """The docked terminal right after boot: `fastfetch --compact` beside the cat mark."""
+    W, H = 1600, 1000
+    size, lh = 30, 42
     cw = size * 0.6
-    lines = [[("~/monitor", ANSI["blue"], True)], [("contacts", ANSI["dim"], False)], []]
+    cat = cat_mark()
+    kv = lambda k, v, c=None: [(f"{k:<7}", ANSI["blue"], True), (v, c or ANSI["fg"], False)]  # noqa: E731
+    rows = [
+        [("alxnko", ANSI["green"], True), ("@", ANSI["fg"], False), ("nitro", ANSI["green"], True)],
+        [("-" * 12, ANSI["fg"], False)],
+        kv("os", "meowOS x86_64"),
+        kv("host", "nitro"),
+        kv("kernel", "7.2.6-meow"),
+        kv("uptime", "3 mins"),
+        kv("shell", "bash 5.3"),
+        kv("role", "tech lead"),
+        kv("loc", "Kyrgyzstan"),
+        kv("rank", "#1 committer in KG"),
+    ]
+    width = max(len(c) for c in cat)
+    lines = [prompt("fastfetch --compact")]
+    for i in range(max(len(cat), len(rows))):
+        art = [(" " * (width + 3), ANSI["fg"], False)]
+        lines.append(art + (rows[i] if i < len(rows) else []))
+    lines += [[], prompt()]
+    x0, y0 = 48, 70
+    args = ["magick", "-size", f"{W}x{H}", f"xc:{ANSI['bg']}"]
+    args += text_cmds(lines, x0, y0, size, lh, cw)
+    args += blocks(cat, x0, y0 + lh - size * 0.95, cw, lh, ANSI["green"])
+    # link underline under the rank value (links render underlined, dim)
+    ri = 1 + 9
+    ux = x0 + cw * (width + 3 + 7)
+    uy = y0 + ri * lh + 6
+    args += ["-fill", ANSI["dim"], "-draw", f"rectangle {ux:.0f},{uy} {ux + cw * 18:.0f},{uy + 1}"]
+    # block cursor after the last prompt
+    last = len(lines) - 1
+    cx = x0 + cw * len("[alxnko@nitro ~]$ ")
+    cy = y0 + last * lh
+    args += ["-fill", ANSI["fg"], "-draw", f"rectangle {cx:.0f},{cy - 24} {cx + cw:.0f},{cy + 6}"]
+    args += [str(path)]
+    subprocess.run(args, check=True)
+
+
+def monitor(path: Path):
+    """Mirror of src/scene/monitor-screen.ts (2048x858 canvas, drawn here at 1.25x) plus
+    the contacts panel the live site pins on the middle of the curve (CONTACTS_UV)."""
+    k = 1.25
+    W, H = 2560, 1072
+    LEFT, RIGHT, TOP = 0.24 * W, 0.76 * W, 0.12 * H
+    sc = lambda v: v * k  # noqa: E731
+    args = ["magick", "-size", f"{W}x{H}", f"xc:{ANSI['bg']}"]
+    # bar across the whole panel: workspaces (2 active), title, clock
+    args += ["-fill", G["900"], "-draw", f"rectangle 0,0 {W},{TOP * 0.62:.0f}"]
+    by = TOP * 0.31 + sc(9)
+    for i, n in enumerate("123"):
+        x = sc(44 + i * 40)
+        args += ["-font", str(MONO), "-pointsize", f"{sc(24):.0f}", "-fill", ANSI["white"] if i == 1 else ANSI["dim"],
+                 "-annotate", f"+{x:.0f}+{by:.0f}", n]
+        if i == 1:
+            args += ["-fill", ANSI["green"], "-draw",
+                     f"rectangle {x - sc(3):.0f},{TOP * 0.62 - sc(4):.0f} {x + sc(17):.0f},{TOP * 0.62:.0f}"]
+    args += ["-fill", ANSI["muted"], "-gravity", "NorthWest"]
+    tw = sc(24) * 0.6
+    args += ["-annotate", f"+{W / 2 - tw * 4.5:.0f}+{by:.0f}", "~/monitor",
+             "-annotate", f"+{W - sc(44) - tw * 9:.0f}+{by:.0f}", "kg  13:37"]
+    # pane rules
+    args += ["-fill", G["800"], "-draw", f"rectangle {LEFT - sc(2):.0f},{TOP:.0f} {LEFT:.0f},{H - sc(40):.0f}",
+             "-draw", f"rectangle {RIGHT:.0f},{TOP:.0f} {RIGHT + sc(2):.0f},{H - sc(40):.0f}"]
+    # left pane: the ASCII mark in green + handle@host
+    cat = cat_mark()
+    msz = sc(30)
+    mcw = msz * 0.6
+    mx = (LEFT - mcw * max(len(c) for c in cat)) / 2
+    args += blocks(cat, mx, TOP + sc(150) - msz * 0.8, mcw, sc(38), ANSI["green"])
+    hy = TOP + sc(150) + len(cat) * sc(38) + sc(50) + sc(10)
+    hsz = sc(28)
+    args += text_cmds([[("alxnko@nitro", ANSI["white"], True)]], LEFT / 2 - hsz * 0.6 * 6, hy, hsz, 0, hsz * 0.6)
+    # centre: the contacts panel (DOM on the live site)
+    csz, clh = sc(30), sc(62)
+    ccw = csz * 0.6
+    cx0 = LEFT + sc(96)
+    lines = [[("contacts", ANSI["dim"], False)], []]
     rows = [("gh", "github.com/alxnko"), ("tg", "t.me/ALXNK0"), ("in", "linkedin.com/in/alxnko"),
             ("ig", "instagram.com/alxnko"), ("mail", "aleksandrnyrko@gmail.com")]
     for short, url in rows:
-        lines.append([(f"{short:<6}", ANSI["dim"], True), (url, ANSI["green"] if short == "gh" else ANSI["fg"], False)])
-        lines.append([])
-    args += text_cmds(lines, 300, bar + 110, size, lh, cw)
-    # right pane: fastfetch-style card with the cat mark
-    args += mark_draw(split + 110, bar + 170, 1.55, GREEN)
-    info = [[("Alex Neko", ANSI["fg"], True)], [("alxnko", ANSI["dim"], False)], [],
-            [("tech lead", ANSI["fg"], False)], [("AIT Solutions", ANSI["muted"], False)], [],
-            [("Kyrgyzstan", ANSI["fg"], False)], [("#1 committer in KG", ANSI["amber"], False)]]
-    args += text_cmds(info, split + 560, bar + 230, 34, 58, 20.4)
+        lines.append([(f"{short:<6}", ANSI["dim"], True), (url, ANSI["fg"], False)])
+    cy0 = TOP + sc(120)
+    args += text_cmds(lines, cx0, cy0, csz, clh, ccw)
+    for i in range(len(rows)):
+        y = cy0 + (2 + i) * clh + sc(18)
+        args += ["-fill", G["800"], "-draw", f"rectangle {cx0:.0f},{y:.0f} {RIGHT - sc(96):.0f},{y + 1:.0f}"]
+        ax = RIGHT - sc(120)
+        ay = cy0 + (2 + i) * clh - sc(10)
+        args += ["-stroke", ANSI["dim"], "-strokewidth", "2", "-fill", "none", "-draw",
+                 f"polyline {ax - 8:.0f},{ay + 8:.0f} {ax + 8:.0f},{ay - 8:.0f}",
+                 "-draw", f"polyline {ax - 4:.0f},{ay - 8:.0f} {ax + 8:.0f},{ay - 8:.0f} {ax + 8:.0f},{ay + 4:.0f}",
+                 "-stroke", "none"]
+    # right pane: role / loc / rank
+    rx = RIGHT + sc(48)
+    for i, (key, val) in enumerate((("role", "tech lead"), ("loc", "Kyrgyzstan"), ("rank", "#1 committer in KG"))):
+        y = TOP + sc(120) + i * sc(96)
+        args += text_cmds([[(key, ANSI["dim"], False)]], rx, y + sc(9), sc(24), 0, sc(24) * 0.6)
+        args += text_cmds([[(val, ANSI["amber"] if key == "rank" else ANSI["fg"], False)]], rx, y + sc(36) + sc(10),
+                          sc(28), 0, sc(28) * 0.6)
     args += [str(path)]
     subprocess.run(args, check=True)
+
+
+def fan_display(path: Path, text="100"):
+    """Mirror of FanDisplay in src/scene/monitor-screen.ts (256x128)."""
+    subprocess.run(["magick", "-size", "256x128", "xc:#050506", "-font", str(MONO_B), "-pointsize", "84",
+                    "-fill", ANSI["white"], "-gravity", "center", "-annotate", "+0+4", text, str(path)], check=True)
 
 
 def main():
@@ -168,6 +211,7 @@ def main():
     WORK.mkdir(parents=True, exist_ok=True)
     laptop(WORK / "screen-laptop.png")
     monitor(WORK / "screen-monitor.png")
+    fan_display(WORK / "fan-display.png")
     print("[screens] wrote", WORK / "screen-laptop.png", WORK / "screen-monitor.png")
 
 

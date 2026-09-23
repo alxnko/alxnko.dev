@@ -3,8 +3,8 @@
 blender -b --factory-startup -P scene/render_posters.py -- --mode posters|check [--size 4096]
 
 The posters are rendered from the *baked atlas* (unlit, exactly what the
-runtime shows) plus the runtime-only layers (screens, ring + wall glow, LEDs,
-window sky), so the live scene can cross-fade in over the poster at the `desk`
+runtime shows) plus the runtime-only layers (screens, ring + wall glow, fan ring + readout,
+keyboard backlights, LEDs, window sky), so the live scene can cross-fade in over the poster at the `desk`
 landmark with no pop. `--mode check` renders cam_desk + cam_wide for both rigs
 at 1200x750 for visual review.
 """
@@ -29,6 +29,10 @@ POSTER = (1600, 1000)
 PORTRAIT = (800, 1000)
 RING = {"day": 0.9, "night": 1.0}          # ring emissive (display-referred)
 GLOW = {"day": 0.22, "night": 0.40}        # additive wall glow peak
+BACKLIGHT = {"day": 0.6, "night": 0.9}     # additive keyboard backlight (flat, soft edge)
+OVERLAYS = ("fan_ring", "fan_display", "kbd_glow", "laptop_kbd_glow")
+HITS = ("hit_laptop", "hit_monitor", "hit_paddle_1", "hit_paddle_2", "hit_paddle_3", "hit_paddle_up",
+        "hit_paddle_down")
 SKY = {"day": ("#dfe8ef", "#a9bfd3"), "night": ("#101726", "#05070c")}  # bottom, top
 LED = {"led_kbd": GREEN, "led_paddle": None, "led_srv_0": C.PRIM["amber"], "led_srv_1": "#dfe6ff",
        "led_srv_2": "#dfe6ff", "led_srv_3": C.PRIM["amber"], "led_srv_4": "#dfe6ff", "led_srv_5": None}
@@ -111,6 +115,44 @@ def glow_material(name, hex_color, peak):
     return m
 
 
+def flat_glow_material(name, hex_color, peak):
+    """Additive flat backlight, soft only at the very edge (runtime glowMaterial uShape = 0)."""
+    m, nt, out = node_mat(name)
+    uvn = nt.nodes.new("ShaderNodeUVMap")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(uvn.outputs["UV"], sep.inputs[0])
+    edges = []
+    for ax in ("X", "Y"):
+        inv = nt.nodes.new("ShaderNodeMath")
+        inv.operation = "SUBTRACT"
+        inv.inputs[0].default_value = 1.0
+        nt.links.new(sep.outputs[ax], inv.inputs[1])
+        mn = nt.nodes.new("ShaderNodeMath")
+        mn.operation = "MINIMUM"
+        nt.links.new(sep.outputs[ax], mn.inputs[0])
+        nt.links.new(inv.outputs[0], mn.inputs[1])
+        edges.append(mn.outputs[0])
+    mn = nt.nodes.new("ShaderNodeMath")
+    mn.operation = "MINIMUM"
+    nt.links.new(edges[0], mn.inputs[0])
+    nt.links.new(edges[1], mn.inputs[1])
+    mr = nt.nodes.new("ShaderNodeMapRange")
+    mr.interpolation_type = "SMOOTHSTEP"
+    mr.inputs["From Min"].default_value = 0.0
+    mr.inputs["From Max"].default_value = 0.08
+    mr.inputs["To Max"].default_value = peak
+    nt.links.new(mn.outputs[0], mr.inputs["Value"])
+    em = nt.nodes.new("ShaderNodeEmission")
+    em.inputs["Color"].default_value = C.hex_lin(hex_color)
+    nt.links.new(mr.outputs["Result"], em.inputs["Strength"])
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+    add = nt.nodes.new("ShaderNodeAddShader")
+    nt.links.new(tr.outputs[0], add.inputs[0])
+    nt.links.new(em.outputs[0], add.inputs[1])
+    nt.links.new(add.outputs[0], out.inputs["Surface"])
+    return m
+
+
 def sky_material(name, bottom, top, fade, bg):
     m, nt, out = node_mat(name)
     uvn = nt.nodes.new("ShaderNodeUVMap")
@@ -157,7 +199,7 @@ def setup(rig, atlas_path, objects=None, window_fade=0.25, screens=True, uv="UVM
     sc = bpy.context.scene
     objs = objects if isinstance(objects, dict) else {o.name: o for o in (objects or bpy.data.objects)}
     atlas = image_emission(f"atlas_{rig}", atlas_path, uv=uv)
-    for name in ("static", "desk_baked", "fan_blades", "cat_body", "cat_head", "cat_tail", "cable_drop"):
+    for name in ("static", "desk_baked", "fan_blades", "cat_body", "cat_head", "cat_tail"):
         if name in objs:
             assign(objs[name], atlas)
     black = flat_emission("off", "#050506", 1.0)
@@ -170,13 +212,26 @@ def setup(rig, atlas_path, objects=None, window_fade=0.25, screens=True, uv="UVM
     assign(objs["ring"], flat_emission(f"ring_{rig}", GREEN, RING[rig]))
     assign(objs["ring_glow"], glow_material(f"glow_{rig}", GREEN, GLOW[rig]))
     objs["ring_glow"].hide_render = False
+    # runtime overlays in the poster state: fan ring + both backlights green, fan readout "100"
+    for name in OVERLAYS:
+        if name in objs:
+            objs[name].hide_render = False
+    if "fan_ring" in objs:
+        assign(objs["fan_ring"], flat_emission(f"fan_ring_{rig}", GREEN, RING[rig]))
+    for name in ("kbd_glow", "laptop_kbd_glow"):
+        if name in objs:
+            assign(objs[name], flat_glow_material(f"{name}_{rig}", GREEN, BACKLIGHT[rig]))
+    if "fan_display" in objs:
+        disp = C.WORK / "fan-display.png"
+        assign(objs["fan_display"], image_emission("fan_disp", disp, uv=uv) if screens and disp.exists()
+               else black)
     for name, col in LED.items():
         if name in objs:
             assign(objs[name], flat_emission(f"led_{name}", col, 1.0) if col else black)
     if "window_sky" in objs:
         objs["window_sky"].hide_render = False
         assign(objs["window_sky"], sky_material(f"sky_{rig}", *SKY[rig], window_fade, BG[rig]))
-    for name in ("hit_laptop", "hit_monitor"):
+    for name in HITS:
         if name in objs:
             objs[name].hide_render = True
     for ob in objs.values():

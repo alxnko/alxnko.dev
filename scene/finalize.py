@@ -82,8 +82,8 @@ def og(poster_night: Path, dst: Path):
     fg, muted = T["semantic"]["dark"]["fg"], T["semantic"]["dark"]["fgMuted"]
     green = T["primitive"]["green"]
     tmp = WORK / "og-render.png"
-    # 780x630 window of the night poster around the desk
-    sh("magick", poster_night, "-crop", "1238x1000+232+0", "+repage", "-resize", "780x630!", tmp)
+    # 780x630 window of the night poster: from the fan + cat on the left edge across the desk
+    sh("magick", poster_night, "-crop", "1238x1000+40+0", "+repage", "-resize", "780x630!", tmp)
     sh("magick", "-size", "1200x630", f"xc:{bg}", tmp, "-geometry", "+420+0", "-composite",
        "-fill", line, "-draw", "rectangle 420,0 420,630",
        "-font", fonts / "VT323-Regular.ttf", "-pointsize", "112", "-fill", fg, "-annotate", "+56+318", "alxnko",
@@ -177,8 +177,9 @@ def build_manifest(version, files, info, bake, crop, stats, sizes, quality):
         "files": {"glb": files["glb"], "atlas": files["atlas"], "poster": files["poster"], "og": "/og.png"},
         "posters": {
             "camera": "cam_desk", "size": [1600, 1000], "deskHeight": info["deskBase"], "theme": {"dark": "night", "light": "day"},
-            "portrait": crop, "ring": "green", "screens": "laptop: fastfetch terminal; monitor: contacts",
-            "note": "rendered from the baked atlas (unlit) + screens/ring/glow/LEDs, so the live scene matches at the desk landmark",
+            "portrait": crop, "ring": "green", "fanRing": "green", "backlight": "green", "fanDisplay": "100",
+            "screens": "laptop: `fastfetch --compact` terminal; monitor: bar + cat mark | contacts | role/loc/rank",
+            "note": "rendered from the baked atlas (unlit) + screens/ring/glow/fan ring/fan readout/keyboard backlights/LEDs, so the live scene matches at the desk landmark",
         },
         "axes": {
             "units": "m", "up": "+Y", "right": "+X", "front": "+Z (the viewer/chair side; the back wall is at -Z)",
@@ -192,7 +193,7 @@ def build_manifest(version, files, info, bake, crop, stats, sizes, quality):
             "static": "merged baked mesh (room, floor, window frame, radiator, lower legs, feet, server body); atlas",
             "desk_rig": {"note": "group; set position.y = deskHeight (translation y = 0.74 at preset 1); everything on the desk rides along",
                          "baseY": info["deskBase"]},
-            "desk_baked": "merged baked mesh (top, upper legs, rails, tray, paddle, laptop, monitor + stand, keyboard, mouse, pad, gamepad, fan body, charger, cables); atlas",
+            "desk_baked": "merged baked mesh (top, upper legs, rails, tray, paddle + button legends, laptop, monitor + stand, keyboard, mouse, pad, gamepad, fan body + bracket); atlas. Clean desk: no charger, no cables",
             "screen_laptop": "flat 16:10 quad, runtime CanvasTexture + dock target; corners in manifest.screens.laptop",
             "screen_monitor": "curved strip (R 1.5 m), runtime CanvasTexture + dock target",
             "fan_blades": info["fan"],
@@ -201,10 +202,19 @@ def build_manifest(version, files, info, bake, crop, stats, sizes, quality):
             "leds": {"positions": info["leds"], "parent": info["ledsParent"],
                      "roles": {"led_paddle": "on while the desk moves", "led_kbd": "steady (the one green LED)",
                                "led_srv_0..5": "decorative pattern, change every 2-6 s"}},
-            "cable_drop": info["cableDrop"],
+            "fan_ring": info["fanRing"],
+            "fan_display": info["fanDisplay"],
+            "kbd_glow": info["kbdGlow"],
+            "laptop_kbd_glow": info["laptopKbdGlow"],
+            "hit_paddle": info["paddleHits"],
             "window_sky": {"window": info["window"], "fade": bake["windowFade"],
                            "note": "procedural sky; mix the sky towards the page bg by `fade` (the room around it is faded by that amount)"},
             "hit_laptop": "invisible tap target (set visible=false)", "hit_monitor": "invisible tap target (set visible=false)",
+            "hit_paddle_1": "invisible tap target over paddle button 1 (see hit_paddle)",
+            "hit_paddle_2": "invisible tap target over paddle button 2 (see hit_paddle)",
+            "hit_paddle_3": "invisible tap target over paddle button 3 (see hit_paddle)",
+            "hit_paddle_up": "invisible tap target over the paddle's up arrow (see hit_paddle)",
+            "hit_paddle_down": "invisible tap target over the paddle's down arrow (see hit_paddle)",
             "geometry": "each named mesh node keeps its authored TRS; its geometry is in a child '<name>__geo' (quantisation transform lives there). Traverse for meshes.",
             "materials": "one unlit placeholder per role: baked, screen, ring, glow, led, sky, hit",
         },

@@ -23,14 +23,19 @@ import common as C  # noqa: E402
 import dims as D  # noqa: E402
 
 A = C.args()
-BAKED = ["static", "desk_baked", "fan_blades", "cat_body", "cat_head", "cat_tail", "cable_drop"]
+BAKED = ["static", "desk_baked", "fan_blades", "cat_body", "cat_head", "cat_tail"]
+PADDLE_HITS = [f"hit_paddle_{k}" for k in ("1", "2", "3", "up", "down")]   # left -> right
+OVERLAYS = ["fan_ring", "fan_display", "kbd_glow", "laptop_kbd_glow"]
 RUNTIME = ["screen_laptop", "screen_monitor", "ring", "ring_glow", "led_paddle", "led_kbd",
-           *[f"led_srv_{i}" for i in range(6)], "window_sky", "hit_laptop", "hit_monitor"]
+           *[f"led_srv_{i}" for i in range(6)], "window_sky", "hit_laptop", "hit_monitor",
+           *OVERLAYS, *PADDLE_HITS]
 CAMS = ["cam_wide", "cam_desk"]
 EXPORT = ["desk_rig"] + BAKED + RUNTIME + CAMS
 MATERIAL_OF = {**{n: "baked" for n in BAKED}, "screen_laptop": "screen", "screen_monitor": "screen",
                "ring": "ring", "ring_glow": "glow", "window_sky": "sky", "hit_laptop": "hit",
-               "hit_monitor": "hit", **{n: "led" for n in RUNTIME if n.startswith("led_")}}
+               "hit_monitor": "hit", **{n: "led" for n in RUNTIME if n.startswith("led_")},
+               "fan_ring": "ring", "fan_display": "screen", "kbd_glow": "glow", "laptop_kbd_glow": "glow",
+               **{n: "hit" for n in PADDLE_HITS}}
 
 
 def g(v):
@@ -75,7 +80,7 @@ def main():
         single_material(ob, mname)
     for ob in objs:
         ob.select_set(ob.name in EXPORT)
-    for n in ("ring_glow", "window_sky", "hit_laptop", "hit_monitor"):
+    for n in ("ring_glow", "window_sky", "hit_laptop", "hit_monitor", *OVERLAYS, *PADDLE_HITS):
         objs[n].hide_render = False
     # camera aspect in the glb comes from the render size: posters are 16:10
     sc = bpy.context.scene
@@ -136,12 +141,6 @@ def collect(objs):
                    "neckPivot": g(rig_local(ch, Vector())), "tailPivot": g(rig_local(ct, Vector())),
                    "headForward": [round(x, 4) for x in g(fwd)],
                    "note": "parts have identity rotation; headForward is the gaze in rig space"}
-    cd = objs["cable_drop"]
-    top = float(cd.get("top_z", 0.675))
-    off = round(top - D.DESK_H, 4)
-    info["cableDrop"] = {"anchor": g(cd.matrix_world.translation), "baseLength": round(top, 4),
-                         "topOffset": off,
-                         "scaleY": f"(deskHeight + ({off})) / {round(top, 4)}"}
     ring = objs["ring"]
     info["ring"] = {"center": g(rig_local(ring, Vector())), "radius": D.MON["ring_r"],
                     "tube": D.MON["ring_tube"], "facing": [0, 0, -1],
@@ -149,6 +148,7 @@ def collect(objs):
     glow = objs["ring_glow"]
     info["ringGlow"] = {"center": g(rig_local(glow, Vector())), "size": 0.9,
                         "note": "quad on the wall, parented to desk_rig; additive radial glow from UV"}
+    info.update(collect_overlays(objs))
     info["leds"] = {n: g(objs[n].matrix_world.translation if not objs[n].parent
                          else rig_local(objs[n], Vector()))
                     for n in RUNTIME if n.startswith("led_")}
@@ -180,6 +180,53 @@ def collect(objs):
     info["window"] = {"center": g(objs["window_sky"].matrix_world.translation), "w": D.WINDOW["w"],
                       "h": D.WINDOW["h"]}
     return info
+
+
+def rig_dir(ob, d_local):
+    """Blender local direction -> glTF direction in desk_rig space (unit, rounded)."""
+    rig = bpy.data.objects["desk_rig"]
+    d = (rig.matrix_world.inverted().to_3x3() @ ob.matrix_world.to_3x3() @ Vector(d_local)).normalized()
+    return [round(x, 4) for x in g(d)]
+
+
+def collect_overlays(objs):
+    out = {}
+    fr = objs["fan_ring"]
+    out["fanRing"] = {"center": g(rig_local(fr, Vector())), "radius": round(D.FAN["r"] - 0.0052, 4),
+                      "band": 0.0052, "depth": 0.0022, "axisLocal": [0, 0, 1],
+                      "facing": rig_dir(fr, (0, -1, 0)),
+                      "default": "green",
+                      "note": "not baked; emissive band on the fan's front bezel, tint = the monitor ring's colour. "
+                              "Node local +Z (glTF) = the fan's front normal; `facing` is that normal in desk_rig space"}
+    fd = objs["fan_display"]
+    vs = local_verts(fd)
+    w, h = (round(abs(vs[1].x - vs[0].x), 4), round(abs(vs[2].z - vs[1].z), 4))
+    out["fanDisplay"] = {"center": g(rig_local(fd, Vector())), "w": w, "h": h, "aspect": "2:1",
+                         "cornersRig": {k: g(rig_local(fd, v)) for k, v in zip(("bl", "br", "tr", "tl"), vs)},
+                         "normalLocal": [0, 0, 1], "facing": rig_dir(fd, (0, -1, 0)),
+                         "uv": "TEXCOORD_0 standard glTF like the screens: stored (0,0) = top-left, (1,1) = "
+                               "bottom-right of the readout -> CanvasTexture (256x128) with flipY=false",
+                         "note": "not baked; flat quad 0.4 mm in front of the hub's dark window, faces the viewer; "
+                                 "runtime draws the fan speed (e.g. '100')"}
+    for n, key in (("kbd_glow", "kbdGlow"), ("laptop_kbd_glow", "laptopKbdGlow")):
+        ob = objs[n]
+        vs = local_verts(ob)
+        out[key] = {"center": g(rig_local(ob, Vector())),
+                    "size": [round((vs[1] - vs[0]).length, 4), round((vs[2] - vs[1]).length, 4)],
+                    "normal": rig_dir(ob, (0, 0, 1)),
+                    "note": "not baked; flat backlight plane under the key tops (inset, just above the "
+                            "plate / well) that shows only between the caps; additive, tint = ring colour; "
+                            "hidden from below by the case. UV 0..1 unused (flat)"}
+    hits = {}
+    for n in PADDLE_HITS:
+        ob = objs[n]
+        hits[n] = g(rig_local(ob, Vector()))
+    out["paddleHits"] = {"centers": hits, "size": {"w": 0.016, "h": 0.016, "d": 0.015}, "order": PADDLE_HITS,
+                         "parent": "desk_rig",
+                         "note": "invisible tap targets over the paddle buttons 1, 2, 3, up, down (left to right; "
+                                 "set visible=false, raycast only); box 1.6 wide x 1.6 tall x 1.5 cm deep, "
+                                 "tilted with the paddle; origin = button centre"}
+    return out
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 const [input, output, check] = process.argv.slice(2);
 if (!input || !output) throw new Error('usage: optimize.ts in.glb out.glb [check.glb]');
 
-const BAKED = new Set(['static', 'desk_baked', 'fan_blades', 'cat_body', 'cat_head', 'cat_tail', 'cable_drop']);
+const BAKED = new Set(['static', 'desk_baked', 'fan_blades', 'cat_body', 'cat_head', 'cat_tail']);
 
 await MeshoptEncoder.ready;
 await MeshoptDecoder.ready;

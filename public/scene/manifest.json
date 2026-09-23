@@ -1,5 +1,5 @@
 {
-  "version": "11a71639",
+  "version": "eb54880a",
   "deskBase": 0.74,
   "presets": [
     0.74,
@@ -46,24 +46,24 @@
       },
       "cornersRig": {
         "bl": [
-          -0.47476,
+          -0.5768,
           0.04698,
-          -0.03761
+          -0.17023
         ],
         "br": [
-          -0.13165,
+          -0.23201,
           0.04698,
-          -0.07367
+          -0.18227
         ],
         "tr": [
-          -0.13749,
+          -0.23397,
           0.25562,
-          -0.12927
+          -0.23814
         ],
         "tl": [
-          -0.4806,
+          -0.57875,
           0.25562,
-          -0.09321
+          -0.2261
         ]
       },
       "normalLocal": [
@@ -137,36 +137,36 @@
     }
   },
   "files": {
-    "glb": "desk.11a71639.glb",
+    "glb": "desk.eb54880a.glb",
     "atlas": {
       "day": {
-        "2048": "atlas-day-2048.7c3c0da5.webp",
-        "1024": "atlas-day-1024.4584136a.webp"
+        "2048": "atlas-day-2048.1833a94b.webp",
+        "1024": "atlas-day-1024.00de0540.webp"
       },
       "night": {
-        "2048": "atlas-night-2048.ea2a82be.webp",
-        "1024": "atlas-night-1024.9934e257.webp"
+        "2048": "atlas-night-2048.a6fedc71.webp",
+        "1024": "atlas-night-1024.25fd159f.webp"
       }
     },
     "poster": {
       "day": {
         "1600": {
-          "avif": "poster-day-1600.5ee900e4.avif",
-          "webp": "poster-day-1600.b1508f91.webp"
+          "avif": "poster-day-1600.ddaa8df8.avif",
+          "webp": "poster-day-1600.0d61bbc9.webp"
         },
         "800": {
-          "avif": "poster-day-800.e052aad3.avif",
-          "webp": "poster-day-800.66626077.webp"
+          "avif": "poster-day-800.81925fc4.avif",
+          "webp": "poster-day-800.5631a222.webp"
         }
       },
       "night": {
         "1600": {
-          "avif": "poster-night-1600.90d5aaa1.avif",
-          "webp": "poster-night-1600.ba85b794.webp"
+          "avif": "poster-night-1600.364581f2.avif",
+          "webp": "poster-night-1600.c488f5ea.webp"
         },
         "800": {
-          "avif": "poster-night-800.e75458bb.avif",
-          "webp": "poster-night-800.a76db98d.webp"
+          "avif": "poster-night-800.b1d56022.avif",
+          "webp": "poster-night-800.5874075c.webp"
         }
       }
     },
@@ -195,8 +195,11 @@
       "rule": "same position/target as cam_desk; keep hfov (50 deg) and widen yfov for aspect < 1.6"
     },
     "ring": "green",
-    "screens": "laptop: fastfetch terminal; monitor: contacts",
-    "note": "rendered from the baked atlas (unlit) + screens/ring/glow/LEDs, so the live scene matches at the desk landmark"
+    "fanRing": "green",
+    "backlight": "green",
+    "fanDisplay": "100",
+    "screens": "laptop: `fastfetch --compact` terminal; monitor: bar + cat mark | contacts | role/loc/rank",
+    "note": "rendered from the baked atlas (unlit) + screens/ring/glow/fan ring/fan readout/keyboard backlights/LEDs, so the live scene matches at the desk landmark"
   },
   "axes": {
     "units": "m",
@@ -216,14 +219,14 @@
       "note": "group; set position.y = deskHeight (translation y = 0.74 at preset 1); everything on the desk rides along",
       "baseY": 0.74
     },
-    "desk_baked": "merged baked mesh (top, upper legs, rails, tray, paddle, laptop, monitor + stand, keyboard, mouse, pad, gamepad, fan body, charger, cables); atlas",
+    "desk_baked": "merged baked mesh (top, upper legs, rails, tray, paddle + button legends, laptop, monitor + stand, keyboard, mouse, pad, gamepad, fan body + bracket); atlas. Clean desk: no charger, no cables",
     "screen_laptop": "flat 16:10 quad, runtime CanvasTexture + dock target; corners in manifest.screens.laptop",
     "screen_monitor": "curved strip (R 1.5 m), runtime CanvasTexture + dock target",
     "fan_blades": {
       "pivot": [
-        -0.53831,
+        -0.5239,
         0.118,
-        0.23863
+        0.24385
       ],
       "axisLocal": [
         0,
@@ -235,24 +238,24 @@
     "cat_body": {
       "hierarchy": "desk_rig > cat_body > (cat_head, cat_tail)",
       "bodyOrigin": [
-        -0.54,
-        0.207,
-        0.235
+        -0.525,
+        0.209,
+        0.24
       ],
       "neckPivot": [
-        -0.52563,
-        0.249,
-        0.26581
+        -0.48046,
+        0.23423,
+        0.23347
       ],
       "tailPivot": [
-        -0.56584,
-        0.237,
-        0.1654
+        -0.61247,
+        0.17709,
+        0.26508
       ],
       "headForward": [
-        0.8725,
-        0.0698,
-        0.4836
+        0.8245,
+        0.1045,
+        0.5561
       ],
       "note": "parts have identity rotation; headForward is the gaze in rig space"
     },
@@ -342,15 +345,148 @@
         "led_srv_0..5": "decorative pattern, change every 2-6 s"
       }
     },
-    "cable_drop": {
-      "anchor": [
-        0.55,
-        0.0,
-        -0.12
+    "fan_ring": {
+      "center": [
+        -0.51439,
+        0.118,
+        0.27701
       ],
-      "baseLength": 0.713,
-      "topOffset": -0.027,
-      "scaleY": "(deskHeight + (-0.027)) / 0.713"
+      "radius": 0.0848,
+      "band": 0.0052,
+      "depth": 0.0022,
+      "axisLocal": [
+        0,
+        0,
+        1
+      ],
+      "facing": [
+        0.2756,
+        0.0,
+        0.9613
+      ],
+      "default": "green",
+      "note": "not baked; emissive band on the fan's front bezel, tint = the monitor ring's colour. Node local +Z (glTF) = the fan's front normal; `facing` is that normal in desk_rig space"
+    },
+    "fan_display": {
+      "center": [
+        -0.51475,
+        0.118,
+        0.27576
+      ],
+      "w": 0.024,
+      "h": 0.012,
+      "aspect": "2:1",
+      "cornersRig": {
+        "bl": [
+          -0.52628,
+          0.112,
+          0.27907
+        ],
+        "br": [
+          -0.50321,
+          0.112,
+          0.27245
+        ],
+        "tr": [
+          -0.50321,
+          0.124,
+          0.27245
+        ],
+        "tl": [
+          -0.52628,
+          0.124,
+          0.27907
+        ]
+      },
+      "normalLocal": [
+        0,
+        0,
+        1
+      ],
+      "facing": [
+        0.2756,
+        0.0,
+        0.9613
+      ],
+      "uv": "TEXCOORD_0 standard glTF like the screens: stored (0,0) = top-left, (1,1) = bottom-right of the readout -> CanvasTexture (256x128) with flipY=false",
+      "note": "not baked; flat quad 0.4 mm in front of the hub's dark window, faces the viewer; runtime draws the fan speed (e.g. '100')"
+    },
+    "kbd_glow": {
+      "center": [
+        0.11996,
+        0.0272,
+        0.12871
+      ],
+      "size": [
+        0.355,
+        0.112
+      ],
+      "normal": [
+        -0.0018,
+        0.9986,
+        0.0523
+      ],
+      "note": "not baked; flat backlight plane under the key tops (inset, just above the plate / well) that shows only between the caps; additive, tint = ring colour; hidden from below by the case. UV 0..1 unused (flat)"
+    },
+    "laptop_kbd_glow": {
+      "center": [
+        -0.40056,
+        0.0259,
+        -0.06599
+      ],
+      "size": [
+        0.336,
+        0.096
+      ],
+      "normal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "note": "not baked; flat backlight plane under the key tops (inset, just above the plate / well) that shows only between the caps; additive, tint = ring colour; hidden from below by the case. UV 0..1 unused (flat)"
+    },
+    "hit_paddle": {
+      "centers": {
+        "hit_paddle_1": [
+          0.398,
+          -0.03166,
+          0.31518
+        ],
+        "hit_paddle_2": [
+          0.416,
+          -0.03166,
+          0.31518
+        ],
+        "hit_paddle_3": [
+          0.434,
+          -0.03166,
+          0.31518
+        ],
+        "hit_paddle_up": [
+          0.452,
+          -0.03166,
+          0.31518
+        ],
+        "hit_paddle_down": [
+          0.47,
+          -0.03166,
+          0.31518
+        ]
+      },
+      "size": {
+        "w": 0.016,
+        "h": 0.016,
+        "d": 0.015
+      },
+      "order": [
+        "hit_paddle_1",
+        "hit_paddle_2",
+        "hit_paddle_3",
+        "hit_paddle_up",
+        "hit_paddle_down"
+      ],
+      "parent": "desk_rig",
+      "note": "invisible tap targets over the paddle buttons 1, 2, 3, up, down (left to right; set visible=false, raycast only); box 1.6 wide x 1.6 tall x 1.5 cm deep, tilted with the paddle; origin = button centre"
     },
     "window_sky": {
       "window": {
@@ -370,6 +506,11 @@
     },
     "hit_laptop": "invisible tap target (set visible=false)",
     "hit_monitor": "invisible tap target (set visible=false)",
+    "hit_paddle_1": "invisible tap target over paddle button 1 (see hit_paddle)",
+    "hit_paddle_2": "invisible tap target over paddle button 2 (see hit_paddle)",
+    "hit_paddle_3": "invisible tap target over paddle button 3 (see hit_paddle)",
+    "hit_paddle_up": "invisible tap target over the paddle's up arrow (see hit_paddle)",
+    "hit_paddle_down": "invisible tap target over the paddle's down arrow (see hit_paddle)",
     "geometry": "each named mesh node keeps its authored TRS; its geometry is in a child '<name>__geo' (quantisation transform lives there). Traverse for meshes.",
     "materials": "one unlit placeholder per role: baked, screen, ring, glow, led, sky, hit"
   },
@@ -462,23 +603,23 @@
     }
   },
   "stats": {
-    "tris": 20992,
-    "verts": 23391,
+    "tris": 24084,
+    "verts": 26744,
     "bytes": {
-      "desk.11a71639.glb": 200800,
-      "atlas-day-2048.7c3c0da5.webp": 156436,
-      "atlas-day-1024.4584136a.webp": 68502,
-      "atlas-night-2048.ea2a82be.webp": 107574,
-      "atlas-night-1024.9934e257.webp": 43454,
-      "poster-day-1600.5ee900e4.avif": 35433,
-      "poster-day-1600.b1508f91.webp": 49458,
-      "poster-day-800.e052aad3.avif": 19444,
-      "poster-day-800.66626077.webp": 26606,
-      "poster-night-1600.90d5aaa1.avif": 29590,
-      "poster-night-1600.ba85b794.webp": 40692,
-      "poster-night-800.e75458bb.avif": 14043,
-      "poster-night-800.a76db98d.webp": 18338,
-      "../og.png": 422372
+      "desk.eb54880a.glb": 230908,
+      "atlas-day-2048.1833a94b.webp": 157444,
+      "atlas-day-1024.00de0540.webp": 68346,
+      "atlas-night-2048.a6fedc71.webp": 113542,
+      "atlas-night-1024.25fd159f.webp": 45634,
+      "poster-day-1600.ddaa8df8.avif": 37813,
+      "poster-day-1600.0d61bbc9.webp": 55714,
+      "poster-day-800.81925fc4.avif": 20700,
+      "poster-day-800.5631a222.webp": 29624,
+      "poster-night-1600.364581f2.avif": 32154,
+      "poster-night-1600.c488f5ea.webp": 48664,
+      "poster-night-800.b1d56022.avif": 15681,
+      "poster-night-800.5874075c.webp": 22600,
+      "../og.png": 463508
     },
     "quality": {
       "atlas-day-2048": 82,
