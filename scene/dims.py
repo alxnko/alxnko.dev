@@ -72,13 +72,13 @@ CAT = dict(head_w=0.064, head_yaw=40.0, head_tilt=6.0,     # yaw: turned towards
            y_shift=-0.015, phi_shift=-8.0, pivot=(0.0, 0.0, -0.008))
 
 # --- pass 9 props (owner photos 3d-table-references/headphones, sharks) -----------------
-# QCY H3S over-ear headphones lying on the desk in front of the laptop, right of the fan
-# (headphones/1.jpg): the band lying back, leaning; the cups at the front, one lower.
-# pose: roll about the cup axis (band leans back), then tilt about the front-back axis
-# (the left cup lower), then yaw; the lowest point rests on the desk.
-HEADPHONES = dict(x=-0.240, y=-0.170, yaw=-22.0, roll=-58.0, tilt=24.0,
-                  band_r=0.080, band_w=0.036, band_t=0.011,
-                  cup=(0.041, 0.050), shell=(0.036, 0.062), cushion=(0.012, 0.036))
+# QCY H3S over-ear headphones set down on the desk in front of the laptop, right of the fan
+# (headphones/1.jpg). Modelled unworn (the band's spring pulls the cups together), then laid
+# down the way a rigid object comes to rest (build.rest_pose): on a stable face of its convex
+# hull, the one whose up is closest to `up` (model frame: cups along x, band towards +z).
+HEADPHONES = dict(x=-0.250, y=-0.198, yaw=-118.0, up=(0.6, 0.7, -0.2),
+                  band_r=0.072, band_w=0.036, band_t=0.011,
+                  cup=(0.041, 0.050), shell=(0.030, 0.056), cushion=(0.005, 0.030))
 # sharkslides foam slides on the floor under the desk's right end, left of the right foot,
 # toes towards the viewer (sharks/4jpg), casually splayed. Real size (EU 42-43): 28 x 11 cm,
 # 7-8 cm tall at the head. x/y centre, yaw (deg)
