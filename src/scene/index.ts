@@ -15,6 +15,7 @@ import { FanDisplay, MonitorScreen } from './monitor-screen';
 import { catStep, clamp, easeOut, frameInterval, nextFlickIn, Tween, type CatState } from './anim';
 import { attachInput } from './input';
 import { Dock } from './dock';
+import { resolveTarget, type Named } from './pick';
 import type { Line, TermState } from '../term/types';
 
 export interface SceneStore {
@@ -625,12 +626,10 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       raycaster.setFromCamera(new Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1), camera);
       const hit = raycaster.intersectObjects(hits, true)[0];
       if (!hit) return;
-      let n: Object3D | null = hit.object;
-      while (n && !n.name.startsWith('hit_')) n = n.parent;
-      if (n?.name === 'hit_laptop') { world.fly('laptop'); o.termEl.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true }); }
-      else if (n?.name === 'hit_monitor') world.fly('monitor');
-      else if (n?.name.startsWith('hit_paddle_')) o.onPaddle?.(n.name.slice('hit_paddle_'.length));
-      else return;
+      const t = resolveTarget(hit.object as unknown as Named);
+      if (t?.kind === 'laptop') { world.fly('laptop'); o.termEl.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true }); }
+      else if (t?.kind === 'monitor') world.fly('monitor');
+      else if (t?.kind === 'paddle') o.onPaddle?.(t.key);
     },
   });
 
