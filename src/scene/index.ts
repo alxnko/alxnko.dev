@@ -9,7 +9,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import type { FanSpeed, Landmark, Ring, Theme, WorldState } from '../term/types';
 import { parseManifest, type Manifest } from './manifest';
 import { TERM_BG } from '../lib/tokens';
-import { shadowMaterial, windowMaterial, bakedMaterial, emissiveMaterial, glowMaterial, screenMaterial, skyMaterial } from './materials';
+import { shadowMaterial, windowMaterial, bakedMaterial, ghostMaterial, emissiveMaterial, glowMaterial, screenMaterial, skyMaterial } from './materials';
 import { lerpPose, Rail, Spring, type Pose, type Vec3 } from './rail';
 import { FanDisplay, MonitorScreen } from './monitor-screen';
 import { catStep, constrainGaze, clamp, easeOut, frameInterval, nextFlickIn, Tween, type CatState } from './anim';
@@ -65,7 +65,7 @@ export type LoadStep = 'manifest' | 'geometry' | 'lighting' | 'screens';
 export interface SceneHandle { world: SceneWorld; destroy(): void }
 
 const RING: Record<Ring, string> = { green: '#00ff82', purple: '#b061ff', off: '#161618' };
-const FAN_SPEED = [0, 12, 20, 28]; // rad/s
+const FAN_SPEED = [0, 28, 42, 56]; // rad/s (shown as rotation up to FAN_MAX_STEP a frame, the rest as blur)
 const FAN_MAX_STEP = 0.45; // rad per frame (5 blades: 72° apart)
 const FAN_PCT = ['0', '40', '70', '100'];
 /** Portrait phones: the laptop screen sits between the name block and the on-screen keyboard. */
@@ -219,6 +219,18 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const cableLen0 = cable ? Math.max(0.05, rig.getWorldPosition(new Vector3()).y - cable.getWorldPosition(new Vector3()).y) : 1;
   const fan = node('fan_blades');
   const fanQ0 = fan.quaternion.clone();
+  // motion blur: trailing copies of the blades between this frame's angle and the last one,
+  // fading in once the fan spins faster than a frame can show (hidden, so free, when slow)
+  const FAN_TRAILS = 3;
+  const fanTrails = Array.from({ length: FAN_TRAILS }, (_, i) => {
+    const g = fan.clone();
+    const mat = ghostMaterial(baked);
+    meshesOf(g).forEach((m) => { m.material = mat; m.renderOrder = 2; });
+    g.name = `${fan.name}__trail${i}`;
+    g.visible = false;
+    fan.parent!.add(g);
+    return { g, mat };
+  });
   const fanAxis = new Vector3(...manifest.fanAxis).normalize();
   const head = node('cat_head'), tail = node('cat_tail');
   const headQ0 = head.quaternion.clone(), tailQ0 = tail.quaternion.clone();
@@ -544,8 +556,18 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       const drift = o.reducedMotion ? 1 : 1 + 0.04 * Math.sin(now / 3100);
       // capped per frame below half the 72° blade spacing, so a slow frame never turns the
       // spin into a backwards-looking strobe
-      fanAngle = (fanAngle + Math.min(fanSpeed * drift * dt, FAN_MAX_STEP)) % (Math.PI * 2);
+      const want = fanSpeed * drift * dt, step = Math.min(want, FAN_MAX_STEP);
+      fanAngle = (fanAngle + step) % (Math.PI * 2);
       fan.quaternion.copy(fanQ0).multiply(q.setFromAxisAngle(fanAxis, fanAngle));
+      // blur grows with how much faster the fan is than the frame can show, plus a little
+      // from plain speed so the levels read apart even at high refresh rates
+      const blur = clamp(Math.max((want - FAN_MAX_STEP * 0.5) / FAN_MAX_STEP, (fanSpeed - 20) / 40), 0, 1);
+      fanTrails.forEach(({ g, mat }, i) => {
+        g.visible = blur > 0.02;
+        if (!g.visible) return;
+        mat.uniforms.uAlpha.value = blur * 0.45 * (1 - i / FAN_TRAILS);
+        g.quaternion.copy(fanQ0).multiply(q.setFromAxisAngle(fanAxis, fanAngle - (step * (i + 1)) / (FAN_TRAILS + 1)));
+      });
     }
 
     // server LEDs: a new pattern every 2–6 s

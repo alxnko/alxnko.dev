@@ -21,6 +21,22 @@ export function bakedMaterial(day: Texture, night: Texture, mix: number): Shader
   });
 }
 
+/**
+ * A see-through copy of a baked material for motion-blur trails (the spinning fan). It shares
+ * the source's atlas and day/night uniforms, so theme and atlas changes reach it for free.
+ */
+export function ghostMaterial(src: ShaderMaterial): ShaderMaterial {
+  return new ShaderMaterial({
+    uniforms: { ...src.uniforms, uAlpha: { value: 0 } },
+    vertexShader: src.vertexShader,
+    fragmentShader: src.fragmentShader
+      .replace('uniform float uMix;', 'uniform float uMix; uniform float uAlpha;')
+      .replace('gl_FragColor = vec4(c, 1.0);', 'gl_FragColor = vec4(c, uAlpha);'),
+    transparent: true,
+    depthWrite: false,
+  });
+}
+
 /** Live screen: canvas texture plus a cheap fresnel "glass" reflection (no env map). */
 export function screenMaterial(map: Texture): ShaderMaterial {
   return new ShaderMaterial({
