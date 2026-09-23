@@ -10,6 +10,11 @@ export interface GateEnv {
   cores?: number;
   /** navigator.deviceMemory, GB */
   memory?: number;
+  /**
+   * WebGL runs on the CPU (SwiftShader, llvmpipe…): no GPU, so the desk would crawl.
+   * Detected by the <head> gate from the renderer string (Base.astro).
+   */
+  softwareGL?: boolean;
 }
 
 export function decide3D(e: GateEnv): Gate {
@@ -19,5 +24,6 @@ export function decide3D(e: GateEnv): Gate {
   if (q.has('lite')) return 'offer';
   if (e.saveData || e.effectiveType === '2g' || e.effectiveType === 'slow-2g') return 'offer';
   if ((e.cores !== undefined && e.cores < 4) || (e.memory !== undefined && e.memory < 4)) return 'offer';
+  if (e.softwareGL) return 'offer';
   return 'auto';
 }

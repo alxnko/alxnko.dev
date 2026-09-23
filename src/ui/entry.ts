@@ -237,6 +237,7 @@ function afterIdle() {
     effectiveType: nav.connection?.effectiveType,
     cores: nav.hardwareConcurrency || undefined,
     memory: nav.deviceMemory,
+    softwareGL: document.documentElement.dataset.glsw === '1',
   });
   const btn = $('enter3d') as HTMLButtonElement | null;
   btn?.addEventListener('click', enter3d);
