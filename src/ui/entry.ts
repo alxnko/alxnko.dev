@@ -135,6 +135,7 @@ function enter3d() {
         store,
         initial,
         reducedMotion: reducedMotion(),
+        softwareGL: document.documentElement.dataset.glsw === '1',
         mobile: matchMedia('(pointer: coarse)').matches || innerWidth < 720,
         termEl,
         contactsEl,
@@ -237,7 +238,6 @@ function afterIdle() {
     effectiveType: nav.connection?.effectiveType,
     cores: nav.hardwareConcurrency || undefined,
     memory: nav.deviceMemory,
-    softwareGL: document.documentElement.dataset.glsw === '1',
   });
   const btn = $('enter3d') as HTMLButtonElement | null;
   btn?.addEventListener('click', enter3d);

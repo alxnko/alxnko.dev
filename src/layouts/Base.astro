@@ -71,7 +71,8 @@ const ld = JSON.stringify(person).replace(/</g, '\\u003c');
             var cv = document.createElement('canvas'), gl = cv.getContext('webgl2');
             d.dataset.gl = gl ? '2' : '0'; // entry.ts reuses this instead of probing again
             if (!gl) return;
-            // WebGL on the CPU (no GPU / drivers): offer the desk instead of booting into it
+            // WebGL on the CPU (no GPU / drivers): the desk still boots, and renders in its
+            // CPU-friendly mode (src/scene/index.ts, softwareGL)
             var dbg = gl.getExtension('WEBGL_debug_renderer_info');
             var sw = /swiftshader|llvmpipe|softpipe|software|basic render/i.test(String(gl.getParameter(dbg ? dbg.UNMASKED_RENDERER_WEBGL : gl.RENDERER)));
             if (sw) d.dataset.glsw = '1';
@@ -82,7 +83,6 @@ const ld = JSON.stringify(person).replace(/</g, '\\u003c');
             if (!force) {
               if (c.saveData || /(^|-)2g$/.test(c.effectiveType || '')) return;
               if ((n.hardwareConcurrency && n.hardwareConcurrency < 4) || (n.deviceMemory && n.deviceMemory < 4)) return;
-              if (sw) return;
             }
             d.dataset.boot = '3d';
             // watchdog: if the desk is not up after 15 s of the page being shown (script

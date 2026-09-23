@@ -30,6 +30,12 @@ export interface SceneOptions {
   initial: WorldState;
   reducedMotion: boolean;
   mobile: boolean;
+  /**
+   * WebGL runs on the CPU (no GPU: SwiftShader, llvmpipe). The desk renders the same scene
+   * at a lighter internal resolution while anything moves and at a steadier pace, then
+   * redraws at full resolution once the view settles, so a still view keeps every detail.
+   */
+  softwareGL?: boolean;
   termEl: HTMLElement;
   contactsEl: HTMLElement;
   /** The monitor's right pane (role, location, rank link), pinned like the contacts. */
@@ -125,16 +131,30 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const dprCap = o.mobile ? 1.5 : 2;
   const renderer = new WebGLRenderer({
     canvas,
-    antialias: devicePixelRatio < 2,
+    antialias: !o.softwareGL && devicePixelRatio < 2, // MSAA on the CPU costs more than it shows
     alpha: true, // screen regions are transparent windows onto the pinned DOM beneath
     powerPreference: o.mobile ? 'default' : 'high-performance',
   });
   undo.push(() => { renderer.dispose(); renderer.forceContextLoss(); canvas.remove(); });
   renderer.outputColorSpace = SRGBColorSpace;
   let dprScale = 1;
+  // CPU WebGL: pixel budgets for moving and settled frames (the pinned screens are DOM text,
+  // always sharp; only the 3D behind them uses these)
+  const SW_MOVE_PX = 380_000, SW_STILL_PX = 2_400_000, SW_SETTLE_MS = 180;
+  const SW_FRAME_MS = 40, SW_SPIN_MS = 66, SW_IDLE_MS = 200;
+  let sharp = !o.softwareGL;
+  // CPU WebGL: something changed since the last drawn frame (a settled, sharp view is not
+  // redrawn until it does), and when things last moved
+  let dirty = true, lastMove = 0;
+  const pixelRatio = () => {
+    const w = o.stage.clientWidth || innerWidth, h = o.stage.clientHeight || innerHeight;
+    const full = Math.min(devicePixelRatio, dprCap);
+    if (!o.softwareGL) return full * dprScale;
+    return Math.min(full * (sharp ? 1 : dprScale), Math.sqrt((sharp ? SW_STILL_PX : SW_MOVE_PX) / (w * h)));
+  };
   const applySize = () => {
     const w = o.stage.clientWidth || innerWidth, h = o.stage.clientHeight || innerHeight;
-    renderer.setPixelRatio(Math.min(devicePixelRatio, dprCap) * dprScale);
+    renderer.setPixelRatio(pixelRatio());
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     rebuildPoses();
@@ -505,6 +525,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   let slept = -1; // ms this frame was deliberately delayed by (-1: it was not scheduled as a paced frame)
   const hidden = () => document.visibilityState === 'hidden';
   function invalidate() {
+    dirty = true;
     if (disposed || raf) return;
     clearTimeout(timer);
     timer = 0;
@@ -673,7 +694,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     } else tail.quaternion.copy(tailQ0);
 
     // screens
-    monitor.update();
+    if (monitor.update()) dirty = true;
 
     // apply camera
     const p = basePose();
@@ -726,8 +747,21 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     };
     dock.update([quad(screenCorners(laptopScreen)), quad(contactsCorners()), ...(o.infoEl ? [quad(infoCorners())] : [])]);
 
-    renderer.render(scene, camera);
     const spinning = fanSpeed > 0.05 && !o.reducedMotion && fanInView();
+    if (o.softwareGL) {
+      // light frames while anything moves; one full-resolution frame once it has settled
+      const moving = animating || spinning;
+      if (moving) lastMove = now;
+      const settled = !moving && now - lastMove >= SW_SETTLE_MS;
+      if (settled !== sharp) {
+        sharp = settled;
+        renderer.setPixelRatio(pixelRatio());
+        renderer.setSize(o.stage.clientWidth || innerWidth, o.stage.clientHeight || innerHeight, false);
+        dirty = true;
+      }
+      if (moving) dirty = true;
+    } else dirty = true;
+    if (dirty) { renderer.render(scene, camera); dirty = false; }
     // adaptive resolution while moving (camera, desk, or the fan's paced 30 fps): each frame's
     // interval minus the pause we asked for is what it really cost. rAF is capped at vsync, so
     // "fast" means keeping up with a 60 Hz display (~16.7 ms); well past that steps down
@@ -741,7 +775,9 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       }
     }
 
-    const interval = frameInterval({ animating, hidden: hidden(), reducedMotion: o.reducedMotion, idleMs: now - lastInput, spinning });
+    let interval = frameInterval({ animating, hidden: hidden(), reducedMotion: o.reducedMotion, idleMs: now - lastInput, spinning });
+    // CPU WebGL: a steadier pace leaves the page responsive between frames
+    if (o.softwareGL && interval !== null) interval = Math.max(interval, animating ? SW_FRAME_MS : spinning ? SW_SPIN_MS : SW_IDLE_MS);
     slept = interval === 0 ? 0 : interval === SPIN_FRAME_MS ? SPIN_FRAME_MS : -1;
     if (interval === 0) raf = requestAnimationFrame(frame);
     else if (interval !== null) timer = window.setTimeout(() => { timer = 0; raf = requestAnimationFrame(frame); }, interval);

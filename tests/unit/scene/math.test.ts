@@ -22,10 +22,6 @@ describe('decide3D', () => {
     expect(decide3D({ ...base, cores: 2 })).toBe('offer');
     expect(decide3D({ ...base, memory: 2 })).toBe('offer');
   });
-  it('software WebGL (no GPU) gets offer, ?3d still forces it', () => {
-    expect(decide3D({ ...base, softwareGL: true })).toBe('offer');
-    expect(decide3D({ ...base, softwareGL: true, url: 'https://x.dev/?3d' })).toBe('auto');
-  });
   it('?3d forces auto over save-data and weak device', () =>
     expect(decide3D({ ...base, url: 'https://x.dev/?3d', saveData: true, cores: 2 })).toBe('auto'));
 });
