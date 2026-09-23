@@ -1,8 +1,8 @@
 // Lazy 3D desk (spec §6). Loaded via dynamic import only when decide3D() allows.
 // Renders on demand; every surface is unlit (baked), so it stays cheap on phones.
 import {
-  Color, LinearFilter, Mesh, type Object3D, PerspectiveCamera, Quaternion, Raycaster,
-  Scene, SRGBColorSpace, type Texture, TextureLoader, Vector2, Vector3, WebGLRenderer,
+  Box3, Color, Frustum, LinearFilter, Matrix4, Mesh, type Object3D, PerspectiveCamera, Quaternion, Raycaster,
+  Scene, Sphere, SRGBColorSpace, type Texture, TextureLoader, Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
@@ -66,7 +66,11 @@ export interface SceneHandle { world: SceneWorld; destroy(): void }
 
 const RING: Record<Ring, string> = { green: '#00ff82', purple: '#b061ff', off: '#161618' };
 const FAN_SPEED = [0, 28, 42, 56]; // rad/s (shown as rotation up to FAN_MAX_STEP a frame, the rest as blur)
-const FAN_MAX_STEP = 0.45; // rad per frame (5 blades: 72° apart)
+// shown rotation is capped so it looks the same at any frame rate (30 fps idle, 60+ while
+// moving) and never strobes (5 blades 72° apart: a step near 36° reads as spinning backwards);
+// speed beyond it shows as motion blur
+const FAN_SHOWN = 16; // rad/s
+const FAN_MAX_STEP = 0.6; // rad per frame, for hitches
 const FAN_PCT = ['0', '40', '70', '100'];
 /** Portrait phones: the laptop screen sits between the name block and the on-screen keyboard. */
 const PHONE_BAND: [number, number] = [0.2, 0.62];
@@ -221,6 +225,14 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const fanQ0 = fan.quaternion.clone();
   // motion blur: trailing copies of the blades between this frame's angle and the last one,
   // fading in once the fan spins faster than a frame can show (hidden, so free, when slow)
+  // the spinning fan only keeps frames coming while it is actually on screen
+  const fanSphere = new Box3().setFromObject(fan).getBoundingSphere(new Sphere());
+  fan.parent!.worldToLocal(fanSphere.center);
+  const frustum = new Frustum(), projView = new Matrix4(), fanWorld = new Sphere();
+  const fanInView = () => {
+    fanWorld.copy(fanSphere).applyMatrix4(fan.parent!.matrixWorld);
+    return frustum.setFromProjectionMatrix(projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)).intersectsSphere(fanWorld);
+  };
   const FAN_TRAILS = 3;
   const fanTrails = Array.from({ length: FAN_TRAILS }, (_, i) => {
     const g = fan.clone();
@@ -556,12 +568,11 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       const drift = o.reducedMotion ? 1 : 1 + 0.04 * Math.sin(now / 3100);
       // capped per frame below half the 72° blade spacing, so a slow frame never turns the
       // spin into a backwards-looking strobe
-      const want = fanSpeed * drift * dt, step = Math.min(want, FAN_MAX_STEP);
+      const step = Math.min(Math.min(fanSpeed, FAN_SHOWN) * drift * dt, FAN_MAX_STEP);
       fanAngle = (fanAngle + step) % (Math.PI * 2);
       fan.quaternion.copy(fanQ0).multiply(q.setFromAxisAngle(fanAxis, fanAngle));
-      // blur grows with how much faster the fan is than the frame can show, plus a little
-      // from plain speed so the levels read apart even at high refresh rates
-      const blur = clamp(Math.max((want - FAN_MAX_STEP * 0.5) / FAN_MAX_STEP, (fanSpeed - 20) / 40), 0, 1);
+      // blur carries the speed the rotation can't show, so the levels read apart
+      const blur = clamp((fanSpeed - FAN_SHOWN * 0.8) / (FAN_SHOWN * 2.2), 0, 1);
       fanTrails.forEach(({ g, mat }, i) => {
         g.visible = blur > 0.02;
         if (!g.visible) return;
@@ -683,7 +694,8 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     }
     void t0;
 
-    const interval = frameInterval({ animating, hidden: hidden(), reducedMotion: o.reducedMotion, idleMs: now - lastInput });
+    const spinning = fanSpeed > 0.05 && !o.reducedMotion && fanInView();
+    const interval = frameInterval({ animating, hidden: hidden(), reducedMotion: o.reducedMotion, idleMs: now - lastInput, spinning });
     if (interval === 0) raf = requestAnimationFrame(frame);
     else if (interval !== null) timer = window.setTimeout(() => { timer = 0; raf = requestAnimationFrame(frame); }, interval);
   }

@@ -46,6 +46,9 @@ describe('timing helpers', () => {
     expect(frameInterval({ animating: false, hidden: false, reducedMotion: false, idleMs: 61000 })).toBe(125);
     expect(frameInterval({ animating: false, hidden: false, reducedMotion: true, idleMs: 0 })).toBeNull();
     expect(frameInterval({ animating: true, hidden: true, reducedMotion: false, idleMs: 0 })).toBeNull();
+    // a spinning fan keeps a steady frame rate however long the page has been idle
+    expect(frameInterval({ animating: false, hidden: false, reducedMotion: false, idleMs: 61000, spinning: true })).toBe(33);
+    expect(frameInterval({ animating: false, hidden: true, reducedMotion: false, idleMs: 0, spinning: true })).toBeNull();
   });
 });
 

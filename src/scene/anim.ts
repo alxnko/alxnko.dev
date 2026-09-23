@@ -50,12 +50,19 @@ export class Tween {
 }
 
 /** Render-rate policy (spec §6.3): ms between frames, or null = render only on change. */
-export function frameInterval(o: { animating: boolean; hidden: boolean; reducedMotion: boolean; idleMs: number }): number | null {
+/**
+ * Delay before the next frame: 0 = next vsync, null = sleep until something invalidates.
+ * A spinning fan in view keeps a steady 30 fps (no idle slowdown); otherwise idle frames
+ * drop to 20 fps and, after a minute without input, to 8 fps.
+ */
+export function frameInterval(o: { animating: boolean; hidden: boolean; reducedMotion: boolean; idleMs: number; spinning?: boolean }): number | null {
   if (o.hidden) return null;
   if (o.animating) return 0;
   if (o.reducedMotion) return null;
+  if (o.spinning) return SPIN_FRAME_MS;
   return o.idleMs > 60_000 ? 125 : 50;
 }
+export const SPIN_FRAME_MS = 33;
 
 type V3 = [number, number, number];
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
