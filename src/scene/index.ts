@@ -362,6 +362,11 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   let dest: Landmark = o.initial.landmark === 'wide' ? 'wide' : 'desk';
   let from: Pose = rail.pose(dest);
   const flight = new Spring(70);
+  /** Where the camera actually looks this frame (landmark + pan + orbit applied). */
+  const lookAt = new Vector3();
+  /** The camera exactly as it is now: every flight starts here, never from a stored pose. */
+  const currentPose = (): Pose => ({ pos: camera.position.toArray() as Vec3, target: lookAt.toArray() as Vec3, fov: camera.fov });
+  const settled = () => flight.value === 1 && [orbit.yaw, orbit.pitch, ...pan].every((sp) => sp.target === 0 && sp.value === 0) && orbit.dolly.value === 1 && orbit.dolly.target === 1;
   flight.snap(1);
   const basePose = (): Pose => lerpPose(from, rail.pose(dest), flight.value);
   // free look on top of the landmark pose: drag orbits around what you look at, wheel or
@@ -579,6 +584,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       off.applyAxisAngle(right, -orbit.pitch.value);
       camera.position.copy(tgt).add(off);
       camera.lookAt(tgt);
+      lookAt.copy(tgt);
     }
     camera.updateMatrixWorld();
 
@@ -634,15 +640,15 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const world: SceneWorld = {
     fly(to) {
       lastInput = performance.now();
-      orbit.yaw.target = orbit.pitch.target = 0;
-      orbit.dolly.target = 1;
-      for (const s of pan) s.target = 0;
-      if (o.reducedMotion) for (const s of pan) s.snap(0);
-      from = basePose();
+      if (to === dest && settled()) return; // already there: nothing to animate
+      // start from the camera exactly as it is, then fold the free-look offsets into the flight
+      from = currentPose();
       dest = to;
+      orbit.yaw.snap(0); orbit.pitch.snap(0); orbit.dolly.snap(1);
+      for (const sp of pan) sp.snap(0);
       flight.snap(0);
       flight.target = 1;
-      if (o.reducedMotion) { flight.snap(1); orbit.yaw.snap(0); orbit.pitch.snap(0); orbit.dolly.snap(1); }
+      if (o.reducedMotion) flight.snap(1);
       invalidate();
     },
     setDesk(h) {
@@ -764,7 +770,19 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     },
   });
 
-  const onResize = () => { sizeOverlays(); applySize(); };
+  const onResize = () => {
+    const before = currentPose();
+    const wasSettled = flight.value === 1;
+    sizeOverlays();
+    applySize();
+    // a re-fit (keyboard, rotation) glides from the current view instead of jumping
+    if (wasSettled && !o.reducedMotion && lookAt.lengthSq() > 0) {
+      from = before;
+      flight.snap(0);
+      flight.target = 1;
+      invalidate();
+    }
+  };
   const onVis = () => { if (!hidden()) { last = performance.now(); invalidate(); } };
   // GPU context loss (driver reset, tab backgrounded on mobile): let the browser restore it
   // and redraw; the page never drops out of 3D once it has loaded
