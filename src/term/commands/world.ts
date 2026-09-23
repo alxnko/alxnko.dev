@@ -1,4 +1,10 @@
 // theme, desk, ring, fan, sound, meow: commands with a physical effect (spec §3.5).
+
+/** meow in other languages (all hidden from help; see `man meow`). */
+export const MEOW_ALIASES: readonly string[] = [
+  'mew', 'purr', 'nya', 'nyan', 'nyaa', 'にゃー', 'にゃん', 'мяу', 'мияу',
+  'miau', 'miaou', 'miao', 'mjau', 'miyav', '喵', '야옹',
+];
 import { fail, untilAborted, type ShellEnv } from '../registry';
 import { themeName } from '../vfs';
 import type { Command, FanSpeed, Ring, SoundLevel } from '../types';
@@ -100,17 +106,21 @@ export function worldCommands(env: ShellEnv): Command[] {
     },
   };
 
-  const MEOWS = ['meow.', 'mrrp.', 'meow?', 'mrow.'];
-  const meow: Command = {
-    name: 'meow',
-    summary: 'meow',
-    usage: 'meow',
+  // Every way the internet says meow. Each answers in its own word, so `nya` says nya and
+  // `мяу` says мяу; all of them make the cat react. Only `meow` is listed in help.
+  const ENDINGS = ['.', '?', '~', '!', '.'];
+  const meowIn = (name: string, hidden: boolean): Command => ({
+    name,
+    summary: hidden ? `meow, in another language` : 'meow (in many languages)',
+    usage: name,
     group: 'world',
+    hidden,
     run(ctx) {
-      ctx.out(`=^..^=  ${MEOWS[Math.floor(env.random() * MEOWS.length) % MEOWS.length]}`);
+      ctx.out(`=^..^=  ${name}${ENDINGS[Math.floor(env.random() * ENDINGS.length) % ENDINGS.length]}`);
       ctx.world.meow();
     },
-  };
+  });
+  const meows = [meowIn('meow', false), ...MEOW_ALIASES.map((n) => meowIn(n, true))];
 
-  return [theme, desk, ring, fan, sound, meow];
+  return [theme, desk, ring, fan, sound, ...meows];
 }

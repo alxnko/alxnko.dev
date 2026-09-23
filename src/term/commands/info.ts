@@ -1,5 +1,6 @@
 // help, man, whoami, fastfetch, uname, uptime, date, echo, hostname.
 import { CONTACTS, SITE } from '../../content/site';
+import { MEOW_ALIASES } from './world';
 import { CAT_MARK } from '../../content/mark';
 import { b, fg, link, pad, PALETTE } from '../format';
 import { fail, flags, type ShellEnv } from '../registry';
@@ -65,7 +66,7 @@ const MAN: Record<string, string> = {
   ring: 'Sets the ring light behind the monitor: green, purple or off.',
   fan: 'Sets the desk fan speed 0 to 3. Without an argument, cycles.',
   sound: 'Sets the sound level. All sounds are synthesized; off by default.',
-  meow: 'Meows. The cat on the fan may react.',
+  meow: `Meows, and the cat on the fan reacts. Also answers to: ${MEOW_ALIASES.join(', ')}.`,
   cmatrix: 'Shows falling characters for up to eight seconds. Any key stops it.',
   pacman: 'Package manager. -Syu synchronizes and upgrades the system.',
   grep: 'Prints lines matching a fixed-string pattern. -i ignores case, -v inverts the match.',

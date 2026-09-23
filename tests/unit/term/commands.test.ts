@@ -1,4 +1,7 @@
 // @vitest-environment happy-dom
+import { TermStore } from '../../../src/term/store';
+import { Shell } from '../../../src/term/exec';
+import { NullWorld } from '../../../src/term/world';
 import { CAT_MARK } from '../../../src/content/mark';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { bootLines } from '../../../src/term/boot';
@@ -503,5 +506,31 @@ describe('never names the upstream distro', () => {
     const walk = (d: string): string[] => readdirSync(d).flatMap((n) => (statSync(join(d, n)).isDirectory() ? walk(join(d, n)) : [join(d, n)]));
     const files = walk(join(process.cwd(), 'src/term'));
     expect(files.filter((f) => /\barch\b/i.test(readFileSync(f, 'utf8')))).toEqual([]);
+  });
+});
+
+describe('meow in many languages', () => {
+  it.each(['meow', 'nya', 'nyan', 'мяу', 'мияу', 'miau', 'にゃー', '喵', '야옹'])('%s answers in its own word and makes the cat react', async (w) => {
+    const store = new TermStore();
+    const world = new NullWorld();
+    let meows = 0;
+    world.meow = () => { meows++; };
+    const sh = new Shell(store, world);
+    await sh.run(w);
+    const last = store.state.lines.at(-1)!.map((s) => s.text).join('');
+    expect(last).toMatch(new RegExp(`^=\\^\\.\\.\\^=  ${w}[.?~!]$`));
+    expect(meows).toBe(1);
+  });
+  it('only meow is listed in help; man meow lists the aliases', async () => {
+    const store = new TermStore();
+    const sh = new Shell(store, new NullWorld());
+    await sh.run('help');
+    const help = store.state.lines.map((l) => l.map((s) => s.text).join('')).join('\n');
+    expect(help).toMatch(/meow\s+meow \(in many languages\)/);
+    expect(help).not.toMatch(/^\s+nya\s/m);
+    await sh.run('man meow');
+    const man = store.state.lines.map((l) => l.map((s) => s.text).join('')).join('\n');
+    expect(man).toContain('nya');
+    expect(man).toContain('мяу');
   });
 });
