@@ -12,10 +12,13 @@ export interface Manifest {
   };
   /** Axis (glTF node-local) the fan blades spin around. */
   fanAxis: [number, number, number];
+  /** How far the day floor shadow slides per metre the desk rises (glTF x/y/z), if baked. */
+  sunShift?: [number, number, number];
 }
 
 const isStr = (v: unknown): v is string => typeof v === 'string' && /^[\w.-]+$/.test(v);
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const isVec3 = (v: unknown): v is [number, number, number] => Array.isArray(v) && v.length === 3 && v.every(isNum);
 
 export function parseManifest(raw: unknown): Manifest {
   const m = raw as Record<string, any>;
@@ -27,6 +30,7 @@ export function parseManifest(raw: unknown): Manifest {
     isStr(m.files?.glb) &&
     ['day', 'night'].every((t) => isStr(atlas?.[t]?.['2048']) && isStr(atlas?.[t]?.['1024']));
   if (!ok) throw new Error('bad scene manifest');
+  const sun = m.nodes?.shadow_floor?.runtime?.sunShiftPerMetre;
   const axis = Array.isArray(m.fanAxis) && m.fanAxis.length === 3 && m.fanAxis.every(isNum) ? m.fanAxis : [0, 0, 1];
   return {
     version: String(m.version ?? ''),
@@ -35,5 +39,6 @@ export function parseManifest(raw: unknown): Manifest {
     range: m.range,
     files: { glb: m.files.glb, atlas },
     fanAxis: axis as [number, number, number],
+    ...(isVec3(sun) ? { sunShift: sun } : {}),
   };
 }

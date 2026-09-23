@@ -196,7 +196,19 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const shadowMat = shadowMaterial(firstAtlas, firstAtlas, mix);
   const shadowFloor = opt('shadow_floor'), shadowWall = opt('shadow_wall');
   for (const sh of [shadowFloor, shadowWall]) if (sh) meshesOf(sh).forEach((m) => { m.material = shadowMat; m.renderOrder = 1; });
-  const floorScale0 = shadowFloor?.scale.clone();
+  const floorScale0 = shadowFloor?.scale.clone(), floorPos0 = shadowFloor?.position.clone();
+  // day: the sun shadow of a raised top slides along the sun's horizontal direction; night:
+  // the soft screen/lamp shadow spreads and fades. Blended by the theme mix (manifest note).
+  const sunShift = manifest.sunShift;
+  const placeFloorShadow = () => {
+    if (!shadowFloor || !floorScale0 || !floorPos0) return;
+    const up = Math.max(0, rigDy), day = 1 - mix;
+    const k = 1 + 0.35 * up * (sunShift ? mix : 1);
+    shadowFloor.scale.set(floorScale0.x * k, floorScale0.y, floorScale0.z * k);
+    shadowFloor.position.copy(floorPos0);
+    if (sunShift) shadowFloor.position.add(new Vector3(sunShift[0], sunShift[1], sunShift[2]).multiplyScalar(up * day));
+    shadowMat.uniforms.uFade.value = Math.min(0.6, up * 1.4) * (sunShift ? mix : 1);
+  };
   const fanRing = opt('fan_ring');
   if (fanRing) meshesOf(fanRing).forEach((m) => (m.material = ringMat));
   const backlight = glowMaterial();
@@ -447,11 +459,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const setDeskHeight = (h: number) => {
     rigDy = h - manifest.deskBase;
     rig.position.y = rigBaseY + rigDy;
-    if (shadowFloor && floorScale0) {
-      const up = Math.max(0, rigDy);
-      shadowFloor.scale.set(floorScale0.x * (1 + 0.35 * up), floorScale0.y, floorScale0.z * (1 + 0.35 * up));
-      shadowMat.uniforms.uFade.value = Math.min(0.6, up * 1.4);
-    }
+    placeFloorShadow();
     if (cable) cable.scale.y = Math.max(0.2, (cableLen0 + rigDy) / cableLen0);
   };
   setDeskHeight(clamp(o.initial.desk, manifest.range[0], manifest.range[1]));
@@ -537,6 +545,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       mix = mixTween.value(now);
       baked.uniforms.uMix.value = mix;
       shadowMat.uniforms.uMix.value = mix;
+      placeFloorShadow();
       sky.uniforms.uMix.value = mix;
       scene.background = (scene.background as Color).set('#e9e8e4').lerp(new Color('#0a0a0b'), mix);
       animating = true;
