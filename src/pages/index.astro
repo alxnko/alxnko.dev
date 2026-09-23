@@ -16,7 +16,7 @@ const tset = (k: 'wide' | 'tall', f: 'avif' | 'webp') =>
   posters ? JSON.stringify({ day: posters.day[k][f], night: posters.night[k][f] }) : '';
 const PORTRAIT = '(max-width: 719px)';
 ---
-<Base title={title} description={description} path="/">
+<Base title={title} description={description} path="/" desk>
   <button slot="bar" id="enter3d" class="bar-btn" type="button" hidden>enter 3d</button>
   <div id="stage" aria-hidden="true"></div>
   <main class="sheet" id="main">
@@ -46,6 +46,9 @@ const PORTRAIT = '(max-width: 719px)';
       </figure>
     )}
   </main>
+  <button id="back" class="back" type="button" hidden aria-keyshortcuts="Escape">
+    <span aria-hidden="true">←</span> desk <kbd>esc</kbd>
+  </button>
   <Nav />
-  <p id="hint" class="hint">type anywhere · scroll to move</p>
+  <p id="hint" class="hint">type anywhere · drag to look around · scroll to zoom</p>
 </Base>

@@ -450,8 +450,8 @@ are exactly the defaults every generated dev site ships, so they are **banned he
 
 **Required (craft):**
 - Personality comes from **real specifics**: the actual desk, keyboard colorway, fan
-  with the cat, the paddle `1 2 3 ▲ ▼`, Kyrgyzstan coordinates in the status bar
-  (`42.87°N 74.59°E`), the real prompt style, and real facts.
+  with the cat, the paddle `1 2 3 ▲ ▼` 
+ , the real prompt style, and real facts.
 - Typographic discipline: one family (JetBrains Mono) plus the VT323 name mark, a
   strict size scale (12/13/14/16/20/28/40), tabular numbers in the clock and heights.
 - Hard 1 px graphite rules and a precise alignment grid. Chrome labels read like a

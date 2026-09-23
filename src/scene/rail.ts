@@ -42,6 +42,11 @@ export class Rail {
     return unpack(centripetal(p0, p1, p2, p3, u));
   }
 
+  /** The current pose of a landmark (after setPoses). */
+  pose(l: Landmark): Pose {
+    return this.poses[l];
+  }
+
   nearest(t: number): Landmark {
     return LANDMARKS[Math.min(Math.max(Math.round(t), 0), LANDMARKS.length - 1)];
   }
@@ -91,4 +96,14 @@ export class Spring {
     }
     return true;
   }
+}
+
+/** Straight interpolation between two poses (a flight goes directly, not along the rail). */
+export function lerpPose(a: Pose, b: Pose, k: number): Pose {
+  const l = (x: number, y: number) => x + (y - x) * k;
+  return {
+    pos: [l(a.pos[0], b.pos[0]), l(a.pos[1], b.pos[1]), l(a.pos[2], b.pos[2])],
+    target: [l(a.target[0], b.target[0]), l(a.target[1], b.target[1]), l(a.target[2], b.target[2])],
+    fov: l(a.fov, b.fov),
+  };
 }

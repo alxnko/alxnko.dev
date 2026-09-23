@@ -13,12 +13,14 @@ import { TOKENS } from '../lib/tokens';
 import Toggles from '../components/Toggles.astro';
 
 interface Props {
+  /** The home page: boots straight into the 3D desk when the device can run it. */
+  desk?: boolean;
   title: string;
   description: string;
   path: string;
   index?: boolean;
 }
-const { title, description, path, index = true } = Astro.props;
+const { title, description, path, index = true, desk = false } = Astro.props;
 const url = new URL(path, SITE.url).href;
 const og = new URL('/og.png', SITE.url).href;
 const dark = TOKENS.semantic.dark.bg;
@@ -40,7 +42,7 @@ const ld = JSON.stringify(person).replace(/</g, '\\u003c');
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>{title}</title>
     <meta name="description" content={description} />
     {index ? <link rel="canonical" href={url} /> : <meta name="robots" content="noindex" />}
@@ -55,6 +57,28 @@ const ld = JSON.stringify(person).replace(/</g, '\\u003c');
       d.classList.add('js');
       document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = t === 'light' ? light : dark; });
     </script>
+    {desk && (
+      <script is:inline>
+        // Decide before first paint whether this visit boots into the 3D desk (mirrors
+        // decide3D in src/scene/gate.ts). If so, the flat page never flashes: a tty loader
+        // shows until the desk is ready, or until loading fails and the page takes over.
+        (function () {
+          try {
+            var d = document.documentElement, q = location.search, n = navigator, c = n.connection || {};
+            if (/[?&]lite(&|=|$)/.test(q)) return;
+            var cv = document.createElement('canvas'), gl = cv.getContext('webgl2');
+            if (!gl) return;
+            var lose = gl.getExtension('WEBGL_lose_context');
+            if (lose) lose.loseContext();
+            if (!/[?&]3d(&|=|$)/.test(q)) {
+              if (c.saveData || /(^|-)2g$/.test(c.effectiveType || '')) return;
+              if ((n.hardwareConcurrency && n.hardwareConcurrency < 4) || (n.deviceMemory && n.deviceMemory < 4)) return;
+            }
+            d.dataset.boot = '3d';
+          } catch (e) {}
+        })();
+      </script>
+    )}
     <link rel="preload" href={jbRegular} as="font" type="font/woff2" crossorigin />
     <link rel="preload" href={markFont} as="font" type="font/woff2" crossorigin />
     <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -78,10 +102,23 @@ const ld = JSON.stringify(person).replace(/</g, '\\u003c');
     <script type="application/ld+json" set:html={ld} />
   </head>
   <body id="app" data-mode="page">
+    {desk && (
+      <div id="loader" class="loader" role="status" aria-live="polite">
+        <div class="loader-tty">
+          <p class="loader-head"><span>tty1</span><span>{SITE.handle}@{SITE.host}</span></p>
+          <ol id="loader-steps" class="loader-steps">
+            <li data-step="manifest"><span class="st">[      ]</span> Reading scene manifest</li>
+            <li data-step="geometry"><span class="st">[      ]</span> Loading desk geometry</li>
+            <li data-step="lighting"><span class="st">[      ]</span> Baking in the lights</li>
+            <li data-step="screens"><span class="st">[      ]</span> Waking up the screens</li>
+          </ol>
+          <div class="loader-bar" aria-hidden="true"><span id="loader-fill"></span></div>
+        </div>
+      </div>
+    )}
     <a class="skip" href="#term-input">skip to terminal</a>
     <header class="bar">
       <a class="bar-home" href="/" aria-label="alxnko.dev home">alxnko.dev</a>
-      <span class="bar-meta num" aria-hidden="true">{SITE.coords.toLowerCase()}</span>
       <slot name="bar" />
       <Toggles />
     </header>

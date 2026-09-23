@@ -47,7 +47,8 @@ export function screenMaterial(map: Texture): ShaderMaterial {
         float fr = pow(1.0 - clamp(abs(dot(normalize(vN), normalize(vV))), 0.0, 1.0), 4.0);
         // soft diagonal sheen so the glass reads as glass from off-axis
         float sheen = smoothstep(0.0, 1.0, 1.0 - abs(vUv.x - vUv.y * 0.6 - 0.25) * 2.2) * 0.25;
-        vec3 c = base + uRefl * uReflAmt * (fr * 1.6 + sheen * fr + 0.08);
+        // reflection only at grazing angles, so the canvas panes match the live DOM panel's black face-on
+        vec3 c = base + uRefl * uReflAmt * (fr * 1.6 + sheen * fr);
         gl_FragColor = vec4(c, 1.0);
         #include <colorspace_fragment>
       }`,
@@ -57,15 +58,18 @@ export function screenMaterial(map: Texture): ShaderMaterial {
 /** The ring light's wash on the wall: additive, radial, runtime-tinted (spec D8). */
 export function glowMaterial(): ShaderMaterial {
   return new ShaderMaterial({
-    uniforms: { uColor: { value: new Color('#00ff82') }, uIntensity: { value: 1 } },
+    uniforms: { uColor: { value: new Color('#00ff82') }, uIntensity: { value: 1 }, uShape: { value: 1 } },
     vertexShader: vsUv,
     fragmentShader: /* glsl */ `
-      uniform vec3 uColor; uniform float uIntensity; varying vec2 vUv;
+      uniform vec3 uColor; uniform float uIntensity; uniform float uShape; varying vec2 vUv;
       void main() {
         float d = length(vUv - 0.5) * 2.0;
         float ring = exp(-pow((d - 0.38) * 5.0, 2.0)) * 0.55;
         float wash = pow(max(1.0 - d, 0.0), 2.2) * 0.45;
-        float a = (ring + wash) * uIntensity;
+        // uShape 0: flat backlight, soft only at the very edge
+        vec2 e = min(vUv, 1.0 - vUv);
+        float flat_ = smoothstep(0.0, 0.08, min(e.x, e.y));
+        float a = mix(flat_, ring + wash, uShape) * uIntensity;
         gl_FragColor = vec4(uColor * a, a);
         #include <colorspace_fragment>
       }`,

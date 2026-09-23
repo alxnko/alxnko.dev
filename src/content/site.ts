@@ -8,7 +8,6 @@ export const SITE = {
   company: 'AIT Solutions',
   country: 'Kyrgyzstan',
   countryCode: 'KG',
-  coords: '42.87°N 74.59°E',
   host: 'nitro',
   os: 'meowOS',
   rank: {

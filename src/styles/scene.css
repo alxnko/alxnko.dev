@@ -60,7 +60,14 @@
   display: none;
 }
 
-/* the poster matches the desk landmark and sits under the canvas until it fades in */
+/* the poster matches the desk landmark; it shows while the scene loads, then the live
+   scene replaces it (never both at once) */
+[data-scene="ready"] .poster {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--d-slow) var(--ease), visibility 0s linear var(--d-slow);
+}
+
 [data-mode="scene"] .poster {
   position: fixed;
   inset: 0;
@@ -113,27 +120,33 @@
   font-size: var(--fs-2);
 }
 
-/* docked overlays: the runtime sets transform/size; undocked they stay in the a11y tree
-   but are visually transparent, and focusing them flies the camera there */
+/* pinned screens: the live DOM terminal and contacts are mapped onto the laptop and monitor
+   screens with a projective matrix3d every frame, at every distance, so the screens always
+   show the real, interactive thing (no swapping, no popping). The runtime sets the logical
+   size (--screen-w/h, --contacts-w/h) and the transform; data-dock="off" only when a screen
+   faces away or is out of view. */
 [data-mode="scene"] .term,
 [data-mode="scene"] .contacts {
   position: fixed;
   top: 0;
   left: 0;
   z-index: var(--z-dock);
+  margin: 0;
   transform-origin: 0 0;
-  transition: opacity var(--d-fast) linear;
+  backface-visibility: hidden;
+  will-change: transform;
 }
 
-[data-mode="scene"] .term:not([data-dock="screen"]):not([data-dock="sheet"]),
-[data-mode="scene"] .contacts:not([data-dock="screen"]) {
-  opacity: 0;
+[data-mode="scene"] .term[data-dock="off"],
+[data-mode="scene"] .contacts[data-dock="off"],
+[data-mode="scene"] .term:not([data-dock]),
+[data-mode="scene"] .contacts:not([data-dock]) {
+  visibility: hidden;
 }
 
-/* docked on the laptop: the exact logical grid the mirror draws, mapped by matrix3d */
-[data-mode="scene"] .term[data-dock="screen"] {
-  width: var(--mirror-w);
-  height: var(--mirror-h);
+[data-mode="scene"] .term {
+  width: var(--screen-w);
+  height: var(--screen-h);
   border: 0;
   border-radius: 0;
   font-size: var(--mirror-font);
@@ -141,65 +154,93 @@
   --term-lh: 1.25;
 }
 
-[data-mode="scene"] .term[data-dock="screen"] .term-head {
+[data-mode="scene"] .term .term-head {
   height: var(--mirror-bar);
   padding: 0 var(--mirror-pad);
-  font-size: inherit;
+  font-size: 0.8em;
 }
 
-[data-mode="scene"] .term[data-dock="screen"] .term-screen {
+[data-mode="scene"] .term .term-screen {
   flex: 1;
   height: auto;
   padding: var(--mirror-pad) var(--mirror-pad) 0;
 }
 
-[data-mode="scene"] .term[data-dock="screen"] .term-form {
+[data-mode="scene"] .term .term-form {
   padding: 0 var(--mirror-pad) var(--mirror-pad);
   border-top: 0;
   font-size: inherit;
 }
 
-[data-mode="scene"] .term[data-dock="screen"] .term-chips {
+/* the screen is small from afar: the 16px phone input rule applies to the real input box,
+   which is the pinned one here, so keep it legible via the logical size instead */
+[data-mode="scene"] .term .term-form input {
+  font-size: inherit;
+}
+
+[data-mode="scene"] .term .term-chips {
   display: none;
 }
 
 [data-mode="scene"] .contacts {
   width: var(--contacts-w);
   height: var(--contacts-h);
-  padding: var(--sp-6);
+  padding: 40px 56px;
   background: var(--ansi-bg);
   color: var(--ansi-fg);
+  font-size: 30px;
+  line-height: 1.4;
 }
 
-/* narrow or touch: the docked terminal is a sheet over the lower half (the scene frames the
-   laptop above it); the landmark nav rides on top of the sheet so it stays reachable */
-@media (max-width: 719px), (pointer: coarse) {
-  [data-mode="scene"] .term[data-dock="sheet"] {
-    top: auto;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    z-index: var(--z-sheet);
-    height: 50dvh;
-    padding-bottom: env(safe-area-inset-bottom);
-    border-width: 1px 0 0;
-    border-radius: var(--r-m) var(--r-m) 0 0;
-    transform: none !important;
-  }
+[data-mode="scene"] .contacts .label {
+  color: var(--ansi-dim);
+}
 
-  [data-mode="scene"] .term[data-dock="sheet"] .term-screen {
-    flex: 1;
-    height: auto;
-  }
+[data-mode="scene"] .contacts a {
+  min-height: 0;
+  padding: 12px 0;
+  color: var(--ansi-fg);
+  border-color: var(--term-rule, #232326);
+}
 
-  [data-mode="scene"]:has(.term[data-dock="sheet"]) .nav {
-    z-index: var(--z-sheet);
-    bottom: calc(50dvh + var(--sp-2));
-  }
+[data-mode="scene"] .contacts a .c-key {
+  color: var(--ansi-green);
+}
 
-  [data-mode="scene"]:has(.term[data-dock="sheet"]) .hint {
-    display: none;
-  }
+/* back to the desk view: appears whenever you have flown or looked away */
+.back {
+  display: none;
+}
+
+[data-mode="scene"] .back:not([hidden]) {
+  display: inline-flex;
+  position: fixed;
+  z-index: var(--z-chrome);
+  top: calc(env(safe-area-inset-top) + var(--sp-3));
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-m);
+  background: var(--c-bg-elev);
+  color: var(--c-fg);
+  font-size: var(--fs-2);
+}
+
+.back:hover {
+  border-color: var(--c-fg-subtle);
+}
+
+.back kbd {
+  color: var(--c-fg-subtle);
+  font-size: var(--fs-1);
+}
+
+@media (pointer: coarse) {
+  .back kbd { display: none; }
 }
 
 /* landmark nav + hint */
@@ -251,4 +292,115 @@
 
 [data-interacted] .hint {
   opacity: 0;
+}
+
+/* ---- boot loader (3D-capable visits only; decided in <head> before first paint) -------- */
+.loader {
+  display: none;
+}
+
+[data-boot="3d"] .loader {
+  display: grid;
+  place-items: center;
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-skip) - 1);
+  padding: var(--gutter);
+  background: var(--c-bg);
+  transition: opacity var(--d-slow) var(--ease), visibility 0s linear var(--d-slow);
+}
+
+/* while the loader is up, the flat page underneath stays out of sight (and out of the tab order) */
+[data-boot="3d"] body:not([data-scene="ready"]) > :not(.loader):not(script) {
+  visibility: hidden;
+}
+
+[data-boot="3d"] body[data-scene="ready"] .loader {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.loader-tty {
+  width: min(560px, 100%);
+  padding: var(--sp-4) var(--sp-5) var(--sp-5);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-m);
+  background: var(--ansi-bg);
+  color: var(--ansi-fg);
+  font-size: var(--fs-2);
+  line-height: 1.7;
+}
+
+.loader-head {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 var(--sp-3);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--c-line);
+  color: var(--ansi-dim);
+  font-size: var(--fs-1);
+}
+
+.loader-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ansi-dim);
+}
+
+.loader-steps li {
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loader-steps li[data-state="run"] {
+  color: var(--ansi-fg);
+}
+
+.loader-steps li[data-state="ok"] {
+  color: var(--ansi-fg);
+}
+
+.loader-steps li[data-state="ok"] .st {
+  color: var(--ansi-green);
+}
+
+.loader-bar {
+  height: 2px;
+  margin-top: var(--sp-4);
+  background: var(--c-line);
+  overflow: hidden;
+}
+
+.loader-bar span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--ansi-green);
+  transform: scaleX(var(--p, 0));
+  transform-origin: 0 50%;
+  transition: transform var(--d-base) var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-boot="3d"] .loader,
+  .loader-bar span {
+    transition: none;
+  }
+}
+
+/* selection follows attention: in 3D only the screen you have flown to is selectable (the
+   terminal at the laptop, the contacts at the monitor); chrome and far-away screens are not.
+   Inputs stay typeable regardless (user-select does not affect editing). */
+[data-mode="scene"] {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+[data-mode="scene"][data-view="laptop"] .term,
+[data-mode="scene"][data-view="monitor"] .contacts {
+  -webkit-user-select: text;
+  user-select: text;
 }

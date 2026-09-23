@@ -1,20 +1,19 @@
-// Camera input (spec §3.4): wheel / vertical swipe / pinch scrub along the rail; drag
-// orbits a little and springs back; a tap on the laptop or monitor flies there.
+// Camera input: drag (mouse or one finger) looks around the current spot, wheel / pinch
+// zoom in and out, a tap on the laptop or monitor flies there.
 // Every gesture has a button alternative (the landmark nav), per spec §11.
 
 export interface InputHandlers {
   canvas: HTMLCanvasElement;
   reducedMotion: boolean;
-  scrub(dt: number): void;
+  /** Multiply the viewing distance by f (<1 closer). */
+  zoom(f: number): void;
+  /** Incremental drag in CSS px. */
   orbit(dx: number, dy: number): void;
-  release(): void;
   pointer(x: number, y: number): void;
   tap(x: number, y: number): void;
 }
 
-const WHEEL_K = 0.0015;
-const SWIPE_K = 0.006;
-const PINCH_K = 0.012;
+const WHEEL_K = 0.0012;
 const TAP_PX = 8;
 const TAP_MS = 350;
 
@@ -36,12 +35,13 @@ export function attachInput(h: InputHandlers): () => void {
   canvas.style.touchAction = 'none';
   const pts = new Map<number, { x: number; y: number; x0: number; y0: number; t0: number }>();
   let pinch0 = 0;
-  let axis: 'x' | 'y' | null = null;
+  let axis: 'x' | null = null;
 
   const onWheel = (e: WheelEvent) => {
     if (e.ctrlKey || inScrollable(e.target)) return; // ctrl+wheel = browser zoom
     const px = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * innerHeight : e.deltaY;
-    h.scrub(Math.max(-0.6, Math.min(0.6, px * WHEEL_K)));
+    h.zoom(Math.exp(Math.max(-0.5, Math.min(0.5, px * WHEEL_K))));
+    e.preventDefault?.();
   };
 
   const onDown = (e: PointerEvent) => {
@@ -63,18 +63,12 @@ export function attachInput(h: InputHandlers): () => void {
     if (pts.size === 2) {
       const [a, b] = [...pts.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      h.scrub((d - pinch0) * PINCH_K * 0.1);
+      if (pinch0 > 0 && d > 0) h.zoom(pinch0 / d);
       pinch0 = d;
       return;
     }
-    const tx = p.x - p.x0, ty = p.y - p.y0;
-    if (!axis && Math.hypot(tx, ty) > TAP_PX) axis = Math.abs(ty) > Math.abs(tx) ? 'y' : 'x';
-    if (e.pointerType === 'touch') {
-      if (axis === 'y') h.scrub(-dy * SWIPE_K * 0.1);
-      else if (axis === 'x') h.orbit(tx, 0);
-    } else if (axis) {
-      h.orbit(tx, ty);
-    }
+    if (!axis && Math.hypot(p.x - p.x0, p.y - p.y0) > TAP_PX) axis = 'x';
+    if (axis) h.orbit(dx, dy);
   };
 
   const onUp = (e: PointerEvent) => {
@@ -82,16 +76,16 @@ export function attachInput(h: InputHandlers): () => void {
     pts.delete(e.pointerId);
     if (!p) return;
     if (!axis && performance.now() - p.t0 < TAP_MS && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < TAP_PX) h.tap(e.clientX, e.clientY);
-    if (pts.size === 0) { axis = null; h.release(); }
+    if (pts.size === 0) axis = null;
   };
 
-  addEventListener('wheel', onWheel, { passive: true });
+  canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('pointerdown', onDown);
   addEventListener('pointermove', onMove, { passive: true });
   addEventListener('pointerup', onUp, { passive: true });
   addEventListener('pointercancel', onUp, { passive: true });
   return () => {
-    removeEventListener('wheel', onWheel);
+    canvas.removeEventListener('wheel', onWheel);
     canvas.removeEventListener('pointerdown', onDown);
     removeEventListener('pointermove', onMove);
     removeEventListener('pointerup', onUp);

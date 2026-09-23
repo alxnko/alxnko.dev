@@ -1,51 +1,40 @@
-// Glues the live DOM onto the 3D screens (spec §3.3, §6.4). Desktop: the terminal is
-// mapped onto the laptop screen with a projective matrix3d, so docked DOM text lands
-// where the canvas mirror drew it. Phones: the terminal becomes a bottom sheet.
+// Pins the live DOM onto the 3D screens (spec §3.3, §6.4, revised): the terminal on the
+// laptop and the contacts on the monitor are mapped with a projective matrix3d every frame,
+// at every camera distance. Only a screen that faces away or leaves the view is hidden.
 import { homography, toMatrix3d, type Pt } from './homography';
 
-const DOCK_IN = 0.08;
-const DOCK_OUT = 0.15;
-/** Logical size of the contacts panel when docked on the 21:9 monitor. */
-export const CONTACTS_DOCK = { w: 1024, h: 429 } as const;
-
-export interface DockInput {
-  termErr: number;
-  contactsErr: number;
-  sheet: boolean;
-  termQuad: Pt[];
-  contactsQuad: Pt[];
+export interface ScreenQuad {
+  /** Projected corners TL, TR, BR, BL in CSS px, or null when behind the camera. */
+  quad: Pt[] | null;
+  /** True when the screen's front faces the camera. */
+  facing: boolean;
 }
 
 export class Dock {
-  private term = false;
-  private contacts = false;
-  private lastTerm = '';
-  private lastContacts = '';
+  private last = new Map<HTMLElement, string>();
 
-  constructor(private o: { termEl: HTMLElement; contactsEl: HTMLElement; mirrorSize: [number, number] }) {}
+  constructor(private o: { termEl: HTMLElement; contactsEl: HTMLElement }) {}
 
-  update(i: DockInput): { term: boolean; contacts: boolean } {
-    this.term = this.term ? i.termErr < DOCK_OUT : i.termErr < DOCK_IN;
-    this.contacts = this.contacts ? i.contactsErr < DOCK_OUT : i.contactsErr < DOCK_IN;
-    const { termEl, contactsEl, mirrorSize } = this.o;
+  /** Logical (untransformed) size of each overlay, in CSS px. */
+  size(el: HTMLElement): [number, number] {
+    return [el.offsetWidth, el.offsetHeight];
+  }
 
-    const termMode = !this.term ? 'off' : i.sheet ? 'sheet' : 'screen';
-    if (termEl.dataset.dock !== termMode) termEl.dataset.dock = termMode;
-    if (termMode === 'screen') {
-      const [w, h] = mirrorSize;
-      const t = safeMatrix([[0, 0], [w, 0], [w, h], [0, h]], i.termQuad);
-      if (t && t !== this.lastTerm) { termEl.style.transform = t; this.lastTerm = t; }
-    } else if (this.lastTerm) { termEl.style.removeProperty('transform'); this.lastTerm = ''; }
+  private pin(el: HTMLElement, s: ScreenQuad) {
+    const [w, h] = this.size(el);
+    const on = !!s.quad && s.facing && w > 0 && h > 0;
+    const t = on ? safeMatrix([[0, 0], [w, 0], [w, h], [0, h]], s.quad!) : null;
+    const mode = t ? 'screen' : 'off';
+    if (el.dataset.dock !== mode) el.dataset.dock = mode;
+    if (t && t !== this.last.get(el)) {
+      el.style.transform = t;
+      this.last.set(el, t);
+    }
+  }
 
-    const cMode = this.contacts ? 'screen' : 'off';
-    if (contactsEl.dataset.dock !== cMode) contactsEl.dataset.dock = cMode;
-    if (cMode === 'screen') {
-      const { w, h } = CONTACTS_DOCK;
-      const t = safeMatrix([[0, 0], [w, 0], [w, h], [0, h]], i.contactsQuad);
-      if (t && t !== this.lastContacts) { contactsEl.style.transform = t; this.lastContacts = t; }
-    } else if (this.lastContacts) { contactsEl.style.removeProperty('transform'); this.lastContacts = ''; }
-
-    return { term: this.term, contacts: this.contacts };
+  update(term: ScreenQuad, contacts: ScreenQuad) {
+    this.pin(this.o.termEl, term);
+    this.pin(this.o.contactsEl, contacts);
   }
 
   destroy() {
@@ -57,7 +46,7 @@ export class Dock {
 }
 
 function safeMatrix(src: Pt[], dst: Pt[]): string | null {
-  if (dst.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y))) return null;
+  if (dst.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > 1e5 || Math.abs(y) > 1e5)) return null;
   try {
     return toMatrix3d(homography(src, dst));
   } catch {

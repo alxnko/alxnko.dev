@@ -126,12 +126,30 @@ function enter3d() {
         termEl,
         contactsEl,
         onLandmark(l) {
+          document.body.dataset.view = l; // scene.css: only the screen you're at is selectable
           for (const b of document.querySelectorAll<HTMLButtonElement>('#nav [data-landmark]')) {
             if (b.dataset.landmark === l) b.setAttribute('aria-current', 'true');
             else b.removeAttribute('aria-current');
           }
         },
-        onFallback: () => leave3d(),
+        onStep(stepName, state) {
+          const li = document.querySelector<HTMLElement>(`#loader-steps [data-step="${stepName}"]`);
+          if (!li) return;
+          li.dataset.state = state;
+          const st = li.querySelector('.st');
+          if (st) st.textContent = state === 'ok' ? '[  OK  ]' : '[  ..  ]';
+        },
+        onProgress(p) {
+          $('loader-fill')?.style.setProperty('--p', String(Math.min(1, Math.max(0, p))));
+        },
+        onPaddle(key) {
+          // the paddle is just another way to type `desk N`: the terminal shows it too
+          void shell.run(`desk ${key}`);
+        },
+        onAway(away) {
+          const b = $('back');
+          if (b) b.hidden = !away;
+        },
       }),
     )
     .then((handle) => {
@@ -141,7 +159,10 @@ function enter3d() {
       document.body.dataset.scene = 'ready';
       if (btn) btn.hidden = true;
     })
-    .catch(() => leave3d());
+    .catch((e) => {
+      console.warn('3d unavailable:', e);
+      leave3d();
+    });
 }
 
 let handle3d: { destroy(): void } | null = null;
@@ -151,9 +172,14 @@ function leave3d() {
   world.scene = null;
   document.body.dataset.mode = 'page';
   delete document.body.dataset.scene;
+  delete document.documentElement.dataset.boot; // reveal the page (no loader, no 3D)
   const btn = $('enter3d') as HTMLButtonElement | null;
   if (btn && hasWebGL2()) { btn.hidden = false; btn.disabled = false; btn.textContent = 'enter 3d'; }
 }
+
+// The <head> check already decided this visit boots into 3D: start now, not after idle.
+const booting3d = document.documentElement.dataset.boot === '3d';
+if (booting3d) enter3d();
 
 function afterIdle() {
   const nav = navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string }; deviceMemory?: number };
@@ -167,11 +193,18 @@ function afterIdle() {
   });
   const btn = $('enter3d') as HTMLButtonElement | null;
   btn?.addEventListener('click', enter3d);
-  if (gate === 'auto') enter3d();
+  if (gate === 'auto' && !booting3d) enter3d();
   else if (gate === 'offer' && btn) btn.hidden = false;
 }
 
-// camera nav, focus → fly, theme → scene
+// camera nav, back to desk (button or Esc), focus → fly, theme → scene
+$('back')?.addEventListener('click', () => world.fly('desk'));
+addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && world.scene) {
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    world.fly('desk');
+  }
+});
 for (const b of document.querySelectorAll<HTMLButtonElement>('#nav [data-landmark]'))
   b.addEventListener('click', () => world.fly(b.dataset.landmark as Landmark));
 $('term')?.addEventListener('focusin', () => { if (world.scene) world.fly('laptop'); });

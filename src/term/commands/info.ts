@@ -49,7 +49,8 @@ function shortUptime(env: ShellEnv): string {
 }
 
 // The cat mark (shared with the monitor screen), padded to a fixed width.
-const CAT = CAT_MARK.map((l) => l.padEnd(17, ' '));
+const CAT_W = Math.max(...CAT_MARK.map((l) => l.length));
+const CAT = CAT_MARK.map((l) => l.padEnd(CAT_W, ' '));
 
 const MAN: Record<string, string> = {
   help: 'Lists the commands on this machine, grouped. Hidden ones stay hidden.',
@@ -155,7 +156,7 @@ export function infoCommands(env: ShellEnv): Command[] {
         kv('uptime', shortUptime(env)),
         kv('shell', 'bash 5.3'),
         kv('role', `${SITE.role} @ ${SITE.company}`),
-        kv('loc', `${SITE.country} ${SITE.coords}`),
+        kv('loc', SITE.country),
         kv('rank', [link(SITE.rank.short, SITE.rank.href)]),
       ];
       if (!compact) {

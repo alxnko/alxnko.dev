@@ -8,24 +8,37 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { FanSpeed, Landmark, Ring, Theme, WorldState } from '../term/types';
 import { parseManifest, type Manifest } from './manifest';
+import { TERM_BG } from '../lib/tokens';
 import { bakedMaterial, emissiveMaterial, glowMaterial, screenMaterial, skyMaterial } from './materials';
-import { LANDMARKS, landmarkT, Rail, Spring, type Pose, type Vec3 } from './rail';
-import { ScreenMirror, MIRROR, type MirrorStore } from './screen-mirror';
-import { MonitorScreen } from './monitor-screen';
+import { lerpPose, Rail, Spring, type Pose, type Vec3 } from './rail';
+import { FanDisplay, MonitorScreen } from './monitor-screen';
 import { catStep, clamp, easeOut, frameInterval, nextFlickIn, Tween, type CatState } from './anim';
 import { attachInput } from './input';
 import { Dock } from './dock';
+import type { Line, TermState } from '../term/types';
+
+export interface SceneStore {
+  readonly state: TermState;
+  subscribe(fn: (s: TermState) => void): () => void;
+  prompt(): Line;
+}
 
 export interface SceneOptions {
   stage: HTMLElement;
-  store: MirrorStore;
+  store: SceneStore;
   initial: WorldState;
   reducedMotion: boolean;
   mobile: boolean;
   termEl: HTMLElement;
   contactsEl: HTMLElement;
   onLandmark(l: Landmark): void;
-  onFallback(reason: string): void;
+  /** True whenever the view is anywhere but the resting desk view (flown or looked around). */
+  onAway?(away: boolean): void;
+  /** A paddle button under the desk was pressed ('1' | '2' | '3' | 'up' | 'down'). */
+  onPaddle?(key: string): void;
+  /** Loading progress for the boot loader. */
+  onStep?(step: LoadStep, state: 'run' | 'ok'): void;
+  onProgress?(p: number): void;
 }
 
 export interface SceneWorld {
@@ -40,15 +53,24 @@ export interface SceneWorld {
   landmark(): Landmark;
 }
 
+export type LoadStep = 'manifest' | 'geometry' | 'lighting' | 'screens';
+
 export interface SceneHandle { world: SceneWorld; destroy(): void }
 
 const RING: Record<Ring, string> = { green: '#00ff82', purple: '#b061ff', off: '#161618' };
 const FAN_SPEED = [0, 7, 13, 20]; // rad/s
+const FAN_PCT = ['0', '40', '70', '100'];
 const DEG = Math.PI / 180;
 
 export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const base = '/scene/';
-  const manifest: Manifest = parseManifest(await (await fetch(base + 'manifest.json', { cache: 'no-cache' })).json());
+  const step = (s: LoadStep, st: 'run' | 'ok') => o.onStep?.(s, st);
+  step('manifest', 'run');
+  const res = await fetch(base + 'manifest.json', { cache: 'no-cache' });
+  if (!res.ok) throw new Error(`manifest ${res.status}`);
+  const manifest: Manifest = parseManifest(await res.json());
+  step('manifest', 'ok');
+  o.onProgress?.(0.1);
 
   // ---------- renderer ----------
   const canvas = document.createElement('canvas');
@@ -91,7 +113,17 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
 
   const gltfLoader = new GLTFLoader();
   gltfLoader.setMeshoptDecoder(MeshoptDecoder);
-  const [gltf, firstAtlas] = await Promise.all([gltfLoader.loadAsync(base + manifest.files.glb), atlas(themeKey(o.initial.theme))]);
+  step('geometry', 'run');
+  step('lighting', 'run');
+  let gp = 0;
+  const [gltf, firstAtlas] = await Promise.all([
+    gltfLoader.loadAsync(base + manifest.files.glb, (e) => {
+      if (e.total) { gp = e.loaded / e.total; o.onProgress?.(0.1 + gp * 0.6); }
+    }).then((g) => { step('geometry', 'ok'); return g; }),
+    atlas(themeKey(o.initial.theme)).then((t) => { step('lighting', 'ok'); return t; }),
+  ]);
+  o.onProgress?.(0.8);
+  step('screens', 'run');
 
   // ---------- scene graph ----------
   const scene = new Scene();
@@ -108,16 +140,17 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     return out;
   };
 
+  const opt = (n: string) => gltf.scene.getObjectByName(n) ?? null;
   let mix = o.initial.theme === 'light' ? 0 : 1;
   const baked = bakedMaterial(firstAtlas, firstAtlas, mix);
   for (const n of ['static', 'desk_baked', 'cat_body', 'cat_head', 'cat_tail', 'fan_blades']) meshesOf(node(n)).forEach((m) => (m.material = baked));
 
-  const mirror = new ScreenMirror(o.store, { mobile: o.mobile, onDirty: () => invalidate() });
-  mirror.texture.flipY = false;
+  // the terminal typed into is the DOM one pinned on this screen; any output re-renders the frame
+  const unsubStore = o.store.subscribe(() => invalidate());
   const monitor = new MonitorScreen(o.mobile);
   monitor.texture.flipY = false;
   const laptopScreen = node('screen_laptop'), monitorScreen = node('screen_monitor');
-  const laptopMat = screenMaterial(mirror.texture), monitorMat = screenMaterial(monitor.texture);
+  const laptopMat = emissiveMaterial(TERM_BG), monitorMat = screenMaterial(monitor.texture);
   meshesOf(laptopScreen).forEach((m) => (m.material = laptopMat));
   meshesOf(monitorScreen).forEach((m) => (m.material = monitorMat));
 
@@ -137,13 +170,32 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const ledPaddle = led('led_paddle', LED_OFF);
   led('led_kbd', '#c9d4ff');
   const srvLeds = [0, 1, 2, 3, 4, 5].map((i) => led(`led_srv_${i}`, i === 0 ? '#00ff82' : LED_OFF));
-  const hits = [node('hit_laptop'), node('hit_monitor')];
+  // optional nodes (older scene builds lack them): the fan's glowing bezel and speed display,
+  // and the keyboard backlights. All follow the ring colour, like the real RGB does.
+  const fanRing = opt('fan_ring');
+  if (fanRing) meshesOf(fanRing).forEach((m) => (m.material = ringMat));
+  const backlight = glowMaterial();
+  backlight.uniforms.uShape.value = 0; // flat, not radial
+  for (const n of ['kbd_glow', 'laptop_kbd_glow']) {
+    const g = opt(n);
+    if (g) meshesOf(g).forEach((m) => { m.material = backlight; m.renderOrder = 1; });
+  }
+  const fanDisplay = opt('fan_display');
+  const fanReadout = fanDisplay ? new FanDisplay() : null;
+  if (fanDisplay && fanReadout) {
+    fanReadout.texture.flipY = false;
+    meshesOf(fanDisplay).forEach((m) => (m.material = screenMaterial(fanReadout.texture)));
+    fanReadout.set(FAN_PCT[o.initial.fan]);
+  }
+
+  const paddleHits = ['1', '2', '3', 'up', 'down'].map((k) => opt(`hit_paddle_${k}`)).filter((x): x is Object3D => !!x);
+  const hits = [node('hit_laptop'), node('hit_monitor'), ...paddleHits];
   hits.forEach((h) => (h.visible = false));
 
   const rig = node('desk_rig');
   const rigBaseY = rig.position.y;
-  const cable = node('cable_drop');
-  const cableLen0 = Math.max(0.05, rig.getWorldPosition(new Vector3()).y - cable.getWorldPosition(new Vector3()).y);
+  const cable = opt('cable_drop'); // older builds only: the desk is cable-free now
+  const cableLen0 = cable ? Math.max(0.05, rig.getWorldPosition(new Vector3()).y - cable.getWorldPosition(new Vector3()).y) : 1;
   const fan = node('fan_blades');
   const fanQ0 = fan.quaternion.clone();
   const fanAxis = new Vector3(...manifest.fanAxis).normalize();
@@ -166,14 +218,16 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   };
   const wideRef = camPose('cam_wide'), deskRef = camPose('cam_desk');
 
-  /** Screen corners in world space: TL, TR, BR, BL (image orientation via UVs). */
-  const cornerIdx = new Map<Object3D, { mesh: Mesh; idx: number[] }>();
-  const screenCorners = (obj: Object3D): Vector3[] => {
-    let entry = cornerIdx.get(obj);
+  /** World-space corners TL, TR, BR, BL of a UV sub-rectangle of a screen mesh (nearest
+   *  vertices; the monitor strip is finely subdivided along its curve). */
+  const cornerIdx = new Map<string, { mesh: Mesh; idx: number[] }>();
+  const screenCorners = (obj: Object3D, u0 = 0, u1 = 1, v0 = 0, v1 = 1): Vector3[] => {
+    const key = `${obj.name}:${u0}:${u1}:${v0}:${v1}`;
+    let entry = cornerIdx.get(key);
     if (!entry) {
       const mesh = meshesOf(obj)[0];
       const uv = mesh.geometry.getAttribute('uv');
-      const idx = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([u, v]) => {
+      const idx = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]].map(([u, v]) => {
         let best = 0, bd = Infinity;
         for (let i = 0; i < uv.count; i++) {
           const d = (uv.getX(i) - u) ** 2 + (uv.getY(i) - v) ** 2;
@@ -181,13 +235,17 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
         }
         return best;
       });
-      cornerIdx.set(obj, (entry = { mesh, idx }));
+      cornerIdx.set(key, (entry = { mesh, idx }));
     }
     const { mesh, idx } = entry;
     const pos = mesh.geometry.getAttribute('position');
     mesh.updateWorldMatrix(true, false);
     return idx.map((i) => new Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(mesh.matrixWorld));
   };
+  // the live contacts panel covers the middle of the curved monitor (a short arc, so the flat
+  // DOM panel sits on the curve within a few mm); the canvas draws the side panes around it
+  const CONTACTS_UV = [0.24, 0.76, 0.12, 0.92] as const;
+  const contactsCorners = () => screenCorners(monitorScreen, ...CONTACTS_UV);
 
   const adaptFov = (vfov: number, refAspect: number) => {
     const hfov = 2 * Math.atan(Math.tan((vfov * DEG) / 2) * refAspect);
@@ -196,24 +254,18 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   };
   const withRig = (p: Pose, dy: number): Pose => ({ pos: [p.pos[0], p.pos[1] + dy, p.pos[2]], target: [p.target[0], p.target[1] + dy, p.target[2]], fov: p.fov });
 
-  const fitScreen = (corners: Vector3[], margin: number, fov: number, sheet: boolean): Pose => {
-    const [tl, tr, br, bl] = corners;
-    const c = tl.clone().add(tr).add(br).add(bl).multiplyScalar(0.25);
+  const fitScreen = (corners: Vector3[], margin: number, fov: number): Pose => {
+    const [tl, tr, , bl] = corners;
+    const c = corners.reduce((acc, v) => acc.add(v), new Vector3()).multiplyScalar(0.25);
     const w = tl.distanceTo(tr), h = tl.distanceTo(bl);
-    const n = tr.clone().sub(tl).cross(bl.clone().sub(tl)).normalize().negate();
+    const n = tr.clone().sub(tl).cross(bl.clone().sub(tl)).normalize();
     // face the side the seated viewer (cam_desk) is on
     if (n.dot(new Vector3(...deskRef.pose.pos).sub(c)) < 0) n.negate();
     const t = Math.tan((fov * DEG) / 2);
-    // sheet mode (phones): the DOM sheet covers the lower ~50%; frame the screen above it
-    const visH = sheet ? 0.46 : 1;
-    const d = Math.max(h / (margin * visH), w / (margin * camera.aspect)) / (2 * t);
-    const target = sheet ? c.clone().add(new Vector3(0, -h * 0.6, 0)) : c;
-    const pos = c.clone().add(n.multiplyScalar(d));
-    if (sheet) pos.add(target.clone().sub(c)); // shift camera with target: stays fronto-parallel
-    return { pos: pos.toArray() as Vec3, target: target.toArray() as Vec3, fov };
+    const d = Math.max(h / margin, w / (margin * camera.aspect)) / (2 * t);
+    return { pos: c.clone().add(n.multiplyScalar(d)).toArray() as Vec3, target: c.toArray() as Vec3, fov };
   };
 
-  const sheetMode = () => o.mobile || innerWidth < 720;
   let rigDy = 0;
   const rail = new Rail({ wide: wideRef.pose, desk: deskRef.pose, laptop: deskRef.pose, monitor: deskRef.pose });
   function rebuildPoses() {
@@ -221,15 +273,23 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     const wide = { ...wideRef.pose, fov: adaptFov(wideRef.pose.fov, wideRef.refAspect) };
     wide.target = [wide.target[0], wide.target[1] + rigDy, wide.target[2]];
     const desk = withRig({ ...deskRef.pose, fov: adaptFov(deskRef.pose.fov, deskRef.refAspect) }, rigDy);
-    const laptop = fitScreen(screenCorners(laptopScreen), 0.9, 34, sheetMode());
-    const mon = fitScreen(screenCorners(monitorScreen), 0.92, 34, false);
+    const laptop = fitScreen(screenCorners(laptopScreen), 0.94, 34);
+    const mon = fitScreen(screenCorners(monitorScreen), 0.94, 34); // the whole ultrawide, any aspect
     rail.setPoses({ wide, desk, laptop, monitor: mon });
   }
 
   // ---------- state ----------
-  const spring = new Spring(90);
-  spring.snap(landmarkT(o.initial.landmark === 'laptop' || o.initial.landmark === 'monitor' ? 'desk' : o.initial.landmark));
-  const orbit = { yaw: new Spring(140), pitch: new Spring(140) };
+  // flights go straight from wherever the camera is to the chosen landmark
+  let dest: Landmark = o.initial.landmark === 'wide' ? 'wide' : 'desk';
+  let from: Pose = rail.pose(dest);
+  const flight = new Spring(70);
+  flight.snap(1);
+  const basePose = (): Pose => lerpPose(from, rail.pose(dest), flight.value);
+  // free look on top of the landmark pose: drag orbits around what you look at, wheel or
+  // pinch dolly in and out; both stay where you leave them until the next flight
+  const orbit = { yaw: new Spring(160), pitch: new Spring(160), dolly: new Spring(160) };
+  orbit.dolly.snap(1);
+  const YAW = 40 * DEG, PITCH_UP = 22 * DEG, PITCH_DOWN = 10 * DEG, DOLLY: [number, number] = [0.35, 1.9];
   let deskTween: Tween | null = null, deskDone: (() => void) | null = null;
   let mixTween: Tween | null = null;
   let ringTween: { from: Color; to: Color; start: number } | null = null;
@@ -242,6 +302,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   let lastInput = performance.now();
   let srvNext = 0;
   let currentLandmark: Landmark = o.initial.landmark;
+  let wasAway = false;
   const pointer = new Vector2(0, 0);
   let hasPointer = false;
   let disposed = false;
@@ -249,10 +310,10 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const setDeskHeight = (h: number) => {
     rigDy = h - manifest.deskBase;
     rig.position.y = rigBaseY + rigDy;
-    const total = cableLen0 + rigDy;
-    cable.scale.y = Math.max(0.2, total / cableLen0);
+    if (cable) cable.scale.y = Math.max(0.2, (cableLen0 + rigDy) / cableLen0);
   };
   setDeskHeight(clamp(o.initial.desk, manifest.range[0], manifest.range[1]));
+
 
   // ---------- render loop ----------
   let raf = 0, timer = 0, last = performance.now();
@@ -265,7 +326,18 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     raf = requestAnimationFrame(frame);
   }
 
-  const dock = new Dock({ termEl: o.termEl, contactsEl: o.contactsEl, mirrorSize: [MIRROR.w, MIRROR.h] });
+  const dock = new Dock({ termEl: o.termEl, contactsEl: o.contactsEl });
+  // logical overlay sizes: the laptop terminal is a 16:10 grid (fewer columns on phones so
+  // text stays readable when the screen fills the view); contacts match their arc's aspect
+  const sizeOverlays = () => {
+    const tw = Math.round(clamp(innerWidth * 1.9, 640, 1280));
+    o.termEl.style.setProperty('--screen-w', `${tw}px`);
+    o.termEl.style.setProperty('--screen-h', `${Math.round(tw * 0.625)}px`);
+    const [tl, tr, , bl] = contactsCorners();
+    const cw = 1120;
+    o.contactsEl.style.setProperty('--contacts-w', `${cw}px`);
+    o.contactsEl.style.setProperty('--contacts-h', `${Math.round((cw * tl.distanceTo(bl)) / tl.distanceTo(tr))}px`);
+  };
   const q = new Quaternion(), q2 = new Quaternion(), v = new Vector3(), v2 = new Vector3();
   const upWorld = new Vector3(0, 1, 0);
 
@@ -276,9 +348,10 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     let animating = false;
 
     // camera
-    animating = spring.step(dt) || animating;
+    animating = flight.step(dt) || animating;
     animating = orbit.yaw.step(dt) || animating;
     animating = orbit.pitch.step(dt) || animating;
+    animating = orbit.dolly.step(dt) || animating;
 
     // desk motion
     if (deskTween) {
@@ -318,6 +391,8 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     }
     (glow.uniforms.uColor.value as Color).copy(ringCol);
     glow.uniforms.uIntensity.value = ringKind === 'off' && !ringTween ? 0 : (0.35 + 0.65 * mix) * breathe * (1 + pulse);
+    (backlight.uniforms.uColor.value as Color).copy(ringCol);
+    backlight.uniforms.uIntensity.value = ringKind === 'off' && !ringTween ? 0 : (0.3 + 0.45 * mix) * (1 + pulse * 0.5);
 
     // fan
     fanSpeed += (fanTarget - fanSpeed) * Math.min(1, dt * 1.5);
@@ -376,43 +451,47 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     } else tail.quaternion.copy(tailQ0);
 
     // screens
-    const mirrorChanged = mirror.update(Date.now(), o.reducedMotion);
-    const monChanged = monitor.update();
-    void mirrorChanged; void monChanged;
+    monitor.update();
 
     // apply camera
-    const p = rail.sample(spring.value);
+    const p = basePose();
     camera.position.set(...p.pos);
     camera.fov = p.fov;
     camera.updateProjectionMatrix();
     camera.lookAt(...p.target);
-    if (orbit.yaw.value || orbit.pitch.value) {
-      // orbit around the target point, small and springy
+    {
       const tgt = v.set(...p.target);
-      const off = camera.position.clone().sub(tgt);
+      const off = camera.position.clone().sub(tgt).multiplyScalar(orbit.dolly.value);
       off.applyAxisAngle(upWorld, orbit.yaw.value);
       const right = new Vector3().crossVectors(off, upWorld).normalize();
-      off.applyAxisAngle(right, orbit.pitch.value);
+      off.applyAxisAngle(right, -orbit.pitch.value);
       camera.position.copy(tgt).add(off);
       camera.lookAt(tgt);
     }
     camera.updateMatrixWorld();
 
-    const nearest = rail.nearest(spring.value);
+    const away = dest !== 'desk' || Math.abs(orbit.yaw.target) > 0.02 || Math.abs(orbit.pitch.target) > 0.02 || Math.abs(orbit.dolly.target - 1) > 0.03;
+    if (away !== wasAway) { wasAway = away; o.onAway?.(away); }
+    const nearest = dest;
     if (nearest !== currentLandmark) { currentLandmark = nearest; o.onLandmark(nearest); }
 
-    // docking (spec §6.4)
-    const err = (l: Landmark) => Math.abs(spring.value - landmarkT(l)) + Math.abs(orbit.yaw.value) + Math.abs(orbit.pitch.value);
+    // pin the live DOM onto both screens (every frame the camera or desk moves)
     const size = renderer.getSize(new Vector2());
-    const project = (pts: Vector3[]) => pts.map((pt) => {
-      const n = pt.clone().project(camera);
-      return [(n.x * 0.5 + 0.5) * size.x, (-n.y * 0.5 + 0.5) * size.y] as [number, number];
-    });
-    const docked = dock.update({
-      termErr: err('laptop'), contactsErr: err('monitor'), sheet: sheetMode(),
-      termQuad: project(screenCorners(laptopScreen)), contactsQuad: project(screenCorners(monitorScreen)),
-    });
-    mirror.active = !docked.term || sheetMode();
+    const quad = (pts: Vector3[]) => {
+      const c = pts.reduce((acc, q) => acc.add(q), new Vector3()).multiplyScalar(0.25);
+      const n = pts[1].clone().sub(pts[0]).cross(pts[3].clone().sub(pts[0]));
+      // corners run TL→TR→BR→BL in image space, so (TR−TL)×(BL−TL) points into the screen
+      const facing = n.dot(camera.position.clone().sub(c)) < 0;
+      const out: [number, number][] = [];
+      for (const pt of pts) {
+        const e = pt.clone().applyMatrix4(camera.matrixWorldInverse);
+        if (e.z > -camera.near) return { quad: null, facing };
+        const q = pt.clone().project(camera);
+        out.push([(q.x * 0.5 + 0.5) * size.x, (-q.y * 0.5 + 0.5) * size.y]);
+      }
+      return { quad: out, facing };
+    };
+    dock.update(quad(screenCorners(laptopScreen)), quad(contactsCorners()));
 
     const t0 = performance.now();
     renderer.render(scene, camera);
@@ -444,8 +523,12 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     fly(to) {
       lastInput = performance.now();
       orbit.yaw.target = orbit.pitch.target = 0;
-      if (o.reducedMotion) spring.snap(landmarkT(to));
-      else spring.target = landmarkT(to);
+      orbit.dolly.target = 1;
+      from = basePose();
+      dest = to;
+      flight.snap(0);
+      flight.target = 1;
+      if (o.reducedMotion) { flight.snap(1); orbit.yaw.snap(0); orbit.pitch.snap(0); orbit.dolly.snap(1); }
       invalidate();
     },
     setDesk(h) {
@@ -462,11 +545,13 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
         if (disposed) return;
         if (t === 'light') baked.uniforms.uDay.value = tx; else baked.uniforms.uNight.value = tx;
         mixTween = new Tween(mix, want, performance.now(), o.reducedMotion ? 0 : 600);
-        (laptopMat.uniforms.uRefl.value as Color).set(t === 'light' ? '#e9e8e4' : '#9aa3b5');
         (monitorMat.uniforms.uRefl.value as Color).set(t === 'light' ? '#e9e8e4' : '#9aa3b5');
-        laptopMat.uniforms.uReflAmt.value = monitorMat.uniforms.uReflAmt.value = t === 'light' ? 0.16 : 0.1;
+        monitorMat.uniforms.uReflAmt.value = t === 'light' ? 0.16 : 0.1;
         invalidate();
-      }).catch(() => o.onFallback('atlas'));
+      }).catch((e) => {
+        // once the desk is up we never drop back to the page: keep the current lighting
+        console.warn('3d: lighting atlas unavailable, keeping current lighting', e);
+      });
     },
     setRing(r) {
       ringKind = r;
@@ -475,6 +560,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     },
     setFan(s) {
       fanTarget = FAN_SPEED[s];
+      fanReadout?.set(FAN_PCT[s]);
       invalidate();
     },
     meow() {
@@ -500,13 +586,25 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const detachInput = attachInput({
     canvas,
     reducedMotion: o.reducedMotion,
-    scrub(dt) { lastInput = performance.now(); spring.target = clamp(spring.target + dt, 0, LANDMARKS.length - 1); if (o.reducedMotion) spring.snap(spring.target); invalidate(); },
-    orbit(dx, dy) { orbit.yaw.target = clamp(-dx * 0.004, -12 * DEG, 12 * DEG); orbit.pitch.target = clamp(dy * 0.003, -6 * DEG, 6 * DEG); invalidate(); },
-    release() { orbit.yaw.target = orbit.pitch.target = 0; invalidate(); },
+    zoom(f) {
+      lastInput = performance.now();
+      orbit.dolly.target = clamp(orbit.dolly.target * f, DOLLY[0], DOLLY[1]);
+      if (o.reducedMotion) orbit.dolly.snap(orbit.dolly.target);
+      invalidate();
+    },
+    orbit(dx, dy) {
+      lastInput = performance.now();
+      orbit.yaw.target = clamp(orbit.yaw.target - dx * 0.005, -YAW, YAW);
+      orbit.pitch.target = clamp(orbit.pitch.target + dy * 0.004, -PITCH_DOWN, PITCH_UP);
+      if (o.reducedMotion) { orbit.yaw.snap(orbit.yaw.target); orbit.pitch.snap(orbit.pitch.target); }
+      invalidate();
+    },
     pointer(x, y) {
       const r = canvas.getBoundingClientRect();
       pointer.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
       hasPointer = true;
+      raycaster.setFromCamera(pointer, camera);
+      canvas.style.cursor = raycaster.intersectObjects(hits, true).length ? 'pointer' : '';
       world.activity();
     },
     tap(x, y) {
@@ -518,26 +616,38 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       while (n && !n.name.startsWith('hit_')) n = n.parent;
       if (n?.name === 'hit_laptop') { world.fly('laptop'); o.termEl.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true }); }
       else if (n?.name === 'hit_monitor') world.fly('monitor');
+      else if (n?.name.startsWith('hit_paddle_')) o.onPaddle?.(n.name.slice('hit_paddle_'.length));
+      else return;
     },
   });
 
-  const onResize = () => applySize();
+  const onResize = () => { sizeOverlays(); applySize(); };
   const onVis = () => { if (!hidden()) { last = performance.now(); invalidate(); } };
-  const onLost = (e: Event) => { e.preventDefault(); o.onFallback('context-lost'); };
+  // GPU context loss (driver reset, tab backgrounded on mobile): let the browser restore it
+  // and redraw; the page never drops out of 3D once it has loaded
+  const onLost = (e: Event) => e.preventDefault();
+  const onRestored = () => { monitor.invalidate(); fanReadout?.texture && (fanReadout.texture.needsUpdate = true); invalidate(); };
   addEventListener('resize', onResize);
   document.addEventListener('visibilitychange', onVis);
   canvas.addEventListener('webglcontextlost', onLost);
+  canvas.addEventListener('webglcontextrestored', onRestored);
 
   o.stage.append(canvas);
+  if (new URLSearchParams(location.search).has('test')) (window as any).__scene = { scene, camera, renderer, rail, flight, dest: () => dest, orbit, invalidate, world: () => world };
+  sizeOverlays();
   applySize();
   // first frame, then reveal (the app fades the poster out)
-  await new Promise<void>((res) => requestAnimationFrame(() => { frame(performance.now()); res(); }));
+  await document.fonts?.load('400 24px "JetBrains Mono"').catch(() => {});
+  await new Promise<void>((done) => requestAnimationFrame(() => { frame(performance.now()); done(); }));
+  step('screens', 'ok');
+  o.onProgress?.(1);
   // warm the other theme's atlas in idle time so toggling is instant
-  ('requestIdleCallback' in window ? (window as any).requestIdleCallback : setTimeout)(() => {
+  const warm = () =>
     atlas(o.initial.theme === 'light' ? 'night' : 'day').then((tx) => {
       if (o.initial.theme === 'light') baked.uniforms.uNight.value = tx; else baked.uniforms.uDay.value = tx;
     }).catch(() => {});
-  }, 3000);
+  if ('requestIdleCallback' in window) requestIdleCallback(warm, { timeout: 3000 });
+  else setTimeout(warm, 3000);
 
   return {
     world,
@@ -550,8 +660,10 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       removeEventListener('resize', onResize);
       document.removeEventListener('visibilitychange', onVis);
       canvas.removeEventListener('webglcontextlost', onLost);
-      mirror.dispose();
+      canvas.removeEventListener('webglcontextrestored', onRestored);
+      unsubStore();
       monitor.dispose();
+      fanReadout?.dispose();
       renderer.dispose();
       canvas.remove();
     },

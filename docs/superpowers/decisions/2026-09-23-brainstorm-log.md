@@ -113,3 +113,28 @@ Changed:
   `#3a3a3d` → `#404044` (≥ 1.8:1 visibility). Both are enforced by `tests/unit/tokens.test.ts`.
 - Pre-existing bugs found: `robots.txt` references a missing `sitemap.xml`, and
   `security.txt` has a `Policy:` URL that 404s. Both are fixed in Task 10.
+- Owner (2026-09-23): remove coordinates everywhere (site, terminal, posters, spec).
+
+## Owner review in Chrome (2026-09-23, second session): UX issues, all tracked
+| # | Owner comment | Resolution |
+|---|---|---|
+| R1 | "Just a 2D site with a render image, not interactive 3D" | Root cause: three.js 0.186 treats glTF `extras.pivot` as a transform pivot → NaN rig/camera; canvas drew nothing, poster showed. Renamed to `pivot_at` (build.py + shipped glb). Plus a `requestIdleCallback` options bug that silently dropped to the page. **Fixed.** |
+| R2 | "Cat in terminal is wrong" | Hand ASCII replaced by the real mark rendered to half-block characters from catuser.png (20×22 px). **Fixed.** |
+| R3 | "Remove coords everywhere" | Removed from site, terminal, vfs, posters script, spec. **Fixed.** |
+| R4 | Green focus outline on the terminal looks bad | Removed; focus shown by frame lift + block caret. **Fixed.** |
+| R5 | Keyboard backlight (laptop + keyboard), green like the ring | Runtime additive glows tinted with the ring colour; Blender adds `kbd_glow`, `laptop_kbd_glow`. **Runtime done, model pending.** |
+| R6 | Buttons show UI "not where needed, not connected to the stage"; screens should show real things up close without appearing/disappearing | Live DOM terminal + contacts are now pinned onto the 3D screens every frame at every distance (projective matrix3d). Sheet/canvas-mirror swap removed. **Fixed.** |
+| R7 | "What is scroll to move" | Camera is real 3D now: drag = look around, scroll/pinch = zoom, buttons/`cd`/taps fly. **Fixed.** |
+| R8 | Fan too dark; show "100" like the real fan; its ring glows green | `fan_ring` (ring-tinted), `fan_display` (speed readout); lighter housing. **Runtime done, model pending.** |
+| R9 | Gamepad should be DualShock 4-inspired | **Model pending.** |
+| R10 | Screens flicker; laptop console misplaced at desk/wide views | Page CSS 64px margin shifted the pinned DOM; margin reset in scene mode. **Fixed.** |
+| R11 | Ultrawide cut on the sides on non-wide viewports | Monitor landmark fits the whole curved panel to any aspect. **Fixed.** |
+| R12 | Cat on fan should fit the scene (more natural) | Natural loaf pose, shaded desaturated green. **Model pending.** |
+| R13 | "Back to desk" control besides the bottom bar | Floating `← desk` button + Esc whenever flown/looked away. **Fixed.** |
+| R14 | Day button drops out of 3D; fallback must be impossible once 3D works | Theme crash fixed; runtime never falls back after load; GPU context loss restores. **Fixed.** |
+| R15 | Laptop covers part of the ultrawide | Laptop moved/angled in Blender. **Model pending.** |
+| R16 | Remove wires, clean desk | All cables + charger removed; `cable_drop` optional at runtime. **Model pending.** |
+| R17 | Flat page flashes on open | `<head>` gate decides before first paint; tty boot loader with real progress until the desk is ready; page only if 3D unavailable/fails. **In progress.** |
+| R18 | Flying to the monitor passes through the laptop | Flights go straight from the current view to the target (no rail through other landmarks). **In progress.** |
+| R19 | Paddle buttons under the desk should work: 1 lowest, 2 middle, 3 highest (▲▼ nudge) | Clickable `hit_paddle_*` targets run `desk N` through the shell (terminal shows it, desk moves, paddle LED lights). Hover shows a pointer on everything clickable. **Runtime done, hit boxes pending in model.** |
+| R20 | Never lose these comments; document lights/glow etc. | This table is the tracking list; each row is re-verified in the final review before PR. Lights/glow summary: monitor ring + wall wash, fan ring, laptop + keyboard backlights all share the ring colour (`ring green\|purple\|off`), breathe gently, pulse on `meow`; LEDs: paddle (amber while moving), server pattern, keyboard indicator. |

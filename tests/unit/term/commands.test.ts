@@ -59,7 +59,7 @@ describe('info commands', () => {
       /uptime\s+3 mins/,
       /shell\s+bash 5\.3/,
       /role\s+tech lead @ AIT Solutions/,
-      /loc\s+Kyrgyzstan 42\.87°N 74\.59°E/,
+      /loc\s+Kyrgyzstan$/m,
       /rank\s+#1 committer in KG/,
       /gh\s+github\.com\/alxnko/,
       /mail\s+aleksandrnyrko@gmail\.com/,
@@ -76,7 +76,7 @@ describe('info commands', () => {
     const t = await out('fastfetch --compact');
     expect(t).toContain('meowOS');
     expect(t).not.toContain('github.com');
-    expect(t).not.toContain('█');
+    expect(t).not.toMatch(/█{24}/);
   });
 
   it('uname', async () => {

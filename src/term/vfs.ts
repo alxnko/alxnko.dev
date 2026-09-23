@@ -33,7 +33,7 @@ const ABOUT = [
   `# ${SITE.name} (${SITE.handle})`,
   '',
   `${SITE.role} @ ${SITE.company}`,
-  `${SITE.country} · ${SITE.coords}`,
+  SITE.country,
   `${SITE.rank.text} · ${SITE.rank.href}`,
   '',
   'i build systems and ship. meow.',

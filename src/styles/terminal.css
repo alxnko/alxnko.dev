@@ -176,10 +176,14 @@
   .term-form { order: 3; padding-top: var(--sp-2); border-top: 1px solid var(--term-rule); }
 }
 
-.term-form:has(input:focus-visible) {
-  outline: 2px solid var(--ansi-green);
-  outline-offset: -2px;
-  border-radius: 0 0 var(--r-m) var(--r-m);
+/* focus: no outline box; the frame lifts a step and the block caret is the indicator
+   (a solid, blinking, high-contrast cursor exactly where typing lands) */
+.term {
+  transition: border-color var(--d-fast) var(--ease);
+}
+
+.term:focus-within {
+  border-color: var(--ansi-dim);
 }
 
 .term-prompt {
