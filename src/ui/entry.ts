@@ -255,11 +255,15 @@ $('term')?.addEventListener('focusin', () => { if (world.scene) world.fly('lapto
 // and everything returns.
 const coarse = matchMedia('(pointer: coarse)');
 const input = document.getElementById('term-input') as HTMLInputElement | null;
-let fullH = innerHeight;
+// Browsers differ: some shrink the layout viewport for the keyboard (innerHeight), others only
+// the visual viewport; take the smaller of the two against the tallest height seen.
+const viewH = () => Math.min(innerHeight, visualViewport?.height ?? innerHeight);
+let fullH = viewH();
 let keyboardWasUp = false;
 const syncTyping = () => {
-  const kbUp = innerHeight < fullH * 0.8;
-  if (!kbUp) fullH = Math.max(fullH, innerHeight);
+  const h = viewH();
+  const kbUp = h < fullH * 0.8;
+  if (!kbUp) fullH = Math.max(fullH, h);
   if (keyboardWasUp && !kbUp && document.activeElement === input) input?.blur();
   keyboardWasUp = kbUp;
   const on = coarse.matches && !!world.scene && kbUp && document.activeElement === input;
@@ -268,7 +272,8 @@ const syncTyping = () => {
   dispatchEvent(new Event('scene:refit'));
 };
 addEventListener('resize', syncTyping);
-addEventListener('orientationchange', () => { fullH = 0; setTimeout(() => { fullH = innerHeight; syncTyping(); }, 400); });
+visualViewport?.addEventListener('resize', syncTyping);
+addEventListener('orientationchange', () => { fullH = 0; setTimeout(() => { fullH = viewH(); syncTyping(); }, 400); });
 input?.addEventListener('focus', () => setTimeout(syncTyping, 350));
 input?.addEventListener('blur', syncTyping);
 $('contacts')?.addEventListener('focusin', () => { if (world.scene) world.fly('monitor'); });
