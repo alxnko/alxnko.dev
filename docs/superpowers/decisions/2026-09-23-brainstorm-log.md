@@ -106,3 +106,10 @@ Changed:
 - **Fan and cat:** round dark desk fan in a U-bracket at the front-left, with a calico
   plush cat lying on top (→ green faceted cat).
 - **Room:** window with a radiator to the side, wood floor, cream walls.
+
+## Implementation-time adjustments
+- The light-theme accent/green-ink changed `#0a7a42` → `#0a6e3c`: 4.42:1 on the day
+  paper failed AA, and the new value is 5.18:1. The dark strong line changed
+  `#3a3a3d` → `#404044` (≥ 1.8:1 visibility). Both are enforced by `tests/unit/tokens.test.ts`.
+- Pre-existing bugs found: `robots.txt` references a missing `sitemap.xml`, and
+  `security.txt` has a `Policy:` URL that 404s. Both are fixed in Task 10.

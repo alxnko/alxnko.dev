@@ -4,18 +4,29 @@
   "private": true,
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
-    "lint": "astro check",
-    "preview": "astro preview"
+    "build": "bun run tokens:check && astro build && bun scripts/postbuild-csp.ts",
+    "preview": "astro preview",
+    "lint": "astro check && tsc --noEmit",
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "tokens": "bun scripts/gen-tokens.ts",
+    "tokens:check": "bun scripts/gen-tokens.ts --check",
+    "budget": "bun scripts/budget.ts",
+    "scene": "bash scene/run.sh"
   },
   "dependencies": {
-    "@fontsource-variable/outfit": "^5.3.0",
-    "@fontsource/bytesized": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
-    "astro": "^7.0.2"
+    "@fontsource/vt323": "^5.3.0",
+    "astro": "^7.0.2",
+    "three": "^0.186.0"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.9",
-    "typescript": "^6.0.3"
+    "@astrojs/check": "^0.9.10",
+    "@gltf-transform/cli": "^4.5.0",
+    "@playwright/test": "^1.63.0",
+    "@types/three": "^0.186.0",
+    "happy-dom": "^20.14.5",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.1"
   }
 }

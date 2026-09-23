@@ -44,7 +44,7 @@ Executors read both.
 - **Colors:**
   - Green `#00ff82` is a signal only, ≤ ~5 uses per viewport. It never tints
     hardware or backgrounds.
-  - Light-surface green text is `#0a7a42`.
+  - Light-surface green text is `#0a6e3c`.
   - Screens are dark in both themes.
 - **Banned styling:**
   - neon `text-shadow`, scanlines, glitch, CRT curvature, gradient blobs,
@@ -192,9 +192,9 @@ export const LINK_ALLOWLIST: ReadonlySet<string> = new Set([...CONTACTS.map(c =>
 ```
 `design/tokens.json` has this shape (values are in spec §4.2–4.3):
 ```json
-{ "primitive": { "graphite": {"950":"#0a0a0b", "...": "..."}, "day": {...}, "green":"#00ff82", "greenInk":"#0a7a42", "amber":"#ffb454", "red":"#ff5f56", "purple":"#b061ff", "scene": {"laminate":"#dcd8cc","floor":"#5b4a3c","wall":"#cfcabd"} },
+{ "primitive": { "graphite": {"950":"#0a0a0b", "...": "..."}, "day": {...}, "green":"#00ff82", "greenInk":"#0a6e3c", "amber":"#ffb454", "red":"#ff5f56", "purple":"#b061ff", "scene": {"laminate":"#dcd8cc","floor":"#5b4a3c","wall":"#cfcabd"} },
   "semantic": { "dark": {"bg":"…","bgElev":"…","surface":"…","line":"…","lineStrong":"…","fg":"…","fgMuted":"…","fgSubtle":"…","accent":"#00ff82","accentFill":"#00ff82","onAccent":"#06170d","warn":"#ffb454","danger":"#ff5f56","focus":"#00ff82"},
-                "light": {"bg":"#e9e8e4", "...": "...", "accent":"#0a7a42","accentFill":"#00ff82","onAccent":"#06170d","focus":"#0a7a42"} },
+                "light": {"bg":"#e9e8e4", "...": "...", "accent":"#0a6e3c","accentFill":"#00ff82","onAccent":"#06170d","focus":"#0a6e3c"} },
   "ansi": { "black":"#0a0a0b","red":"#ff5f56","green":"#00ff82","yellow":"#ffb454","blue":"#6ea8ff","magenta":"#c792ea","cyan":"#7fdbca","white":"#d8d8d6","dim":"#6d6d6a","muted":"#9a9a96","fg":"#d8d8d6","bg":"#050506" },
   "space": [0,4,8,12,16,24,32,48,64], "radius": {"s":2,"m":4,"l":8},
   "type": {"scale":[12,13,14,16,20,28,40]},

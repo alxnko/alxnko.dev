@@ -141,13 +141,13 @@ Success means:
   700 #2a2a2d, 600 #3a3a3d, 500 #6d6d6a, 400 #9a9a96, 300 #bdbdb9, 200 #d8d8d6,
   100 #ededeb`
 - day: `paper #e9e8e4, paper-2 #dfded9, paper-line #cfcec8`
-- green `#00ff82`, green-ink `#0a7a42`, amber `#ffb454`, red `#ff5f56`,
+- green `#00ff82`, green-ink `#0a6e3c`, amber `#ffb454`, red `#ff5f56`,
   purple `#b061ff` (ring option only)
 - desk laminate `#dcd8cc`, floor wood (desaturated) `#5b4a3c`, wall `#cfcabd`
 
 ### 4.3 Semantic roles (dark / light)
 `bg, bg-elev, surface, line, line-strong, fg, fg-muted, fg-subtle, accent (#00ff82 /
-#0a7a42), accent-fill (#00ff82 both), on-accent, warn, danger, focus`.
+#0a6e3c), accent-fill (#00ff82 both), on-accent, warn, danger, focus`.
 
 The terminal always uses the dark ANSI palette, because screens stay dark:
 - black, red, green, yellow (amber), blue `#6ea8ff`, magenta `#c792ea`, cyan `#7fdbca`,
