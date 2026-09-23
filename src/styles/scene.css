@@ -696,3 +696,12 @@
   [data-mode="scene"] .toggle { padding: 0; min-width: 44px; justify-content: center; }
   [data-mode="scene"] .toggle-label { display: none; }
 }
+
+/* desktop reads from further away: one step up for the whole chrome (phones keep theirs) */
+@media (min-width: 720px) and (pointer: fine) {
+  [data-mode="scene"] .identity .mark { font-size: 40px; }
+  [data-mode="scene"] .identity .name { font-size: var(--fs-5); line-height: 26px; }
+  [data-mode="scene"] .identity .facts { font-size: var(--fs-4); line-height: 24px; gap: var(--sp-1); }
+  [data-mode="scene"] :is(.toggle, .back:not([hidden]), .nav button) { font-size: 0.9375rem; }
+  [data-mode="scene"] .hint { font-size: var(--fs-2); }
+}
