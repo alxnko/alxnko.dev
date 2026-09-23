@@ -124,12 +124,16 @@ img, svg, picture {
   color: var(--c-on-accent);
   font-size: var(--fs-2);
   border-radius: var(--r-s);
-  transform: translateY(calc(-100% - var(--sp-5)));
+  /* out of view by its own height plus the whole top inset: in-app browsers (Instagram…)
+     report a tall safe-area inset, and a fixed offset left the link peeking out */
+  transform: translateY(calc(-100% - env(safe-area-inset-top) - var(--sp-5)));
+  opacity: 0;
 }
 
 /* enters in 120 ms, leaves instantly */
 .skip:focus-visible {
   transform: none;
+  opacity: 1;
   transition: transform var(--d-fast) var(--ease);
   outline-color: var(--c-fg);
 }

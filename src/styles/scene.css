@@ -155,7 +155,9 @@
   margin: 0;
   transform-origin: 0 0;
   backface-visibility: hidden;
-  will-change: transform;
+  /* no will-change: Android WebViews (Instagram, Telegram…) then keep the text raster from the
+     first frame's scale and the screens stay blurry up close; the 3D transform alone already
+     gives the screens their own compositor layer */
 }
 
 [data-mode="scene"] .term[data-dock="off"],

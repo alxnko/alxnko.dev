@@ -125,6 +125,65 @@ test.describe('3D desk', () => {
     expect(await page.evaluate(() => history.state?.away ?? null)).toBeNull();
   });
 
+  test('looking around never takes the eye under the desk top, at either height', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    for (const h of [0.74, 1.12]) {
+      await page.evaluate((h) => (window as any).__scene.world().setDesk(h), h);
+      await page.waitForTimeout(2000);
+      // zoom toward the keyboard (pivot at desk level), then orbit the eye down past it
+      const kb = await page.evaluate(() => {
+        const s = (window as any).__scene;
+        const o = s.scene.getObjectByName('desk_rig') ?? s.scene;
+        const v = o.getWorldPosition(new (s.camera.position.constructor)());
+        return v.toArray();
+      });
+      await page.evaluate(({ kb }) => {
+        const s = (window as any).__scene;
+        s.pan[0].target = 0; s.pan[1].target = kb[1] - 0.95; s.pan[2].target = 0;
+        s.orbit.dolly.target = 0.5; s.orbit.pitch.target = -0.38; s.invalidate();
+      }, { kb });
+      await page.waitForTimeout(2000);
+      const r = await page.evaluate(() => { const s = (window as any).__scene; return { y: s.camera.position.y, d: s.orbit.dolly.value, ok: s.camera.position.toArray().every(Number.isFinite) }; });
+      expect(r.ok).toBe(true);
+      expect(r.d).toBeGreaterThan(0.1); // no collapse into the look point
+      expect(r.y).toBeGreaterThanOrEqual(h + 0.15 - 1e-3);
+      await page.evaluate(() => (window as any).__scene.world().fly('desk'));
+      await page.waitForTimeout(2000);
+    }
+  });
+
+  test('the landmark views are exactly their preset poses, at either desk height', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    for (const h of [0.74, 1.12]) {
+      await page.evaluate((h) => (window as any).__scene.world().setDesk(h), h);
+      await page.waitForTimeout(2000);
+      for (const l of ['wide', 'desk', 'laptop', 'monitor']) {
+        await page.evaluate((l) => (window as any).__scene.world().fly(l), l);
+        await page.waitForTimeout(2200);
+        const gap = await page.evaluate((l) => {
+          const s = (window as any).__scene; const want = s.rail.pose(l).pos;
+          return Math.hypot(...s.camera.position.toArray().map((v: number, i: number) => v - want[i]));
+        }, l);
+        expect(gap, `${l} at ${h}`).toBeLessThan(1e-3);
+      }
+    }
+  });
+
+  test('the skip link stays out of sight until keyboard focus shows it', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    const skip = page.locator('.skip');
+    const box = await skip.boundingBox();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(0);
+    await expect(skip).toHaveCSS('opacity', '0');
+    await page.keyboard.press('Tab');
+    await expect(skip).toBeFocused();
+    await expect(skip).toHaveCSS('opacity', '1');
+    await expect.poll(async () => (await skip.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+  });
+
   test('cd monitor flies there, docks contacts, updates the nav', async ({ page }) => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });

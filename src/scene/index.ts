@@ -97,7 +97,8 @@ function typingBand(): [number, number] {
 const MON_CONTACTS_UV = [0.24, 0.76, 0.12, 0.92] as const;
 const MON_INFO_UV = [0.765, 0.995, 0.12, 0.92] as const;
 const DEG = Math.PI / 180;
-const GAZE = { yaw: 50 * DEG, up: 12 * DEG, down: 20 * DEG };
+// a loaf cat turns its head, it doesn't crane: wider than this lifts the head out of its chest
+const GAZE = { yaw: 40 * DEG, up: 6 * DEG, down: 14 * DEG };
 
 /**
  * Load and start the desk. If anything fails partway, whatever was already created (GL
@@ -689,8 +690,10 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       const upLocal = head.parent!.worldToLocal(head.parent!.getWorldPosition(v2).add(upWorld)).sub(head.parent!.worldToLocal(head.parent!.getWorldPosition(new Vector3()))).normalize();
       const g = constrainGaze(restForward.toArray() as [number, number, number], wantLocal.toArray() as [number, number, number], upLocal.toArray() as [number, number, number], GAZE);
       const delta = q.setFromUnitVectors(restForward, new Vector3(...g));
-      head.quaternion.slerp(delta.multiply(restQ), Math.min(1, dt * (cat.mode === 'stare' ? 2.2 : 6)));
-      animating = true;
+      const want = delta.multiply(restQ);
+      head.quaternion.slerp(want, Math.min(1, dt * (cat.mode === 'stare' ? 2.2 : 6)));
+      // only while it is still turning: a cat holding its gaze needs no new frames
+      if (head.quaternion.angleTo(want) > 0.002) animating = true;
     } else {
       head.quaternion.slerp(restQ, Math.min(1, dt * 3));
       if (head.quaternion.angleTo(restQ) > 0.002) animating = true;
@@ -723,12 +726,23 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       // stay inside the room: past a wall, the window or the ceiling, the camera slides in
       // toward what it looks at (the desk side stays free), and the dolly follows so zooming
       // back in answers at once instead of unwinding the overshoot first
-      const t = roomFit(tgt.clamp(ROOM_MIN, ROOM_MAX), off);
-      if (t < 1) {
-        off.multiplyScalar(t);
-        const d = orbit.dolly.value * t;
+      const capDolly = (k: number) => {
+        const d = orbit.dolly.value * k;
         if (orbit.dolly.target > d) orbit.dolly.target = d;
         if (orbit.dolly.value > d) orbit.dolly.snap(d);
+      };
+      const t = roomFit(tgt.clamp(ROOM_MIN, ROOM_MAX), off);
+      if (t < 1) { off.multiplyScalar(t); capDolly(t); }
+      // looking around never takes the eye under (or skimming) the desk top, whose underside
+      // is not meant to be seen. Only the eye is held (the look point stays put), and never
+      // above where the preset view itself puts it, so the landmark views are unchanged
+      const floorY = Math.min(rigDy + manifest.deskBase + 0.15, p.pos[1]);
+      if (tgt.y + off.y < floorY) {
+        if (off.y < 0 && tgt.y > floorY + 1e-3) {
+          const k = (floorY - tgt.y) / off.y; // slide in toward the look point
+          off.multiplyScalar(k);
+          capDolly(k);
+        } else off.y = floorY - tgt.y; // look point at or below the floor: raise the eye
       }
       camera.position.copy(tgt).add(off);
       camera.lookAt(tgt);
