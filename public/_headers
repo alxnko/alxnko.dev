@@ -14,8 +14,14 @@
 # Content-hashed build output and scene assets: immutable for a year.
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
-/scene/*
+/scene/*.glb
   Cache-Control: public, max-age=31536000, immutable
+/scene/*.webp
+  Cache-Control: public, max-age=31536000, immutable
+/scene/*.avif
+  Cache-Control: public, max-age=31536000, immutable
+/scene/manifest.json
+  Cache-Control: public, max-age=0, must-revalidate
 
 # HTML: always revalidate in the browser, short edge cache.
 /

@@ -12,7 +12,7 @@ import { TERM_BG } from '../lib/tokens';
 import { windowMaterial, bakedMaterial, emissiveMaterial, glowMaterial, screenMaterial, skyMaterial } from './materials';
 import { lerpPose, Rail, Spring, type Pose, type Vec3 } from './rail';
 import { FanDisplay, MonitorScreen } from './monitor-screen';
-import { catStep, clamp, easeOut, frameInterval, nextFlickIn, Tween, type CatState } from './anim';
+import { catStep, constrainGaze, clamp, easeOut, frameInterval, nextFlickIn, Tween, type CatState } from './anim';
 import { attachInput } from './input';
 import { Dock } from './dock';
 import { resolveTarget, type Named } from './pick';
@@ -67,6 +67,7 @@ const FAN_PCT = ['0', '40', '70', '100'];
 const MON_CONTACTS_UV = [0.24, 0.76, 0.12, 0.92] as const;
 const MON_INFO_UV = [0.765, 0.995, 0.12, 0.92] as const;
 const DEG = Math.PI / 180;
+const GAZE = { yaw: 50 * DEG, up: 12 * DEG, down: 20 * DEG };
 
 export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const base = '/scene/';
@@ -298,6 +299,9 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   // pinch dolly in and out; both stay where you leave them until the next flight
   const orbit = { yaw: new Spring(160), pitch: new Spring(160), dolly: new Spring(160) };
   orbit.dolly.snap(1);
+  // zoom-to-cursor shifts what you orbit around toward the point under the cursor
+  const pan = [new Spring(160), new Spring(160), new Spring(160)];
+  const PAN_MAX = 0.9;
   const YAW = 40 * DEG, PITCH_UP = 22 * DEG, PITCH_DOWN = 10 * DEG, DOLLY: [number, number] = [0.35, 1.9];
   let deskTween: Tween | null = null, deskDone: (() => void) | null = null;
   let mixTween: Tween | null = null;
@@ -367,6 +371,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     animating = orbit.yaw.step(dt) || animating;
     animating = orbit.pitch.step(dt) || animating;
     animating = orbit.dolly.step(dt) || animating;
+    for (const s of pan) animating = s.step(dt) || animating;
 
     // desk motion
     if (deskTween) {
@@ -442,14 +447,11 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       animating = true;
     }
     if (look) {
-      const headPos = head.getWorldPosition(v);
-      const restDir = restForward.clone();
-      const wantDir = head.parent!.worldToLocal(look.clone()).sub(head.position).normalize();
-      const delta = q.setFromUnitVectors(restDir, wantDir);
-      const ang = 2 * Math.acos(clamp(delta.w, -1, 1));
-      const maxA = 55 * DEG;
-      if (ang > maxA) delta.slerp(new Quaternion(), 1 - maxA / ang);
-      void headPos;
+      const wantLocal = head.parent!.worldToLocal(look.clone()).sub(head.position).normalize();
+      // world up in the body's frame, so the limits are "above/below" as a cat would feel them
+      const upLocal = head.parent!.worldToLocal(head.parent!.getWorldPosition(v2).add(upWorld)).sub(head.parent!.worldToLocal(head.parent!.getWorldPosition(new Vector3()))).normalize();
+      const g = constrainGaze(restForward.toArray() as [number, number, number], wantLocal.toArray() as [number, number, number], upLocal.toArray() as [number, number, number], GAZE);
+      const delta = q.setFromUnitVectors(restForward, new Vector3(...g));
       head.quaternion.slerp(delta.multiply(restQ), Math.min(1, dt * (cat.mode === 'stare' ? 2.2 : 6)));
       animating = true;
     } else {
@@ -470,12 +472,12 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
 
     // apply camera
     const p = basePose();
-    camera.position.set(...p.pos);
+    const pv = new Vector3(pan[0].value, pan[1].value, pan[2].value);
+    camera.position.set(...p.pos).add(pv);
     camera.fov = p.fov;
     camera.updateProjectionMatrix();
-    camera.lookAt(...p.target);
     {
-      const tgt = v.set(...p.target);
+      const tgt = v.set(...p.target).add(pv);
       const off = camera.position.clone().sub(tgt).multiplyScalar(orbit.dolly.value);
       off.applyAxisAngle(upWorld, orbit.yaw.value);
       const right = new Vector3().crossVectors(off, upWorld).normalize();
@@ -485,7 +487,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     }
     camera.updateMatrixWorld();
 
-    const away = dest !== 'desk' || Math.abs(orbit.yaw.target) > 0.02 || Math.abs(orbit.pitch.target) > 0.02 || Math.abs(orbit.dolly.target - 1) > 0.03;
+    const away = dest !== 'desk' || pan.some((s) => Math.abs(s.target) > 0.01) || Math.abs(orbit.yaw.target) > 0.02 || Math.abs(orbit.pitch.target) > 0.02 || Math.abs(orbit.dolly.target - 1) > 0.03;
     if (away !== wasAway) { wasAway = away; o.onAway?.(away); }
     const nearest = dest;
     if (nearest !== currentLandmark) { currentLandmark = nearest; o.onLandmark(nearest); }
@@ -539,6 +541,8 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       lastInput = performance.now();
       orbit.yaw.target = orbit.pitch.target = 0;
       orbit.dolly.target = 1;
+      for (const s of pan) s.target = 0;
+      if (o.reducedMotion) for (const s of pan) s.snap(0);
       from = basePose();
       dest = to;
       flight.snap(0);
@@ -599,9 +603,22 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const detachInput = attachInput({
     canvas: o.stage,
     reducedMotion: o.reducedMotion,
-    zoom(f) {
+    zoom(f, x, y) {
       lastInput = performance.now();
-      orbit.dolly.target = clamp(orbit.dolly.target * f, DOLLY[0], DOLLY[1]);
+      const nd = clamp(orbit.dolly.target * f, DOLLY[0], DOLLY[1]);
+      const k = nd / orbit.dolly.target; // the factor actually applied after clamping
+      // the point under the cursor: first surface hit, else a point at the orbit distance
+      const r = o.stage.getBoundingClientRect();
+      raycaster.setFromCamera(new Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1), camera);
+      const surf = raycaster.intersectObjects(gltf.scene.children, true).find((h) => h.object.visible && !/^hit_/.test(h.object.name));
+      const cur = new Vector3(...basePose().target).add(new Vector3(pan[0].target, pan[1].target, pan[2].target));
+      const at = surf?.point ?? raycaster.ray.at(camera.position.distanceTo(cur), new Vector3());
+      // moving the pivot by (1 - k) of the way to that point keeps it fixed on screen
+      const next = new Vector3(pan[0].target, pan[1].target, pan[2].target).addScaledVector(at.sub(cur), 1 - k);
+      if (next.length() > PAN_MAX) next.setLength(PAN_MAX);
+      pan[0].target = next.x; pan[1].target = next.y; pan[2].target = next.z;
+      orbit.dolly.target = nd;
+      if (o.reducedMotion) { orbit.dolly.snap(nd); for (const s of pan) s.snap(s.target); }
       if (o.reducedMotion) orbit.dolly.snap(orbit.dolly.target);
       invalidate();
     },
@@ -633,7 +650,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     },
   });
 
-  const onResize = () => { sizeOverlays(); applySize(); };
+  const onResize = () => { sizeOverlays(); dock.remeasure(); applySize(); };
   const onVis = () => { if (!hidden()) { last = performance.now(); invalidate(); } };
   // GPU context loss (driver reset, tab backgrounded on mobile): let the browser restore it
   // and redraw; the page never drops out of 3D once it has loaded

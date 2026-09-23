@@ -56,3 +56,34 @@ export function frameInterval(o: { animating: boolean; hidden: boolean; reducedM
   if (o.reducedMotion) return null;
   return o.idleMs > 60_000 ? 125 : 50;
 }
+
+type V3 = [number, number, number];
+const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm = (a: V3): V3 => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+
+export interface GazeLimits { yaw: number; up: number; down: number }
+
+/**
+ * Where the cat may look: `want` constrained to a natural head range around `rest`
+ * (radians: ±yaw sideways, `up` above and `down` below the resting line), measured in a
+ * frame whose vertical is `up`. Keeps the head out of its own body whatever the target.
+ */
+export function constrainGaze(rest: V3, want: V3, upAxis: V3, lim: GazeLimits): V3 {
+  const u = norm(upAxis);
+  // rest direction split into horizontal heading + elevation
+  const restEl = Math.asin(Math.max(-1, Math.min(1, dot(norm(rest), u))));
+  const f = norm([rest[0] - u[0] * dot(rest, u), rest[1] - u[1] * dot(rest, u), rest[2] - u[2] * dot(rest, u)]);
+  const r = norm(cross(f, u));
+  const w = norm(want);
+  const az = Math.atan2(dot(w, r), dot(w, f));
+  const el = Math.asin(Math.max(-1, Math.min(1, dot(w, u))));
+  const a = Math.max(-lim.yaw, Math.min(lim.yaw, az));
+  const e = Math.max(restEl - lim.down, Math.min(restEl + lim.up, el));
+  const c = Math.cos(e);
+  return norm([
+    f[0] * c * Math.cos(a) + r[0] * c * Math.sin(a) + u[0] * Math.sin(e),
+    f[1] * c * Math.cos(a) + r[1] * c * Math.sin(a) + u[1] * Math.sin(e),
+    f[2] * c * Math.cos(a) + r[2] * c * Math.sin(a) + u[2] * Math.sin(e),
+  ]);
+}

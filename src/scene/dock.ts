@@ -12,12 +12,20 @@ export interface ScreenQuad {
 
 export class Dock {
   private last = new Map<HTMLElement, string>();
+  private sizes = new Map<HTMLElement, [number, number]>();
 
   constructor(private els: HTMLElement[]) {}
 
-  /** Logical (untransformed) size of each overlay, in CSS px. */
+  /** Logical (untransformed) size of each overlay, in CSS px; measured once per resize. */
   size(el: HTMLElement): [number, number] {
-    return [el.offsetWidth, el.offsetHeight];
+    let s = this.sizes.get(el);
+    if (!s || !s[0]) this.sizes.set(el, (s = [el.offsetWidth, el.offsetHeight]));
+    return s;
+  }
+
+  /** Call after the overlays' logical size changes (resize). */
+  remeasure() {
+    this.sizes.clear();
   }
 
   private pin(el: HTMLElement, s: ScreenQuad) {

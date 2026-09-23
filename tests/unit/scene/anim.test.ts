@@ -48,3 +48,28 @@ describe('timing helpers', () => {
     expect(frameInterval({ animating: true, hidden: true, reducedMotion: false, idleMs: 0 })).toBeNull();
   });
 });
+
+import { constrainGaze } from '../../../src/scene/anim';
+
+describe('constrainGaze', () => {
+  const D = Math.PI / 180;
+  const lim = { yaw: 50 * D, up: 12 * D, down: 20 * D };
+  const el = (v: number[]) => Math.asin(v[1]) / D;
+  const az = (v: number[]) => Math.atan2(v[0], v[2]) / D;
+  it('passes a target inside the range through', () => {
+    const v = constrainGaze([0, 0, 1], [0.2, 0.05, 1], [0, 1, 0], lim);
+    expect(az(v)).toBeCloseTo(Math.atan2(0.2, 1) / D, 1);
+  });
+  it('never looks steeply up (head would go into the body)', () => {
+    const v = constrainGaze([0, 0, 1], [0, 1, 0.01], [0, 1, 0], lim);
+    expect(el(v)).toBeLessThanOrEqual(12.01);
+  });
+  it('clamps sideways and downward', () => {
+    expect(Math.abs(az(constrainGaze([0, 0, 1], [1, 0, -0.5], [0, 1, 0], lim)))).toBeLessThanOrEqual(50.01);
+    expect(el(constrainGaze([0, 0, 1], [0, -1, 0.1], [0, 1, 0], lim))).toBeGreaterThanOrEqual(-20.01);
+  });
+  it('limits are relative to a tilted rest pose', () => {
+    const rest = [0, Math.sin(10 * D), Math.cos(10 * D)] as [number, number, number];
+    expect(el(constrainGaze(rest, [0, 1, 0.01], [0, 1, 0], lim))).toBeCloseTo(22, 0);
+  });
+});

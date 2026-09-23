@@ -50,7 +50,7 @@ const ld = JSON.stringify(person).replace(/</g, '\\u003c');
     <meta name="theme-color" content={light} media="(prefers-color-scheme: light)" />
     <script is:inline define:vars={{ dark, light }}>
       var d = document.documentElement, t = null;
-      try { t = localStorage.getItem('alxnko:theme'); } catch (e) {}
+      try { t = localStorage.getItem('alxnko:theme') || localStorage.getItem('alxnko-theme'); } catch (e) {}
       if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
       d.dataset.theme = t;
       d.classList.add('js');
@@ -64,16 +64,23 @@ const ld = JSON.stringify(person).replace(/</g, '\\u003c');
         (function () {
           try {
             var d = document.documentElement, q = location.search, n = navigator, c = n.connection || {};
-            if (/[?&]lite(&|=|$)/.test(q)) return;
             var cv = document.createElement('canvas'), gl = cv.getContext('webgl2');
+            d.dataset.gl = gl ? '2' : '0'; // entry.ts reuses this instead of probing again
             if (!gl) return;
             var lose = gl.getExtension('WEBGL_lose_context');
             if (lose) lose.loseContext();
-            if (!/[?&]3d(&|=|$)/.test(q)) {
+            var force = /[?&]3d(&|=|$)/.test(q);
+            if (!force && /[?&]lite(&|=|$)/.test(q)) return;
+            if (!force) {
               if (c.saveData || /(^|-)2g$/.test(c.effectiveType || '')) return;
               if ((n.hardwareConcurrency && n.hardwareConcurrency < 4) || (n.deviceMemory && n.deviceMemory < 4)) return;
             }
             d.dataset.boot = '3d';
+            // watchdog: if the desk is not up in 15 s (script blocked, stale cached HTML,
+            // stalled download), reveal the page rather than a loader forever
+            setTimeout(function () {
+              if (!document.body || document.body.dataset.scene !== 'ready') delete d.dataset.boot;
+            }, 15000);
           } catch (e) {}
         })();
       </script>

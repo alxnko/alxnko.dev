@@ -6,8 +6,8 @@ export interface InputHandlers {
   /** The element that receives camera input (the stage layer under the pinned screens). */
   canvas: HTMLElement;
   reducedMotion: boolean;
-  /** Multiply the viewing distance by f (<1 closer). */
-  zoom(f: number): void;
+  /** Multiply the viewing distance by f (<1 closer), toward the point under (x, y). */
+  zoom(f: number, x: number, y: number): void;
   /** Incremental drag in CSS px. */
   orbit(dx: number, dy: number): void;
   pointer(x: number, y: number): void;
@@ -41,7 +41,7 @@ export function attachInput(h: InputHandlers): () => void {
   const onWheel = (e: WheelEvent) => {
     if (e.ctrlKey || inScrollable(e.target)) return; // ctrl+wheel = browser zoom
     const px = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * innerHeight : e.deltaY;
-    h.zoom(Math.exp(Math.max(-0.5, Math.min(0.5, px * WHEEL_K))));
+    h.zoom(Math.exp(Math.max(-0.5, Math.min(0.5, px * WHEEL_K))), e.clientX, e.clientY);
     e.preventDefault?.();
   };
 
@@ -64,7 +64,7 @@ export function attachInput(h: InputHandlers): () => void {
     if (pts.size === 2) {
       const [a, b] = [...pts.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (pinch0 > 0 && d > 0) h.zoom(pinch0 / d);
+      if (pinch0 > 0 && d > 0) h.zoom(pinch0 / d, (a.x + b.x) / 2, (a.y + b.y) / 2);
       pinch0 = d;
       return;
     }

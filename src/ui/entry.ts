@@ -99,13 +99,20 @@ async function boot(first: boolean) {
   await shell.run(first && !narrow() ? 'fastfetch' : 'fastfetch --compact');
 }
 
+/** Answered once in <head> (Base.astro); probe only if that script did not run. */
 function hasWebGL2(): boolean {
+  const known = document.documentElement.dataset.gl;
+  if (known) return known === '2';
   try {
-    return !!document.createElement('canvas').getContext('webgl2');
+    const gl = document.createElement('canvas').getContext('webgl2');
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    return !!gl;
   } catch {
     return false;
   }
 }
+
+const MOUNT_TIMEOUT_MS = 20000;
 
 const $ = (id: string) => document.getElementById(id);
 
@@ -115,8 +122,7 @@ function enter3d() {
   if (!stage || !termEl || !contactsEl) return;
   if (btn) { btn.disabled = true; btn.textContent = 'loading 3d'; }
   document.body.dataset.scene = 'loading';
-  import('../scene/index')
-    .then((m) =>
+  const mounting = import('../scene/index').then((m) =>
       m.mount({
         stage,
         store,
@@ -145,14 +151,19 @@ function enter3d() {
         },
         onPaddle(key) {
           // the paddle is just another way to type `desk N`: the terminal shows it too
-          void shell.run(`desk ${key}`);
+          const { input, cursor } = store.state; // a half-typed line survives the press
+          void shell.run(`desk ${key}`).then(() => store.setInput(input, cursor));
         },
         onAway(away) {
           const b = $('back');
           if (b) b.hidden = !away;
         },
-      }),
-    )
+      }));
+  let timedOut = false;
+  const timeout = new Promise<never>((_, reject) => setTimeout(() => { timedOut = true; reject(new Error('3d load timed out')); }, MOUNT_TIMEOUT_MS));
+  // a mount that finishes after the timeout cleans up after itself
+  mounting.then((h) => { if (timedOut) h.destroy(); }, () => {});
+  Promise.race([mounting, timeout])
     .then((handle) => {
       handle3d = handle;
       world.scene = handle.world;
@@ -216,7 +227,8 @@ for (const [id, l] of SCREENS) {
 // camera nav, back to desk (button or Esc), focus → fly, theme → scene
 $('back')?.addEventListener('click', () => world.fly('desk'));
 addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && world.scene) {
+  // the terminal claims Esc first (completions, history search, a running toy)
+  if (e.key === 'Escape' && world.scene && !e.defaultPrevented) {
     (document.activeElement as HTMLElement | null)?.blur?.();
     world.fly('desk');
   }

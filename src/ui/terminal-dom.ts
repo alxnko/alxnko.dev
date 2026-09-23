@@ -338,7 +338,10 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
       case 'Tab': if (!e.shiftKey) tab(e); return;
       case 'ArrowUp': e.preventDefault(); histWalk(-1); return;
       case 'ArrowDown': e.preventDefault(); histWalk(1); return;
-      case 'Escape': hideComp(); return;
+      case 'Escape':
+        if (s.overlay || s.busy) { e.preventDefault(); deps.interrupt(); return; }
+        if (!comp.hidden) { e.preventDefault(); hideComp(); }
+        return;
     }
   }
 

@@ -122,29 +122,29 @@ Changed:
 | R2 | "Cat in terminal is wrong" | Hand ASCII replaced by the real mark rendered to half-block characters from catuser.png (20×22 px). **Fixed.** |
 | R3 | "Remove coords everywhere" | Removed from site, terminal, vfs, posters script, spec. **Fixed.** |
 | R4 | Green focus outline on the terminal looks bad | Removed; focus shown by frame lift + block caret. **Fixed.** |
-| R5 | Keyboard backlight (laptop + keyboard), green like the ring | Runtime additive glows tinted with the ring colour; Blender adds `kbd_glow`, `laptop_kbd_glow`. **Runtime done, model pending.** |
+| R5 | Keyboard backlight (laptop + keyboard), green like the ring | Runtime additive glows tinted with the ring colour; Blender adds `kbd_glow`, `laptop_kbd_glow`. **Done** (pass 2: `kbd_glow`, `laptop_kbd_glow`; runtime tint). |
 | R6 | Buttons show UI "not where needed, not connected to the stage"; screens should show real things up close without appearing/disappearing | Live DOM terminal + contacts are now pinned onto the 3D screens every frame at every distance (projective matrix3d). Sheet/canvas-mirror swap removed. **Fixed.** |
 | R7 | "What is scroll to move" | Camera is real 3D now: drag = look around, scroll/pinch = zoom, buttons/`cd`/taps fly. **Fixed.** |
-| R8 | Fan too dark; show "100" like the real fan; its ring glows green | `fan_ring` (ring-tinted), `fan_display` (speed readout); lighter housing. **Runtime done, model pending.** |
-| R9 | Gamepad should be DualShock 4-inspired | **Model pending.** |
+| R8 | Fan too dark; show "100" like the real fan; its ring glows green | `fan_ring` (ring-tinted), `fan_display` (speed readout); lighter housing. **Done** (pass 2: `fan_ring`, `fan_display`). |
+| R9 | Gamepad should be DualShock 4-inspired | **Done** (pass 2: DS4-style pad). |
 | R10 | Screens flicker; laptop console misplaced at desk/wide views | Page CSS 64px margin shifted the pinned DOM; margin reset in scene mode. **Fixed.** |
 | R11 | Ultrawide cut on the sides on non-wide viewports | Monitor landmark fits the whole curved panel to any aspect. **Fixed.** |
-| R12 | Cat on fan should fit the scene (more natural) | Natural loaf pose, shaded desaturated green. **Model pending.** |
+| R12 | Cat on fan should fit the scene (more natural) | Natural loaf pose, shaded desaturated green. **Done** (pass 2 loaf pose; further polish in pass 3). |
 | R13 | "Back to desk" control besides the bottom bar | Floating `← desk` button + Esc whenever flown/looked away. **Fixed.** |
 | R14 | Day button drops out of 3D; fallback must be impossible once 3D works | Theme crash fixed; runtime never falls back after load; GPU context loss restores. **Fixed.** |
-| R15 | Laptop covers part of the ultrawide | Laptop moved/angled in Blender. **Model pending.** |
-| R16 | Remove wires, clean desk | All cables + charger removed; `cable_drop` optional at runtime. **Model pending.** |
-| R17 | Flat page flashes on open | `<head>` gate decides before first paint; tty boot loader with real progress until the desk is ready; page only if 3D unavailable/fails. **In progress.** |
-| R18 | Flying to the monitor passes through the laptop | Flights go straight from the current view to the target (no rail through other landmarks). **In progress.** |
-| R19 | Paddle buttons under the desk should work: 1 lowest, 2 middle, 3 highest (▲▼ nudge) | Clickable `hit_paddle_*` targets run `desk N` through the shell (terminal shows it, desk moves, paddle LED lights). Hover shows a pointer on everything clickable. **Runtime done, hit boxes pending in model.** |
+| R15 | Laptop covers part of the ultrawide | Laptop moved/angled in Blender. **Done** (pass 2), refined with the stand in pass 3. |
+| R16 | Remove wires, clean desk | All cables + charger removed; `cable_drop` optional at runtime. **Done** (pass 2: charger, cables, `cable_drop` removed). |
+| R17 | Flat page flashes on open | `<head>` gate decides before first paint; tty boot loader with real progress until the desk is ready; page only if 3D unavailable/fails. **Done** (head gate + loader + 15 s watchdog + 20 s mount timeout). |
+| R18 | Flying to the monitor passes through the laptop | Flights go straight from the current view to the target (no rail through other landmarks). **Done** (straight pose-to-pose flights). |
+| R19 | Paddle buttons under the desk should work: 1 lowest, 2 middle, 3 highest (▲▼ nudge) | Clickable `hit_paddle_*` targets run `desk N` through the shell (terminal shows it, desk moves, paddle LED lights). Hover shows a pointer on everything clickable. **Done** (hit boxes pass 2; tap resolution fixed in R28). |
 | R20 | Never lose these comments; document lights/glow etc. | This table is the tracking list; each row is re-verified in the final review before PR. Lights/glow summary: monitor ring + wall wash, fan ring, laptop + keyboard backlights all share the ring colour (`ring green\|purple\|off`), breathe gently, pulse on `meow`; LEDs: paddle (amber while moving), server pattern, keyboard indicator. |
 | R21 | Text selectable only on the screen you're at (none at wide/desk) | `body[data-view]` + scene.css `user-select`. **Fixed.** |
 | R22 | Not everything clickable (sun icon, monitor from desk view); investigate all | Scene container click-through; every control's icon + label hit-tested in Chrome (29/29 ok); screens from afar are one button that flies you there. **Fixed.** |
 | R23 | "#1 committer" clickable everywhere, incl. monitor | Rank restored in 3D identity; monitor right pane is a live pinned panel with the link. **Fixed.** |
-| R24 | Remove "AIT Solutions" everywhere | Removed from site, terminal, JSON-LD, monitor; posters/og in Blender pass. **Site fixed, posters pending.** |
+| R24 | Remove "AIT Solutions" everywhere | Removed from site, terminal, JSON-LD, monitor; posters/og in Blender pass. **Done** (site + posters/og, pass 2). |
 | R25 | Invert vertical drag (grab-the-scene) | **Fixed.** |
-| R26 | Live screens can appear on top of 3D objects (laptop screen over fan/cat) | Canvas now sits *above* the pinned DOM; screen regions render as transparent depth-writing windows, so anything in front of a screen occludes it per pixel. Input moved to the stage layer beneath. **Fixed (verifying).** |
-| R27 | Cat's tail looks black, not green | Cat remodel in Blender pass; tail on the green material, verified in the unlit atlas render; no fan cable. **Model pending.** |
+| R26 | Live screens can appear on top of 3D objects (laptop screen over fan/cat) | Canvas now sits *above* the pinned DOM; screen regions render as transparent depth-writing windows, so anything in front of a screen occludes it per pixel. Input moved to the stage layer beneath. **Done** (verified in Chrome from side angles). |
+| R27 | Cat's tail looks black, not green | Cat remodel in Blender pass; tail on the green material, verified in the unlit atlas render; no fan cable. **Done** (pass 2: tail rebuilt, green in atlas check). |
 
 ### Lights & glow (owner asked to keep this written down)
 - **Monitor ring** (back of the ultrawide) + its **wall wash**: runtime-tinted, green by default, `ring green|purple|off`, breathes ±6 % over 8 s, pulses on `meow`.
@@ -156,3 +156,12 @@ Changed:
 | R28 | Desk doesn't move when clicking the paddle buttons | Tap hits landed on quantised `<name>__geo` children, so the target name was wrong (`desk 1__geo`); also silently broke laptop/monitor taps. Pure `resolveTarget` + unit test. Verified in Chrome: click on "3" → `desk 3`, desk at 112 cm. **Fixed.** |
 | R29 | Laptop is on a stand (new photos in `3d-table-references/new`), not flat | Blender pass 3: black foldable stand, deck tilted ~15° up to the back, lid near vertical. **Model pending.** |
 | R30 | Live terminal floats in front of the fan from a side angle | The `screen_laptop` quad was not coplanar with the lid; pass 3 parents it to the lid, ≤1 mm off the panel, side-angle verified. **Model pending.** |
+| R31 | Zoom toward the cursor / pinch point, not the centre | Raycast under the cursor; the orbit pivot moves (1−k) toward it so the point stays fixed on screen. **Done.** |
+| R32 | Cat's head can turn into its own body (cursor high) | Gaze constrained to a natural range (±50° sideways, +12°/−20° vertical from rest), unit-tested. **Done.** |
+| R33 | Keyboards look unreal, numpad especially (laptop + external) | Pass 3: real 96 %/1800 key table with sculpted caps; laptop chiclet layout with numpad + touchpad. **Model pending.** |
+| R34 | ASCII cat mark has defects and is asymmetric | Re-rasterised on a grid centred on the mark's axis, head/ears/body mirror-averaged; only the tail off-axis. **Done.** |
+
+### Code review (pre-PR) — findings and resolution
+- Important: loader had no watchdog → head watchdog (15 s) + mount timeout (20 s, late mounts clean up). Esc in the terminal also flew back to the desk → terminal claims Esc (completions, search, toys) and the global handler honours `defaultPrevented`. Docs unreconciled → this table + superseded notes in spec/plan.
+- Minor, fixed: `?3d&lite` gate order; WebGL probe leaks (head answer reused, probe contexts released); poster theme on load; old `alxnko-theme` key migrated; paddle keeps half-typed input; touch-specific hint; per-frame layout reads (sizes cached); day-theme slivers (screen-black stage behind windows); `manifest.json` no longer immutable; redirects test; stale comments.
+- Minor, accepted: GPU context loss waits for restore instead of showing the poster (R14: never leave 3D once loaded). `og.png` keeps `Cross-Origin-Resource-Policy: same-origin` (Pages joins overlapping header rules, so a per-file override would produce an invalid combined value; crawlers are unaffected).

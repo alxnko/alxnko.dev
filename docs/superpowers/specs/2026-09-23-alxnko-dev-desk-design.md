@@ -1,5 +1,12 @@
 # alxnko.dev: "the desk" redesign (design spec)
 
+> **Superseded in part by the owner review (decision log R1–R34).** Notably: no company name and no
+> coordinates anywhere (R3, R24; `worksFor` dropped from JSON-LD); screens are always-pinned live DOM
+> behind transparent canvas windows (R6, R26) instead of the sheet/canvas-mirror swap of §3.3/§5.1;
+> the camera is direct flights + drag orbit + zoom-to-cursor (R7, R18, R31) instead of the §3.4 rail
+> scrub; once 3D loads it never falls back (R14); paddle buttons are clickable (R19). Where this spec
+> and the decision log disagree, the decision log wins.
+
 Date: 2026-09-23 · Status: approved in brainstorming · Branch: `feat/redesign-desk`
 
 ## 1. Goal

@@ -1,16 +1,18 @@
-// The brand mark (the faceted cat) in half-block characters, rendered from the mark image
-// (catuser.png, 20×22 px, two pixels per cell) so the terminal shows the real shape.
-// Shared by fastfetch and the monitor screen so the mark only exists in one place.
+// The brand mark (the faceted cat) in half-block characters. Rasterised from catuser.png on a
+// grid centred on the mark's axis (10 px cells, two per character row) with the ears, head and
+// body averaged with their mirror, so the drawing is exactly symmetric; only the tail sits
+// off-axis, as in the mark. Shared by fastfetch, the monitor screen and the posters.
 export const CAT_MARK: readonly string[] = [
-  ' ▄██  ▄██▄  ▄██',
-  ' ▀▀▄▄███████▄▀▀',
-  '  ████████████▄',
-  '   ▀████████▀',
-  '    ▄ ▀▀█▀ ▄▄  ██▄',
-  '   ████▄ ████▄ ███▄',
-  '  █████  █████▄ ████',
-  ' ██████  ██████▄ █▀',
-  '███████  ███████',
-  '  ▀████  ████▀▀',
-  '     ▀█  █▀',
+  ' ▄█▄  ▄▄▄  ▄█▄',
+  ' ▀▀ ▄█████▄ ▀▀',
+  ' ▄███████████▄',
+  '  ▀█████████▀',
+  '     ▀███▀    █▄',
+  '   ██▄▄ ▄▄██  ██▄',
+  '  █████ █████ ▀███',
+  ' ██████ ██████ ██▀',
+  '▄██████ ██████▄',
+  '▀██████ ██████▀',
+  '   ▀███ ███▀',
+  '      ▀ ▀',
 ];

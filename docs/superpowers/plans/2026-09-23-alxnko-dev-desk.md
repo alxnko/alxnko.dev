@@ -1,5 +1,9 @@
 # alxnko.dev "the desk": implementation plan
 
+> **Executed; later superseded in part by the owner review** (see the decision log R1–R34): the
+> public facts drop the company and coordinates (`SITE.company`/`SITE.coords` no longer exist), the
+> canvas mirror and sheet mode were replaced by pinned DOM screens, and `cable_drop` was removed.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development
 > (recommended) or superpowers:executing-plans to implement this plan task by task.
 > Steps use checkbox (`- [ ]`) syntax for tracking.

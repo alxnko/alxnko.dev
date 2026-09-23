@@ -60,7 +60,8 @@ describe('postbuild CSP', () => {
     expect(h).toMatch(/Permissions-Policy: camera=\(\), microphone=\(\), geolocation=\(\)/);
     expect(h).toContain('Cross-Origin-Opener-Policy: same-origin');
     expect(h).toContain('Cross-Origin-Resource-Policy: same-origin');
-    expect(h).toMatch(/\/scene\/\*\n\s+Cache-Control: public, max-age=31536000, immutable/);
+    expect(h).toMatch(/\/scene\/\*\.glb\n\s+Cache-Control: public, max-age=31536000, immutable/);
+    expect(h).toMatch(/\/scene\/manifest\.json\n\s+Cache-Control: public, max-age=0, must-revalidate/);
     expect(h).toMatch(/\/404\.html\n\s+Cache-Control: public, max-age=0/);
   });
 

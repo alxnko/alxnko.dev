@@ -1,16 +1,17 @@
-/* graphite / scene mode (spec §3.3): the canvas owns the viewport, the DOM becomes overlay
-   chrome. Docking transforms are applied by the scene runtime through CSSOM; this file only
-   defines the states. Hooks: body[data-mode], and data-dock="off|screen|sheet" on #term and
-   #contacts (src/scene/dock.ts). Docked logical sizes match the canvas mirror
-   (screen-mirror.ts MIRROR 1280×800, font 24/30, pad 28, bar 40) and CONTACTS_DOCK. */
+/* graphite / scene mode: the 3D desk owns the viewport. Layers: #stage (camera input) <
+   pinned screens (#term on the laptop, #contacts + #mon-info on the monitor; mapped onto the
+   3D screens every frame by src/scene/dock.ts via CSSOM matrix3d) < the WebGL canvas (whose
+   screen regions are transparent windows, so 3D objects occlude the screens) < chrome.
+   Hooks: body[data-mode|data-scene|data-view], data-dock="screen|off" on each pinned panel.
+   The laptop panel's logical grid is --screen-w/h (set by the runtime) at --screen-font. */
 
 :root {
-  --mirror-w: 1280px;
-  --mirror-h: 800px;
-  --mirror-font: 24px;
-  --mirror-lh: 30px;
-  --mirror-pad: 28px;
-  --mirror-bar: 40px;
+  --screen-w: 1280px;
+  --screen-h: 800px;
+  --screen-font: 24px;
+  --screen-lh: 30px;
+  --screen-pad: 28px;
+  --screen-bar: 40px;
   --contacts-w: 1024px;
   --contacts-h: 429px;
 }
@@ -165,25 +166,25 @@
   height: var(--screen-h);
   border: 0;
   border-radius: 0;
-  font-size: var(--mirror-font);
-  line-height: var(--mirror-lh);
+  font-size: var(--screen-font);
+  line-height: var(--screen-lh);
   --term-lh: 1.25;
 }
 
 [data-mode="scene"] .term .term-head {
-  height: var(--mirror-bar);
-  padding: 0 var(--mirror-pad);
+  height: var(--screen-bar);
+  padding: 0 var(--screen-pad);
   font-size: 0.8em;
 }
 
 [data-mode="scene"] .term .term-screen {
   flex: 1;
   height: auto;
-  padding: var(--mirror-pad) var(--mirror-pad) 0;
+  padding: var(--screen-pad) var(--screen-pad) 0;
 }
 
 [data-mode="scene"] .term .term-form {
-  padding: 0 var(--mirror-pad) var(--mirror-pad);
+  padding: 0 var(--screen-pad) var(--screen-pad);
   border-top: 0;
   font-size: inherit;
 }
@@ -476,4 +477,16 @@
 [data-mode="scene"][data-view="monitor"] .mon-info {
   -webkit-user-select: text;
   user-select: text;
+}
+
+.hint-touch { display: none; }
+@media (pointer: coarse) {
+  .hint-fine { display: none; }
+  .hint-touch { display: inline; }
+}
+
+/* the stage (input layer) is what shows through any sub-pixel gap between a screen window
+   and its pinned DOM: keep it screen-black so day theme never shows light slivers */
+[data-scene="ready"] #stage {
+  background: var(--ansi-bg);
 }
