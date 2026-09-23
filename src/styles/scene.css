@@ -323,7 +323,7 @@
   z-index: calc(var(--z-skip) - 1);
   padding: var(--gutter);
   background: var(--c-bg);
-  transition: opacity var(--d-slow) var(--ease), visibility 0s linear var(--d-slow);
+  transition: opacity var(--d-base) var(--ease), visibility 0s linear var(--d-base);
 }
 
 /* while the loader is up, the flat page underneath stays out of sight (and out of the tab order) */

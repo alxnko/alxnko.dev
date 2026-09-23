@@ -8,7 +8,7 @@ test.describe('3D desk', () => {
     const g = await guard(page);
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
-    await expect(page.locator('#stage canvas')).toHaveCount(1);
+    await expect(page.locator('canvas.stage-canvas')).toHaveCount(1);
     await page.waitForTimeout(800);
     g.check();
   });
