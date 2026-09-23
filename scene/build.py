@@ -12,6 +12,7 @@ import random
 import sys
 from pathlib import Path
 
+sys.dont_write_bytecode = True  # no __pycache__ in the repo
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import bmesh  # noqa: E402
@@ -457,8 +458,9 @@ def build_laptop(m):
     y_s = -lt / 2 - 0.0005
     zc = L["chin"] + sh / 2
     corners = [(-sw / 2, 0, -sh / 2), (sw / 2, 0, -sh / 2), (sw / 2, 0, sh / 2), (-sw / 2, 0, sh / 2)]
-    # Blender UV v is flipped by the glTF exporter (v' = 1 - v): store bl=(0,0) in glTF
-    scr = plane("screen_laptop", corners, m["screen"], uvs=[(0, 1), (1, 1), (1, 0), (0, 0)])
+    # Blender UV (0,0) = bottom-left of the image; the exporter flips v, so glTF stores
+    # the standard (0,0) = top-left (runtime: CanvasTexture flipY=false)
+    scr = plane("screen_laptop", corners, m["screen"], uvs=[(0, 0), (1, 0), (1, 1), (0, 1)])
     scr.matrix_world = M @ Mlid @ Matrix.Translation((0, y_s, zc))
     hit = C.box("hit_laptop", (lw + 0.01, 0.03, lh + 0.01), (0, 0, lh / 2), bevel=0.0,
                 mat_=m["hit"])
@@ -613,7 +615,7 @@ def build_monitor(m):
         (b0, t0), (b1, t1) = vs[i], vs[i + 1]
         f = sbm.faces.new((b0, b1, t1, t0))
         u0, u1 = i / cols, (i + 1) / cols
-        for loop, uv in zip(f.loops, ((u0, 1), (u1, 1), (u1, 0), (u0, 0))):
+        for loop, uv in zip(f.loops, ((u0, 0), (u1, 0), (u1, 1), (u0, 1))):
             loop[uvl].uv = uv
     screen = obj_from_bm("screen_monitor", sbm, m["screen"])
     C.set_origin(screen, (cx, cyc + r_s, g["zc"]))
@@ -1037,7 +1039,7 @@ def build_charger_and_cables(m, kbd_M):
     # tray -> right leg (rides with the rig); cable_drop continues to the floor
     Rg(C.cable("cable_tray_leg", [Vector((0.38, D.TOP[1] / 2 - 0.06, H - D.TOP[2] - 0.05)),
                                   Vector((0.46, 0.12, H - D.TOP[2] - 0.06)),
-                                  Vector((D.LEG_X + 0.004, 0.045, H - D.TOP[2] - 0.04))], r=0.006), 0.3)
+                                  Vector((D.LEG_X + 0.004, 0.045, H - D.TOP[2] - 0.004))], r=0.006), 0.3)
     for ob in bpy.data.objects:
         if ob.name.startswith("cable_") and not ob.data.materials:
             ob.data.materials.append(m["cable"])
@@ -1046,7 +1048,7 @@ def build_charger_and_cables(m, kbd_M):
 def build_cable_drop(m):
     """Vertical cable run down the rear-right leg. Origin = floor anchor;
     the runtime scales it along Y (glTF) with the desk height."""
-    top_z = D.DESK_H - D.TOP[2] - 0.04
+    top_z = D.DESK_H - D.TOP[2] - 0.002   # just under the top: runtime scales by (rigY - cableY)
     anchor = Vector((D.LEG_X + 0.03, 0.12, 0.0))
     pts = [anchor + Vector((0.04, 0.08, 0.004)), anchor + Vector((0.0, 0.0, 0.006)),
            Vector((D.LEG_X + 0.004, 0.05, 0.06)), Vector((D.LEG_X + 0.002, 0.046, 0.25)),

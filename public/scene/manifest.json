@@ -1,0 +1,432 @@
+{
+  "version": "11a71639",
+  "deskBase": 0.74,
+  "presets": [
+    0.74,
+    0.95,
+    1.12
+  ],
+  "range": [
+    0.7,
+    1.2
+  ],
+  "step": 0.05,
+  "fanAxis": [
+    0,
+    0,
+    1
+  ],
+  "screens": {
+    "laptop": {
+      "w": 0.345,
+      "h": 0.216,
+      "node": "screen_laptop",
+      "aspect": "16:10",
+      "cornersLocal": {
+        "bl": [
+          -0.1725,
+          -0.108,
+          0.0
+        ],
+        "br": [
+          0.1725,
+          -0.108,
+          0.0
+        ],
+        "tr": [
+          0.1725,
+          0.108,
+          0.0
+        ],
+        "tl": [
+          -0.1725,
+          0.108,
+          0.0
+        ]
+      },
+      "cornersRig": {
+        "bl": [
+          -0.47476,
+          0.04698,
+          -0.03761
+        ],
+        "br": [
+          -0.13165,
+          0.04698,
+          -0.07367
+        ],
+        "tr": [
+          -0.13749,
+          0.25562,
+          -0.12927
+        ],
+        "tl": [
+          -0.4806,
+          0.25562,
+          -0.09321
+        ]
+      },
+      "normalLocal": [
+        0,
+        0,
+        1
+      ]
+    },
+    "monitor": {
+      "w": 0.8,
+      "h": 0.335,
+      "radius": 1.5,
+      "node": "screen_monitor",
+      "radiusMesh": 1.4994,
+      "arcRad": 0.53333,
+      "curvatureCenterLocal": [
+        0.0,
+        0.0,
+        1.4994
+      ],
+      "axisLocal": [
+        0,
+        1,
+        0
+      ],
+      "cornersLocal": {
+        "bl": [
+          -0.39512,
+          -0.1675,
+          0.053
+        ],
+        "br": [
+          0.39512,
+          -0.1675,
+          0.053
+        ],
+        "tr": [
+          0.39512,
+          0.1675,
+          0.053
+        ],
+        "tl": [
+          -0.39512,
+          0.1675,
+          0.053
+        ]
+      },
+      "cornersRig": {
+        "bl": [
+          -0.19512,
+          0.11,
+          -0.1464
+        ],
+        "br": [
+          0.59512,
+          0.11,
+          -0.1464
+        ],
+        "tr": [
+          0.59512,
+          0.445,
+          -0.1464
+        ],
+        "tl": [
+          -0.19512,
+          0.445,
+          -0.1464
+        ]
+      },
+      "uv": "u runs along the arc (left->right); stored glTF v: 0 = top, 1 = bottom (standard)"
+    }
+  },
+  "files": {
+    "glb": "desk.11a71639.glb",
+    "atlas": {
+      "day": {
+        "2048": "atlas-day-2048.7c3c0da5.webp",
+        "1024": "atlas-day-1024.4584136a.webp"
+      },
+      "night": {
+        "2048": "atlas-night-2048.ea2a82be.webp",
+        "1024": "atlas-night-1024.9934e257.webp"
+      }
+    }
+  },
+  "axes": {
+    "units": "m",
+    "up": "+Y",
+    "right": "+X",
+    "front": "+Z (the viewer/chair side; the back wall is at -Z)",
+    "origin": "floor, under the centre of the desk top",
+    "handedness": "right (glTF)",
+    "fanAxis": "fan_blades local +Z",
+    "uvScreens": "screen_laptop / screen_monitor TEXCOORD_0 is standard glTF: stored (0,0) = top-left, (1,1) = bottom-right of the visible image (Blender UV (0,0) = bottom-left) -> CanvasTexture with flipY=false",
+    "uvSky": "window_sky / ring_glow TEXCOORD_0 stored (0,0) = bottom-left as seen from the room: vUv.y = up",
+    "uvAtlas": "TEXCOORD_0 standard glTF (flipY=false); atlas is display-referred sRGB: sample as SRGBColorSpace, output unlit, no tone mapping"
+  },
+  "nodes": {
+    "static": "merged baked mesh (room, floor, window frame, radiator, lower legs, feet, server body); atlas",
+    "desk_rig": {
+      "note": "group; set position.y = deskHeight (translation y = 0.74 at preset 1); everything on the desk rides along",
+      "baseY": 0.74
+    },
+    "desk_baked": "merged baked mesh (top, upper legs, rails, tray, paddle, laptop, monitor + stand, keyboard, mouse, pad, gamepad, fan body, charger, cables); atlas",
+    "screen_laptop": "flat 16:10 quad, runtime CanvasTexture + dock target; corners in manifest.screens.laptop",
+    "screen_monitor": "curved strip (R 1.5 m), runtime CanvasTexture + dock target",
+    "fan_blades": {
+      "pivot": [
+        -0.53831,
+        0.118,
+        0.23863
+      ],
+      "axisLocal": [
+        0,
+        0,
+        1
+      ],
+      "note": "spin about the node's local +Z (glTF); pivot = hub = node origin"
+    },
+    "cat_body": {
+      "hierarchy": "desk_rig > cat_body > (cat_head, cat_tail)",
+      "bodyOrigin": [
+        -0.54,
+        0.207,
+        0.235
+      ],
+      "neckPivot": [
+        -0.52563,
+        0.249,
+        0.26581
+      ],
+      "tailPivot": [
+        -0.56584,
+        0.237,
+        0.1654
+      ],
+      "headForward": [
+        0.8725,
+        0.0698,
+        0.4836
+      ],
+      "note": "parts have identity rotation; headForward is the gaze in rig space"
+    },
+    "cat_head": "pivot = neck (node origin)",
+    "cat_tail": "pivot = tail base (node origin)",
+    "ring": {
+      "center": [
+        0.2,
+        0.2655,
+        -0.2525
+      ],
+      "radius": 0.09,
+      "tube": 0.004,
+      "facing": [
+        0,
+        0,
+        -1
+      ],
+      "default": "green",
+      "note": "not baked; emissive tint at runtime"
+    },
+    "ring_glow": {
+      "center": [
+        0.2,
+        0.2655,
+        -0.346
+      ],
+      "size": 0.9,
+      "note": "quad on the wall, parented to desk_rig; additive radial glow from UV"
+    },
+    "leds": {
+      "positions": {
+        "led_paddle": [
+          0.42,
+          -0.04,
+          0.2895
+        ],
+        "led_kbd": [
+          0.12,
+          0.00403,
+          0.1275
+        ],
+        "led_srv_0": [
+          0.84,
+          0.0,
+          -0.17
+        ],
+        "led_srv_1": [
+          0.84,
+          0.0,
+          -0.17
+        ],
+        "led_srv_2": [
+          0.84,
+          0.0,
+          -0.17
+        ],
+        "led_srv_3": [
+          0.84,
+          0.0,
+          -0.17
+        ],
+        "led_srv_4": [
+          0.84,
+          0.0,
+          -0.17
+        ],
+        "led_srv_5": [
+          0.84,
+          0.0,
+          -0.17
+        ]
+      },
+      "parent": {
+        "led_paddle": "desk_rig",
+        "led_kbd": "desk_rig",
+        "led_srv_0": null,
+        "led_srv_1": null,
+        "led_srv_2": null,
+        "led_srv_3": null,
+        "led_srv_4": null,
+        "led_srv_5": null
+      },
+      "roles": {
+        "led_paddle": "on while the desk moves",
+        "led_kbd": "steady (the one green LED)",
+        "led_srv_0..5": "decorative pattern, change every 2-6 s"
+      }
+    },
+    "cable_drop": {
+      "anchor": [
+        0.55,
+        0.0,
+        -0.12
+      ],
+      "baseLength": 0.713,
+      "topOffset": -0.027,
+      "scaleY": "(deskHeight + (-0.027)) / 0.713"
+    },
+    "window_sky": {
+      "window": {
+        "center": [
+          -1.572,
+          1.45,
+          0.4
+        ],
+        "w": 0.9,
+        "h": 1.2
+      },
+      "fade": {
+        "day": 0.245,
+        "night": 0.655
+      },
+      "note": "procedural sky; mix the sky towards the page bg by `fade` (the room around it is faded by that amount)"
+    },
+    "hit_laptop": "invisible tap target (set visible=false)",
+    "hit_monitor": "invisible tap target (set visible=false)",
+    "geometry": "each named mesh node keeps its authored TRS; its geometry is in a child '<name>__geo' (quantisation transform lives there). Traverse for meshes.",
+    "materials": "one unlit placeholder per role: baked, screen, ring, glow, led, sky, hit"
+  },
+  "cameras": {
+    "cam_wide": {
+      "parent": null,
+      "hfovDeg": 55.0,
+      "yfovDeg": 36.0451,
+      "aspect": 1.6,
+      "position": [
+        0.95,
+        1.85,
+        2.55
+      ],
+      "target": [
+        -0.15,
+        0.85,
+        0.0
+      ]
+    },
+    "cam_desk": {
+      "parent": "desk_rig",
+      "hfovDeg": 50.0,
+      "yfovDeg": 32.4967,
+      "aspect": 1.6,
+      "position": [
+        -0.02,
+        1.42,
+        1.55
+      ],
+      "target": [
+        -0.03,
+        0.88,
+        -0.02
+      ],
+      "positionRig": [
+        -0.02,
+        0.68,
+        1.55
+      ],
+      "targetRig": [
+        -0.03,
+        0.14,
+        -0.02
+      ]
+    }
+  },
+  "bounds": {
+    "min": [
+      -1.62,
+      -0.00037,
+      -0.35
+    ],
+    "max": [
+      2.6,
+      2.7,
+      3.65
+    ]
+  },
+  "bake": {
+    "samples": 512,
+    "size": 4096,
+    "exposure": {
+      "day": 1.1,
+      "night": 3.0
+    },
+    "fade": {
+      "center": [
+        -0.25,
+        -0.15,
+        0.95
+      ],
+      "axes": [
+        2.0,
+        1.6,
+        1.3
+      ],
+      "f0": {
+        "day": 0.62,
+        "night": 0.42
+      },
+      "f1": {
+        "day": 1.05,
+        "night": 0.98
+      }
+    },
+    "bg": {
+      "day": "#e9e8e4",
+      "night": "#0a0a0b"
+    }
+  },
+  "stats": {
+    "tris": 20992,
+    "verts": 23391,
+    "bytes": {
+      "desk.11a71639.glb": 200800,
+      "atlas-day-2048.7c3c0da5.webp": 156436,
+      "atlas-day-1024.4584136a.webp": 68502,
+      "atlas-night-2048.ea2a82be.webp": 107574,
+      "atlas-night-1024.9934e257.webp": 43454
+    },
+    "quality": {
+      "atlas-day-2048": 82,
+      "atlas-day-1024": 78,
+      "atlas-night-2048": 82,
+      "atlas-night-1024": 78
+    }
+  }
+}
