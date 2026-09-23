@@ -307,7 +307,8 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   // then reused while the desk moves.
   const ANGLES: [number, number][] = [[0, 0], [0, 10], [12, 0], [-12, 0], [12, 10], [-12, 10], [0, 20], [20, 12], [-20, 12], [0, 30], [25, 25], [-25, 25]];
   const viewChoice = new Map<string, [number, number]>();
-  const fitScreen = (key: string, corners: Vector3[], margin: number, fov: number): Pose => {
+  /** `top` < 1 frames the screen into the top fraction of the view (phones: room for the keyboard). */
+  const fitScreen = (key: string, corners: Vector3[], margin: number, fov: number, top = 1): Pose => {
     const [tl, tr, , bl] = corners;
     const c = corners.reduce((acc, v) => acc.add(v), new Vector3()).multiplyScalar(0.25);
     const w = tl.distanceTo(tr), h = tl.distanceTo(bl);
@@ -315,7 +316,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     // face the side the seated viewer (cam_desk) is on
     if (n.dot(new Vector3(...deskRef.pose.pos).sub(c)) < 0) n.negate();
     const t = Math.tan((fov * DEG) / 2);
-    const d = Math.max(h / margin, w / (margin * camera.aspect)) / (2 * t);
+    const d = Math.max(h / (margin * top), w / (margin * camera.aspect)) / (2 * t);
     const eyeFor = ([yaw, up]: [number, number]) => {
       const dir = n.clone().applyAxisAngle(upWorldConst, yaw * DEG);
       const right = new Vector3().crossVectors(dir, upWorldConst).normalize();
@@ -327,7 +328,16 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       choice = ANGLES.find((a) => clearView(eyeFor(a), corners)) ?? [0, 0];
       viewChoice.set(ck, choice);
     }
-    return { pos: eyeFor(choice).toArray() as Vec3, target: c.toArray() as Vec3, fov };
+    const eye = eyeFor(choice);
+    if (top < 1) {
+      // slide the view down so the screen's centre sits at the middle of the top band
+      const up = tl.clone().sub(bl).normalize();
+      const shift = (0.5 - top / 2) * 2 * d * t;
+      eye.addScaledVector(up, -shift);
+      const target = c.clone().addScaledVector(up, -shift);
+      return { pos: eye.toArray() as Vec3, target: target.toArray() as Vec3, fov };
+    }
+    return { pos: eye.toArray() as Vec3, target: c.toArray() as Vec3, fov };
   };
   const upWorldConst = new Vector3(0, 1, 0);
 
@@ -338,7 +348,8 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     const wide = { ...wideRef.pose, fov: adaptFov(wideRef.pose.fov, wideRef.refAspect) };
     wide.target = [wide.target[0], wide.target[1] + rigDy, wide.target[2]];
     const desk = withRig({ ...deskRef.pose, fov: adaptFov(deskRef.pose.fov, deskRef.refAspect) }, rigDy);
-    const laptop = fitScreen('laptop', screenCorners(laptopScreen), 0.94, 34);
+    // portrait phones: the laptop screen sits in the top ~55 %, leaving room for the keyboard
+    const laptop = fitScreen('laptop', screenCorners(laptopScreen), 0.94, 34, camera.aspect < 1 ? 0.55 : 1);
     // the whole ultrawide on landscape screens; on portrait phones the live contacts panel fills
     // the width (readable), and the side panes are a drag away
     const mon = camera.aspect < 1 ? fitScreen('contacts', contactsCorners(), 0.96, 34) : fitScreen('monitor', screenCorners(monitorScreen), 0.94, 34);
