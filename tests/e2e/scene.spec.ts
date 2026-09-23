@@ -103,6 +103,28 @@ test.describe('3D desk', () => {
     await expect(page.locator('#identity')).toBeVisible();
   });
 
+  test('Back peels one layer: view mode, then the desk, then the page', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await page.locator('#nav [data-landmark="monitor"]').click();
+    await expect(page.locator('#back')).toBeVisible();
+    await page.locator('#t-view').click();
+    await expect(page.locator('#noui-exit')).toBeVisible();
+    await page.goBack();
+    await expect(page.locator('#noui-exit')).toBeHidden();
+    await expect(page.locator('#back')).toBeVisible();
+    await page.goBack();
+    await expect(page.locator('#back')).toBeHidden({ timeout: 5000 });
+    expect(new URL(page.url()).search).toBe('?3d&test');
+    // leaving by the on-screen button leaves no stray entry behind
+    await page.locator('#nav [data-landmark="laptop"]').click();
+    await expect(page.locator('#back')).toBeVisible();
+    await page.locator('#back').click();
+    await expect(page.locator('#back')).toBeHidden({ timeout: 5000 });
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => history.state?.away ?? null)).toBeNull();
+  });
+
   test('cd monitor flies there, docks contacts, updates the nav', async ({ page }) => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });

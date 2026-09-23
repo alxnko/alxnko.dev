@@ -168,6 +168,7 @@ function enter3d() {
         onAway(away) {
           const b = $('back');
           if (b) b.hidden = !away;
+          syncAwayHistory(away);
         },
       }));
   let timedOut = false;
@@ -256,14 +257,30 @@ function setViewMode(on: boolean, fromHistory = false) {
     delete document.body.dataset.noui;
     if (exitBtn) exitBtn.hidden = true;
     viewBtn?.setAttribute('aria-pressed', 'false');
-    if (!fromHistory && history.state?.noui) history.back();
+    if (!fromHistory && history.state?.noui) popQuietly();
     viewBtn?.focus({ preventScroll: true });
   }
   world.scene?.setFreeLook(on);
 }
 viewBtn?.addEventListener('click', () => setViewMode(true));
 exitBtn?.addEventListener('click', () => setViewMode(false));
-addEventListener('popstate', () => { if (inViewMode()) setViewMode(false, true); });
+// Back (phone gesture/button, browser Back) peels one layer: view mode → interface, then
+// "away from the desk" → the desk, then it leaves the page as usual. Each layer is one history
+// entry; leaving a layer another way (button, Esc) removes its entry so history stays clean.
+let skipPop = false;
+function popQuietly() { skipPop = true; history.back(); }
+function syncAwayHistory(away: boolean) {
+  if (away && !history.state?.away && !history.state?.noui) history.pushState({ away: true }, '');
+  else if (!away && history.state?.away) popQuietly();
+}
+const isAway = () => !!world.scene && !$('back')?.hidden;
+addEventListener('popstate', () => {
+  if (skipPop) skipPop = false;
+  else if (inViewMode()) setViewMode(false, true);
+  else if (isAway()) { world.fly('desk'); return; }
+  // back on the interface but still away from the desk (e.g. after view mode): re-arm Back
+  if (isAway()) syncAwayHistory(true);
+});
 
 addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && inViewMode()) { e.preventDefault(); setViewMode(false); return; }
