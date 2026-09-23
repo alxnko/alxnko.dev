@@ -39,6 +39,8 @@ export interface SceneOptions {
   onAway?(away: boolean): void;
   /** A paddle button under the desk was pressed ('1' | '2' | '3' | 'up' | 'down'). */
   onPaddle?(key: string): void;
+  /** ▲/▼ held: the desk moves until release; `end` reports the final height (m). */
+  onHold?(state: 'start' | 'end', height: number): void;
   /** Loading progress for the boot loader. */
   onStep?(step: LoadStep, state: 'run' | 'ok'): void;
   onProgress?(p: number): void;
@@ -316,6 +318,9 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   let srvNext = 0;
   let currentLandmark: Landmark = o.initial.landmark;
   let wasAway = false;
+  // press-and-hold on ▲/▼: after HOLD_MS the desk runs at a real desk's speed until release
+  const HOLD_MS = 260, HOLD_SPEED = 0.06; // m/s
+  let hold: { dir: 1 | -1; start: number; active: boolean } | null = null;
   const pointer = new Vector2(0, 0);
   let hasPointer = false;
   let disposed = false;
@@ -373,6 +378,21 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     animating = orbit.dolly.step(dt) || animating;
     for (const s of pan) animating = s.step(dt) || animating;
 
+    // desk motion: press-and-hold
+    if (hold && !hold.active && now - hold.start >= HOLD_MS) {
+      hold.active = true;
+      deskTween = null;
+      deskDone?.();
+      deskDone = null;
+      o.onHold?.('start', rigDy + manifest.deskBase);
+    }
+    if (hold?.active) {
+      const h = clamp(rigDy + manifest.deskBase + hold.dir * HOLD_SPEED * dt, manifest.range[0], manifest.range[1]);
+      setDeskHeight(h);
+      rebuildPoses();
+      ledPaddle.set('#ffb454');
+      animating = true;
+    }
     // desk motion
     if (deskTween) {
       setDeskHeight(deskTween.value(now));
@@ -638,6 +658,24 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       o.stage.style.cursor = raycaster.intersectObjects(hits, true).length ? 'pointer' : '';
       world.activity();
     },
+    press(x, y) {
+      const r = canvas.getBoundingClientRect();
+      raycaster.setFromCamera(new Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1), camera);
+      const t = resolveTarget((raycaster.intersectObjects(hits, true)[0]?.object ?? null) as unknown as Named | null);
+      if (t?.kind === 'paddle' && (t.key === 'up' || t.key === 'down')) {
+        hold = { dir: t.key === 'up' ? 1 : -1, start: performance.now(), active: false };
+        invalidate();
+      }
+    },
+    release() {
+      const was = hold;
+      hold = null;
+      if (!was?.active) return false; // a short press stays a tap (a 5 cm nudge)
+      ledPaddle.set(LED_OFF);
+      o.onHold?.('end', rigDy + manifest.deskBase);
+      invalidate();
+      return true;
+    },
     tap(x, y) {
       const r = canvas.getBoundingClientRect();
       raycaster.setFromCamera(new Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1), camera);
@@ -662,7 +700,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   canvas.addEventListener('webglcontextrestored', onRestored);
 
   o.stage.after(canvas); // above the pinned screens (they show through its windows)
-  if (new URLSearchParams(location.search).has('test')) (window as any).__scene = { scene, camera, renderer, rail, flight, dest: () => dest, orbit, invalidate, world: () => world };
+  if (new URLSearchParams(location.search).has('test')) (window as any).__scene = { scene, camera, renderer, rail, flight, dest: () => dest, orbit, invalidate, world: () => world, hold: () => hold };
   sizeOverlays();
   applySize();
   // first frame, then reveal (the app fades the poster out)

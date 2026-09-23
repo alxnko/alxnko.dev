@@ -41,6 +41,10 @@ class AppWorld implements WorldPort {
     this.s.landmark = to;
     this.scene?.fly(to);
   }
+  /** The desk was moved directly (press-and-hold on the paddle). */
+  noteDesk(h: number): void {
+    this.s.desk = h;
+  }
   setDesk(h: number): Promise<void> {
     this.s.desk = h;
     this.sound.motor(reducedMotion() || !this.scene ? 200 : 1500);
@@ -149,6 +153,13 @@ function enter3d() {
         onProgress(p) {
           $('loader-fill')?.style.setProperty('--p', String(Math.min(1, Math.max(0, p))));
         },
+        onHold(state, h) {
+          if (state === 'start') { stopMotor = world.sound.motorHold(); return; }
+          stopMotor?.();
+          stopMotor = null;
+          world.noteDesk(h);
+          store.print([{ text: 'desk: ' }, { text: `${Math.round(h * 100)} cm`, fg: 'white' }]);
+        },
         onPaddle(key) {
           // the paddle is just another way to type `desk N`: the terminal shows it too
           const { input, cursor } = store.state; // a half-typed line survives the press
@@ -178,6 +189,7 @@ function enter3d() {
 }
 
 let handle3d: { destroy(): void } | null = null;
+let stopMotor: (() => void) | null = null;
 function leave3d() {
   handle3d?.destroy();
   handle3d = null;

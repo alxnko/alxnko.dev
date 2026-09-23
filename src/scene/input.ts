@@ -12,6 +12,9 @@ export interface InputHandlers {
   orbit(dx: number, dy: number): void;
   pointer(x: number, y: number): void;
   tap(x: number, y: number): void;
+  /** Pointer went down (press-and-hold targets); `release` returns true if it consumed the press. */
+  press?(x: number, y: number): void;
+  release?(): boolean;
 }
 
 const WHEEL_K = 0.0012;
@@ -46,7 +49,8 @@ export function attachInput(h: InputHandlers): () => void {
   };
 
   const onDown = (e: PointerEvent) => {
-    canvas.setPointerCapture(e.pointerId);
+    if (pts.size === 0) h.press?.(e.clientX, e.clientY);
+    try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or already-released pointer */ }
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now() });
     axis = null;
     if (pts.size === 2) {
@@ -68,7 +72,7 @@ export function attachInput(h: InputHandlers): () => void {
       pinch0 = d;
       return;
     }
-    if (!axis && Math.hypot(p.x - p.x0, p.y - p.y0) > TAP_PX) axis = 'x';
+    if (!axis && Math.hypot(p.x - p.x0, p.y - p.y0) > TAP_PX) { axis = 'x'; h.release?.(); }
     if (axis) h.orbit(dx, dy);
   };
 
@@ -76,7 +80,8 @@ export function attachInput(h: InputHandlers): () => void {
     const p = pts.get(e.pointerId);
     pts.delete(e.pointerId);
     if (!p) return;
-    if (!axis && performance.now() - p.t0 < TAP_MS && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < TAP_PX) h.tap(e.clientX, e.clientY);
+    const held = pts.size === 0 && (h.release?.() ?? false);
+    if (!held && !axis && performance.now() - p.t0 < TAP_MS && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < TAP_PX) h.tap(e.clientX, e.clientY);
     if (pts.size === 0) axis = null;
   };
 

@@ -11,6 +11,8 @@ export interface Sound {
   enter(): void;
   tick(): void;
   motor(ms: number): void;
+  /** Motor hum until the returned stop() is called (press-and-hold on the paddle). */
+  motorHold(): () => void;
   meow(): void;
   fan(s: FanSpeed): void;
 }
@@ -106,6 +108,29 @@ export function createSound(): Sound {
       o.connect(f).connect(g).connect(master);
       o.start(t);
       o.stop(end + 0.05);
+    },
+    motorHold() {
+      if (!ctx || !master || level === 'off') return () => {};
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = 60;
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 240;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.35, t + 0.12);
+      o.connect(f).connect(g).connect(master);
+      o.start(t);
+      return () => {
+        if (!ctx) return;
+        const e = ctx.currentTime;
+        g.gain.cancelScheduledValues(e);
+        g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), e);
+        g.gain.exponentialRampToValueAtTime(0.0001, e + 0.15);
+        o.stop(e + 0.2);
+      };
     },
     meow() {
       if (!ctx || !master || level === 'off') return;
