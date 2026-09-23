@@ -31,7 +31,7 @@ PADDLE = dict(x=0.42, size=(0.13, 0.045, 0.022), below=0.03)
 # it sits on a black foldable scissor stand (photos ref-new/1-4): keyboard deck tilted
 # up towards the back (front bottom edge ~2.2 cm, rear ~7.7 cm above the desk), lid
 # opened so the screen leans back only a little in world space
-LAPTOP = dict(x=-0.344, y=-0.012, yaw=15.0, base=(0.36, 0.265, 0.025), lid_t=0.008,
+LAPTOP = dict(x=-0.350, y=0.022, yaw=27.0, base=(0.36, 0.265, 0.025), lid_t=0.008,
               open_deg=110.0, screen=(0.345, 0.216), bezel_side=0.0075,
               bezel_top=0.009, chin=0.02, tilt=11.0, front_z=0.028)
 LSTAND = dict(xs=0.112, bar=(0.011, 0.004), pad=0.0015, rail=(-0.126, 0.104))
@@ -39,7 +39,7 @@ LSTAND = dict(xs=0.112, bar=(0.011, 0.004), pad=0.0015, rail=(-0.126, 0.104))
 # --- ultrawide (34" 21:9, 1500R) ---------------------------------------------
 # yaw (deg, + = counter-clockwise from above): the left side swings forward towards the
 # laptop; the whole monitor (panel, housing, ring, stand) swivels about the stand neck
-MON = dict(x=0.20, front_y=0.245, yaw=7.0, screen=(0.80, 0.335), radius=1.5, bezel=0.006,
+MON = dict(x=0.20, front_y=0.17, yaw=-12.0, screen=(0.80, 0.335), radius=1.5, bezel=0.006,
            chin=0.016, corner=0.008, screen_bottom=0.11, panel_t=0.013,
            back=(0.54, 0.27, 0.038), ring_r=0.09, ring_tube=0.004)
 STAND = dict(neck=(0.075, 0.03), base=(0.25, 0.14, 0.012), base_dy=0.02)   # base centre behind front_y
@@ -58,11 +58,11 @@ GAMEPAD = dict(x=0.05, y=0.085, yaw=-9.0, width=0.161)
 
 # --- fan + cat ------------------------------------------------------------------
 FAN = dict(x=-0.487, y=-0.25, yaw=6.0, r=0.09, depth=0.10, center_h=0.106)
-# sitting upright on the drum top (brand mark as a cat): slim torso (width <= 0.55 x height),
-# head on top of it (diamond, ~0.9 x the shoulder width), ~17 cm tall with the ears.
-# yaw: faces the viewer, turned a little towards the laptop; head_yaw: the head a bit more
-CAT = dict(yaw=22.0, body_h=0.108, head_w=0.040, head_up=0.0175, head_down=0.0145, head_d=0.017,
-           head_gap=0.0025, head_yaw=12.0, head_tilt=-4.0)
+# pass-3 loaf (lying over the drum top, head at the laptop end) - the owner's pick. neck_h:
+# pivot height above the housing (pass 3: 0.036, inside the back, so the head sank into the
+# body when it turned); head_lift raises the head above the pivot
+CAT = dict(head_w=0.064, head_yaw=40.0, head_tilt=6.0, neck_phi=-2.0,     # yaw: turned towards the laptop; tilt > 0: chin up
+           neck_h=0.048, head_lift=0.010, tail_lift=0.004)
 
 # --- misc -----------------------------------------------------------------------
 SERVER = dict(x=0.84, y=0.17, size=(0.45, 0.30, 0.18))
@@ -77,5 +77,5 @@ SOCKET = dict(x=-0.42, z=0.60)
 CONDUIT_X = 0.66
 
 # --- cameras ------------------------------------------------------------------------
-CAM_DESK = dict(loc=(-0.04, -1.55, 1.42), target=(-0.07, 0.02, 0.88), hfov=50.0, aspect=1.6)
+CAM_DESK = dict(loc=(0.03, -1.55, 1.42), target=(-0.06, 0.02, 0.88), hfov=50.0, aspect=1.6)
 CAM_WIDE = dict(loc=(0.95, -2.55, 1.85), target=(-0.15, 0.0, 0.85), hfov=55.0, aspect=1.6)

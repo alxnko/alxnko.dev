@@ -1,5 +1,5 @@
 {
-  "version": "24bd284c",
+  "version": "7e77e0f0",
   "deskBase": 0.74,
   "presets": [
     0.74,
@@ -46,24 +46,24 @@
       },
       "cornersRig": {
         "bl": [
-          -0.54086,
+          -0.55673,
           0.1237,
-          -0.05619
+          -0.04778
         ],
         "br": [
-          -0.20761,
+          -0.24934,
           0.1237,
-          -0.14549
+          -0.2044
         ],
         "tr": [
-          -0.21636,
+          -0.26468,
           0.33704,
-          -0.17813
+          -0.23451
         ],
         "tl": [
-          -0.5496,
+          -0.57207,
           0.33704,
-          -0.08883
+          -0.07788
         ]
       },
       "normalLocal": [
@@ -113,61 +113,61 @@
       },
       "cornersRig": {
         "bl": [
-          -0.17638,
+          -0.21343,
           0.11,
-          -0.14422
+          -0.20138
         ],
         "br": [
-          0.60797,
+          0.55954,
           0.11,
-          -0.24052
+          -0.03709
         ],
         "tr": [
-          0.60797,
+          0.55954,
           0.445,
-          -0.24052
+          -0.03709
         ],
         "tl": [
-          -0.17638,
+          -0.21343,
           0.445,
-          -0.14422
+          -0.20138
         ]
       },
       "uv": "u runs along the arc (left->right); stored glTF v: 0 = top, 1 = bottom (standard)",
-      "yawDeg": 7.0
+      "yawDeg": -12.0
     }
   },
   "files": {
-    "glb": "desk.24bd284c.glb",
+    "glb": "desk.7e77e0f0.glb",
     "atlas": {
       "day": {
-        "2048": "atlas-day-2048.9af8559c.webp",
-        "1024": "atlas-day-1024.f83737c3.webp"
+        "2048": "atlas-day-2048.0035cede.webp",
+        "1024": "atlas-day-1024.4b082b70.webp"
       },
       "night": {
-        "2048": "atlas-night-2048.1d8a2f4d.webp",
-        "1024": "atlas-night-1024.d3c319a4.webp"
+        "2048": "atlas-night-2048.0bec9962.webp",
+        "1024": "atlas-night-1024.61278f0f.webp"
       }
     },
     "poster": {
       "day": {
         "1600": {
-          "avif": "poster-day-1600.61932092.avif",
-          "webp": "poster-day-1600.2429aefd.webp"
+          "avif": "poster-day-1600.52ca0452.avif",
+          "webp": "poster-day-1600.6b3f7584.webp"
         },
         "800": {
-          "avif": "poster-day-800.2ec81ec7.avif",
-          "webp": "poster-day-800.2727f884.webp"
+          "avif": "poster-day-800.c8460b70.avif",
+          "webp": "poster-day-800.31b459c4.webp"
         }
       },
       "night": {
         "1600": {
-          "avif": "poster-night-1600.d9251d69.avif",
-          "webp": "poster-night-1600.569bee02.webp"
+          "avif": "poster-night-1600.bb072913.avif",
+          "webp": "poster-night-1600.952e5a31.webp"
         },
         "800": {
-          "avif": "poster-night-800.c331c2e7.avif",
-          "webp": "poster-night-800.a5c17072.webp"
+          "avif": "poster-night-800.f4a7f8fd.avif",
+          "webp": "poster-night-800.95f16bc2.webp"
         }
       }
     },
@@ -244,19 +244,19 @@
         0.25
       ],
       "neckPivot": [
-        -0.48363,
-        0.305,
-        0.25834
+        -0.49111,
+        0.24242,
+        0.25647
       ],
       "tailPivot": [
-        -0.47559,
-        0.205,
-        0.21951
+        -0.58083,
+        0.16727,
+        0.25986
       ],
       "headForward": [
-        0.5578,
-        0.0698,
-        0.827
+        0.7154,
+        0.1045,
+        0.6908
       ],
       "note": "parts have identity rotation; headForward is the gaze in rig space"
     },
@@ -264,23 +264,23 @@
     "cat_tail": "pivot = tail base (node origin)",
     "ring": {
       "center": [
-        0.20286,
+        0.19511,
         0.2655,
-        -0.29768
+        -0.22301
       ],
       "radius": 0.09,
       "tube": 0.004,
       "facing": [
-        -0.1219,
+        0.2079,
         0.0,
-        -0.9926
+        -0.9781
       ],
       "default": "green",
       "note": "not baked; emissive tint at runtime"
     },
     "ring_glow": {
       "center": [
-        0.20286,
+        0.19511,
         0.2655,
         -0.346
       ],
@@ -432,9 +432,9 @@
     },
     "laptop_kbd_glow": {
       "center": [
-        -0.35237,
+        -0.36461,
         0.08609,
-        -0.0189
+        -0.05049
       ],
       "size": [
         0.3309,
@@ -442,9 +442,9 @@
       ],
       "tiles": 103,
       "normal": [
-        0.0494,
+        0.0866,
         0.9816,
-        0.1843
+        0.17
       ],
       "note": "not baked; flat backlight: one rect per key slot (tiles the key block) under the key tops, just above the plate / well, so it shows only between the caps; additive, tint = ring colour; hidden from below by the case. UV 0..1 unused (flat)"
     },
@@ -578,22 +578,22 @@
       "yfovDeg": 32.4967,
       "aspect": 1.6,
       "position": [
-        -0.04,
+        0.03,
         1.42,
         1.55
       ],
       "target": [
-        -0.07,
+        -0.06,
         0.88,
         -0.02
       ],
       "positionRig": [
-        -0.04,
+        0.03,
         0.68,
         1.55
       ],
       "targetRig": [
-        -0.07,
+        -0.06,
         0.14,
         -0.02
       ]
@@ -603,7 +603,7 @@
     "min": [
       -1.62,
       -0.00037,
-      -0.35988
+      -0.35
     ],
     "max": [
       2.6,
@@ -644,23 +644,23 @@
     }
   },
   "stats": {
-    "tris": 24610,
-    "verts": 26877,
+    "tris": 24736,
+    "verts": 26945,
     "bytes": {
-      "desk.24bd284c.glb": 236568,
-      "atlas-day-2048.9af8559c.webp": 151126,
-      "atlas-day-1024.f83737c3.webp": 66532,
-      "atlas-night-2048.1d8a2f4d.webp": 101096,
-      "atlas-night-1024.d3c319a4.webp": 40480,
-      "poster-day-1600.61932092.avif": 38825,
-      "poster-day-1600.2429aefd.webp": 58380,
-      "poster-day-800.2ec81ec7.avif": 20605,
-      "poster-day-800.2727f884.webp": 30284,
-      "poster-night-1600.d9251d69.avif": 33786,
-      "poster-night-1600.569bee02.webp": 52032,
-      "poster-night-800.c331c2e7.avif": 15912,
-      "poster-night-800.a5c17072.webp": 23492,
-      "../og.png": 476919
+      "desk.7e77e0f0.glb": 237376,
+      "atlas-day-2048.0035cede.webp": 159144,
+      "atlas-day-1024.4b082b70.webp": 68872,
+      "atlas-night-2048.0bec9962.webp": 111054,
+      "atlas-night-1024.61278f0f.webp": 43162,
+      "poster-day-1600.52ca0452.avif": 40976,
+      "poster-day-1600.6b3f7584.webp": 62068,
+      "poster-day-800.c8460b70.avif": 21335,
+      "poster-day-800.31b459c4.webp": 31634,
+      "poster-night-1600.bb072913.avif": 35961,
+      "poster-night-1600.952e5a31.webp": 55554,
+      "poster-night-800.f4a7f8fd.avif": 16551,
+      "poster-night-800.95f16bc2.webp": 24708,
+      "../og.png": 494201
     },
     "quality": {
       "atlas-day-2048": 82,

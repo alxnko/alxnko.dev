@@ -118,7 +118,7 @@ def build_materials():
     m["metal_tip"] = C.mat("metal_tip", C.G["300"], bevel=0.0)
     # cat: a deeper, slightly desaturated green so the bake shades its facets (not a neon toy)
     m["shadow"] = C.mat("shadow", "#ffffff", rough=1.0, bevel=0.0)
-    m["cat"] = C.mat("cat", "#16b86a", rough=0.45, edge=0.18, edge_hex="#63d396", bevel=0.0)
+    m["cat"] = C.mat("cat", "#14995a", rough=0.4, edge=0.25, edge_hex="#63d396", bevel=0.0)
     m["server"] = C.mat("server", C.G["850"], edge=0.4, edge_hex=C.G["500"], bevel=0.003)
     m["server_front"] = C.mat("server_front", C.G["800"], edge=0.35, edge_hex=C.G["500"], bevel=0.002)
     m["legend"] = C.mat("legend", C.G["300"], bevel=0.0)
@@ -596,7 +596,9 @@ def build_laptop(m):
     kbm = bmesh.new()
     for cx, cy, w, d in slots:
         bm_chiclet(kbm, w - LAP_KEY_GAP, d - LAP_KEY_GAP, 0.0016, (cx, cy, top + 0.0002))
-    bmesh.ops.recalc_face_normals(kbm, faces=kbm.faces)
+    # no recalc_face_normals here: the caps are separate single faces, recalc flips about half
+    # of them to face down (culled at runtime -> the backlight tiles showed as green keys);
+    # bm_chiclet winds them counter-clockwise = facing up
     parts.append(obj_from_bm("lap_keys", kbm, m["laptop_key"]))
     # speaker / vent grille strip along the top edge of the deck, above the top row
     gy0, gy1 = kb_y1 + 0.004, bd / 2 - 0.016
@@ -1285,167 +1287,158 @@ def build_fan(m):
 
 
 def build_cat(m):
-    """Faceted low-poly cat SITTING UPRIGHT on top of the fan drum, built from the brand
-    mark (catuser.png): a diamond head (wider than tall) with two right-angle ears whose
-    outer edges are vertical, a slim shield-shaped torso whose front is the mark's two
-    body panels split by a crisp vertical groove and widening towards the haunches, and
-    the mark's slanted wedge as a tapered tail curling from the right haunch up the right
-    side. Faces the viewer, turned a little towards the laptop; the head a bit more.
-
-    Cat frame: origin on the drum top (fan x, y), x = cat's left->right as seen from the
-    front, y = back, z = up, the face looks down -y. Parts are world-oriented (identity
-    rotation); cat_head pivots at the neck (body top), cat_tail at its base. The runtime
-    gaze (yaw +-50, pitch +12/-20 deg about the neck) keeps the head clear of the body:
-    the head's lowest point sits ~9 mm above the neck pivot, the neck post is hidden in
-    the body's top."""
-    F, Ct = D.FAN, D.CAT
-    rt = F["r"] + 0.001                                # housing top radius
-    Mf = fan_matrix()
-    Mf_inv = Mf.inverted()
-    top_z = D.DESK_H + F["center_h"] + rt
-    Wc = M_at((F["x"], F["y"], top_z), yaw=Ct["yaw"])
+    """Faceted low-poly cat in the brand-mark language (diamond head, right-triangle
+    ears, body split down the middle by a spine groove, wedge tail), posed like the
+    owner's plush in the photos: a loaf lying left-right over the fan's round top,
+    chest and front paws at the front edge (paws draping over the bezel), head
+    raised at the laptop end and turned towards the laptop / viewer, tail wrapped
+    round the hip and forward along the front edge.
+    Parts are world-oriented (identity rotation); cat_head pivots at the neck,
+    cat_tail at its base. ~0.17 m rump to chest along the arc.
+    Frame below: fan-local, x = right (towards the laptop), y = back, z = up,
+    origin on the housing top; the body follows the housing arc (angle phi from
+    the top, + towards the laptop)."""
+    F = D.FAN
+    Ct = D.CAT
+    rt = F["r"] + 0.001                               # housing top radius
+    base = Vector((F["x"], F["y"], D.DESK_H + F["center_h"] + rt))
+    Rot = C.euler((0, 0, F["yaw"])).to_3x3()
 
     def W(p):
-        return Wc @ Vector(p)
+        return base + Rot @ Vector(p)
 
-    def surf_z(p_cat):
-        """Drum top height (cat frame z) under a cat-frame point."""
-        q = Mf_inv @ W(p_cat)
-        xf = max(-rt, min(rt, q.x))
-        return (math.sqrt(rt * rt - xf * xf) - rt)
+    def A(phi, y, h):
+        """Point `h` above the housing surface at arc angle phi (deg), depth y."""
+        a = math.radians(phi)
+        rr = rt + h - 0.0025
+        return Vector((rr * math.sin(a), y, rr * math.cos(a) - rt))
 
-    # ---- body: lofted 12-vertex sections. Front = the mark's two flat panels (the front legs /
-    # chest, narrower than the haunches) split by a crisp V groove; the haunches bulge at the
-    # lower sides; seen from the side the chest is near vertical and the back slopes from the
-    # shoulders down to the deep haunches (a seated cat's triangle)
-    H = Ct["body_h"]
-    # z (fraction of H), half-width (haunch/side), front-panel half-width, front depth, back depth
-    prof = [(0.00, 0.0282, 0.0250, 0.036, 0.038), (0.10, 0.0295, 0.0252, 0.037, 0.041),
-            (0.32, 0.0288, 0.0228, 0.034, 0.035), (0.55, 0.0240, 0.0202, 0.031, 0.022),
-            (0.78, 0.0222, 0.0186, 0.027, 0.010), (0.93, 0.0220, 0.0180, 0.022, 0.002),
-            (1.00, 0.0175, 0.0150, 0.016, -0.004)]
-    gw, gd = 0.0028, 0.0045                            # groove half-width at the surface, depth
+    def tube(bm, pts, radii, n=6, cap0=True, tip=None):
+        """Faceted tube through fan-local points; radii = [(r_side, r_up)] per point."""
+        rings = []
+        prev = None
+        for i, c in enumerate(pts):
+            d = (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
+            ref = Vector((0, 1, 0)) if abs(d.y) < 0.9 else Vector((1, 0, 0))
+            u = (prev if prev is not None else d.cross(ref)).copy()
+            u = (u - d * u.dot(d)).normalized()
+            v = d.cross(u).normalized()
+            prev = u
+            r1, r2 = radii[i]
+            rings.append([bm.verts.new(W(c + u * (r1 * math.cos(2 * math.pi * k / n))
+                                         + v * (r2 * math.sin(2 * math.pi * k / n)))) for k in range(n)])
+        for i in range(len(rings) - 1):
+            for k in range(n):
+                bm.faces.new((rings[i][k], rings[i][(k + 1) % n], rings[i + 1][(k + 1) % n], rings[i + 1][k]))
+        if cap0:
+            bm.faces.new(list(reversed(rings[0])))
+        if tip is not None:
+            tv = bm.verts.new(W(tip))
+            for k in range(n):
+                bm.faces.new((rings[-1][k], rings[-1][(k + 1) % n], tv))
+        else:
+            bm.faces.new(rings[-1])
+        return rings
 
-    def section(w, fw, df, db):
-        right = [(gw, -df), (fw, -0.95 * df), (w, -0.25 * df + 0.2 * db), (0.84 * w, 0.62 * db + 0.1 * df),
-                 (0.38 * w, db + 0.04 * df)]
-        left = [(-x, y) for x, y in reversed(right)]
-        return [(0.0, -df + gd)] + right + [(0.0, db + 0.05 * df)] + left
-
+    # body: 9-vertex loaf sections across the fan depth (belly on the housing, flanks,
+    # a spine groove = the mark's body split down the middle)
+    yo = -0.004
     bm = bmesh.new()
     rings = []
-    for zf, w, fw, df, db in prof:
-        z = zf * H
-        rings.append([bm.verts.new(W((x, y, z if zf > 0 else surf_z((x, y, 0)) - 0.0008)))
-                      for x, y in section(w, fw, df, db)])
-    n = len(rings[0])
+    for phi, w, t in ((-56, 0.022, 0.030), (-47, 0.035, 0.046), (-35, 0.043, 0.056), (-20, 0.045, 0.058),
+                      (-4, 0.043, 0.055), (11, 0.040, 0.054), (23, 0.035, 0.053), (32, 0.027, 0.044)):
+        w *= 1.15                                     # the drum is 10 cm deep: fuller loaf
+        sec = [(-0.84 * w, 0.0), (-w, 0.42 * t), (-0.74 * w, 0.84 * t), (-0.16 * w, t), (0.0, t - 0.0045),
+               (0.16 * w, t), (0.74 * w, 0.84 * t), (w, 0.42 * t), (0.84 * w, 0.0)]
+        rings.append([bm.verts.new(W(A(phi, yo + y, h))) for y, h in sec])
+    n = 9
     for i in range(len(rings) - 1):
         for j in range(n):
             bm.faces.new((rings[i][j], rings[i][(j + 1) % n], rings[i + 1][(j + 1) % n], rings[i + 1][j]))
-    cb = bm.verts.new(W((0, 0, surf_z((0, 0, 0)) - 0.0008)))
-    ct = bm.verts.new(W((0, -0.009, H + 0.0015)))
+    rump = bm.verts.new(W(A(-63, yo, 0.016)))
+    chest = bm.verts.new(W(A(38, yo - 0.004, 0.020)))
     for j in range(n):
-        bm.faces.new((rings[0][(j + 1) % n], rings[0][j], cb))
-        bm.faces.new((rings[-1][j], rings[-1][(j + 1) % n], ct))
+        bm.faces.new((rings[0][(j + 1) % n], rings[0][j], rump))
+        bm.faces.new((rings[-1][j], rings[-1][(j + 1) % n], chest))
+    # front legs: from the chest over the front edge, draping down the bezel, paws at the end
+    for phi in (27.0, 14.0):
+        top = A(phi, -0.036, 0.016)
+        pts = [top, A(phi + 1, -0.057, 0.010), A(phi + 2, -0.064, -0.004), A(phi + 2, -0.066, -0.013)]
+        tube(bm, [Vector(p) for p in pts], [(0.011, 0.012), (0.0105, 0.010), (0.010, 0.0095), (0.0115, 0.010)],
+             n=6, tip=A(phi + 2.5, -0.072, -0.019))
+    # hind leg: faceted haunch on the front flank at the hips, foot tucked in above the tail
+    tube(bm, [A(-37, -0.036, 0.027), A(-31, -0.050, 0.021)], [(0.016, 0.014), (0.011, 0.009)], n=6,
+         tip=A(-25, -0.057, 0.018))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     body = obj_from_bm("cat_body", bm, m["cat"])
     C.set_origin(body, W((0.0, 0.0, 0.0)))
     tag(body, 2.2)
 
-    # ---- head: the mark's diamond as a faceted solid + right-angle ears, on a short neck
-    neck = Vector((0.0, -0.009, H))                    # pivot (cat frame) = top of the body
-    Hm = (Matrix.Translation(neck) @ C.euler((0, 0, Ct["head_yaw"])) @ C.euler((Ct["head_tilt"], 0, 0)))
-    hw, ht, hb, hd = Ct["head_w"] / 2, Ct["head_up"], Ct["head_down"], Ct["head_d"]
-    hc = Vector((0.0, -0.003, Ct["head_gap"] + hb))    # head centre above the pivot
+    # head: faceted diamond (the mark's head seen along the gaze) + ear prisms, raised at the
+    # laptop end of the loaf and turned towards the laptop / viewer
+    nphi = Ct["neck_phi"]
+    neck = A(nphi, yo - 0.002, Ct["neck_h"])        # pivot: on the back, clear of the body
+    Hm = (Matrix.Translation(neck) @ C.euler((0, 0, -90.0 + Ct["head_yaw"]))
+          @ C.euler((0, -Ct["head_tilt"], 0)))
+    s = Ct["head_w"] / 122.0                       # the mark's head is 122 px wide
+    hc = Vector((0.016, 0.0, 0.024 + Ct["head_lift"]))
+    hw, ht, hb = 61 * s, 52 * s, 45 * s
 
-    def WH(p):  # head frame: x = right, y = back, z = up, face towards -y
+    def WH(p):  # head frame: x = gaze, y = left, z = up
         return W(Hm @ (hc + Vector(p)))
 
     bm = bmesh.new()
-    # outline (L, BL, B, BR, R, TR, T, TL) at the widest plane; the edge midpoints bulge 4 %
-    oct_ = [(-hw, 0, 0), (-0.52 * hw, 0.001, -0.52 * hb), (0, 0.002, -hb), (0.52 * hw, 0.001, -0.52 * hb),
-            (hw, 0, 0), (0.52 * hw, 0, 0.52 * ht), (0, 0, ht), (-0.52 * hw, 0, 0.52 * ht)]
+    # outline octagon (L, TL, T, TR, R, BR, B, BL) at the widest plane, cheeks bulge a little
+    oct_ = [(0, hw, 0), (-0.002, 0.56 * hw, 0.56 * ht), (-0.003, 0, ht), (-0.002, -0.56 * hw, 0.56 * ht),
+            (0, -hw, 0), (0.003, -0.60 * hw, -0.52 * hb), (0.004, 0, -hb), (0.003, 0.60 * hw, -0.52 * hb)]
     ring0 = [bm.verts.new(WH(p)) for p in oct_]
-    face = [bm.verts.new(WH((0.50 * x, -hd + 0.0015 * (z < 0), 0.50 * z - 0.001))) for x, _, z in oct_]
-    nose = bm.verts.new(WH((0.0, -hd - 0.0035, -0.0035)))
-    back = [bm.verts.new(WH((0.56 * x, 0.85 * hd, 0.56 * z + 0.001))) for x, _, z in oct_]
-    kp = bm.verts.new(WH((0.0, hd * 1.05, 0.002)))
+    face = [bm.verts.new(WH((0.012 + 0.002 * (p[2] < 0), 0.52 * p[1], 0.52 * p[2] - 0.002))) for p in oct_]
+    nose = bm.verts.new(WH((0.020, 0.0, -0.007)))
+    back = [bm.verts.new(WH((-0.012, 0.55 * p[1], 0.55 * p[2] + 0.002))) for p in oct_]
+    kp = bm.verts.new(WH((-0.018, 0.0, 0.003)))
     for i in range(8):
         j = (i + 1) % 8
-        bm.faces.new((ring0[j], ring0[i], face[i], face[j]))
-        bm.faces.new((face[j], face[i], nose))
-        bm.faces.new((ring0[i], ring0[j], back[j], back[i]))
-        bm.faces.new((back[i], back[j], kp))
-    s = 2 * hw / 122.0                                 # the mark's head is 122 px wide
+        bm.faces.new((ring0[i], ring0[j], face[j], face[i]))
+        bm.faces.new((face[i], face[j], nose))
+        bm.faces.new((ring0[j], ring0[i], back[i], back[j]))
+        bm.faces.new((back[j], back[i], kp))
+    gap = 2 * s
     for sgn in (1, -1):
-        # mark ear (px from the head centre): vertical outer edge, hypotenuse parallel to the
-        # head's upper edge; its lower edge sits 1 mm inside the head's outline (no gap)
-        sink = 10.5 * s
-        nx, nz = 0.649, 0.761
-        tri = [(61 + 1.25 * (x - 61), 17 + 1.25 * (z - 17)) for x, z in ((61, 62), (59, 17), (31, 40))]
-        tri = [(sgn * (x * s - sink * nx), z * s - sink * nz) for x, z in tri]
-        fr = [bm.verts.new(WH((x, -0.0012, z))) for x, z in tri]
-        bk = [bm.verts.new(WH((0.95 * x, 0.0048, z - 0.001))) for x, z in tri]
-        if sgn < 0:
-            fr, bk = fr[::-1], bk[::-1]
-        bm.faces.new(fr[::-1])
-        bm.faces.new(bk)
+        # mark ear (px rel. head centre): vertical outer edge, hypotenuse parallel to the head edge
+        tri = [(sgn * 61 * s, 62 * s - gap), (sgn * 59 * s, 17 * s - gap), (sgn * 31 * s, 40 * s - gap)]
+        front = [bm.verts.new(WH((0.002, yy, zz))) for yy, zz in tri]
+        back_ = [bm.verts.new(WH((-0.007, yy * 0.94, zz - 0.003))) for yy, zz in tri]
+        bm.faces.new(front)
+        bm.faces.new(list(reversed(back_)))
         for i in range(3):
-            j = (i + 1) % 3
-            bm.faces.new((fr[i], fr[j], bk[j], bk[i]))
-    # neck post (hexagonal), from inside the body top up into the head
-    k = 6
-    lo = [bm.verts.new(W(Hm @ Vector((0.0085 * math.cos(2 * math.pi * i / k), 0.0085 * math.sin(2 * math.pi * i / k), -0.010))))
-          for i in range(k)]
-    hi = [bm.verts.new(W(Hm @ Vector((0.008 * math.cos(2 * math.pi * i / k), -0.002 + 0.008 * math.sin(2 * math.pi * i / k),
-                                       Ct["head_gap"] + 0.006)))) for i in range(k)]
-    for i in range(k):
-        j = (i + 1) % k
-        bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
-    bm.faces.new(lo[::-1])
-    bm.faces.new(hi)
+            bm.faces.new((front[i], back_[i], back_[(i + 1) % 3], front[(i + 1) % 3]))
+    # neck: short faceted tube from the shoulders up into the back of the head
+    tube(bm, [A(nphi - 5, yo - 0.002, 0.028), neck, Hm @ (hc + Vector((-0.010, 0, -0.010)))],
+         [(0.019, 0.017), (0.016, 0.015), (0.014, 0.013)], n=6, cap0=True)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     head = obj_from_bm("cat_head", bm, m["cat"])
     C.set_origin(head, W(neck))
-    tag(head, 2.6)
+    tag(head, 2.4)
 
-    # ---- tail: the mark's slanted wedge, from the right haunch round and up the right side
-    pts = [(0.022, 0.024, 0.008), (0.039, 0.010, 0.008), (0.046, -0.012, 0.012), (0.048, -0.027, 0.028),
-           (0.045, -0.030, 0.050), (0.040, -0.027, 0.066)]
-    radii = [0.0088, 0.0084, 0.0077, 0.0068, 0.0057, 0.0044]
-    P = []
-    for (x, y, z), r in zip(pts, radii):
-        z = max(z, surf_z((x, y, 0)) + r * 0.8 + 0.0006)
-        P.append(Vector((x, y, z)))
-    tip = Vector((0.036, -0.024, 0.078))
+    # tail: from the rump round the hip and forward along the front edge of the housing top,
+    # under the hind leg towards the front paws (the loaf's wrapped tail; faces the camera)
+    tl = Ct["tail_lift"]                          # pass 5: lifted clear of the housing + hind leg
+    tpath = [A(-57, yo + 0.004, 0.020 + tl), A(-64, -0.016, 0.015 + tl), A(-63, -0.036, 0.011 + tl),
+             A(-54, -0.049, 0.008 + tl), A(-42, -0.056, 0.006 + tl), A(-30, -0.058, 0.005 + tl),
+             A(-19, -0.057, 0.006 + tl)]
+    radii = [(0.0105, 0.0095), (0.0098, 0.0088), (0.0092, 0.0082), (0.0086, 0.0077), (0.008, 0.0072),
+             (0.0072, 0.0065), (0.0062, 0.0056)]
     bm = bmesh.new()
-    rings = []
-    prev = None
-    k = 5
-    for i, c in enumerate(P):
-        d = (P[min(i + 1, len(P) - 1)] - P[max(i - 1, 0)]).normalized()
-        u = (prev if prev is not None else d.cross(Vector((0, 0, 1)))).copy()
-        u = (u - d * u.dot(d)).normalized()
-        v = d.cross(u).normalized()
-        prev = u
-        r = radii[i]
-        rings.append([bm.verts.new(W(c + u * (r * math.cos(2 * math.pi * q / k + 0.3))
-                                     + v * (0.8 * r * math.sin(2 * math.pi * q / k + 0.3)))) for q in range(k)])
-    for i in range(len(rings) - 1):
-        for q in range(k):
-            bm.faces.new((rings[i][q], rings[i][(q + 1) % k], rings[i + 1][(q + 1) % k], rings[i + 1][q]))
-    bm.faces.new(rings[0][::-1])
-    tv = bm.verts.new(W(tip))
-    for q in range(k):
-        bm.faces.new((rings[-1][q], rings[-1][(q + 1) % k], tv))
+    tube(bm, tpath, radii, n=6, tip=A(-11, -0.055, 0.008 + tl))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     tail = obj_from_bm("cat_tail", bm, m["cat"])
-    C.set_origin(tail, W(P[0]))
-    tag(tail, 1.8)
-    head_fwd = (Wc.to_3x3() @ Hm.to_3x3() @ Vector((0, -1, 0))).normalized()
+    C.set_origin(tail, W(tpath[0]))
+    tag(tail, 1.6)
+    head_fwd = Rot @ (Hm.to_3x3() @ Vector((1, 0, 0)))
     return body, head, tail, head_fwd
 
 
+# ------------------------------------------------------------------ server + room
 # ------------------------------------------------------------------ server + room
 
 def build_server(m):
