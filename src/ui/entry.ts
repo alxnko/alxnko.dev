@@ -227,7 +227,14 @@ function leave3d() {
 
 // The <head> check already decided this visit boots into 3D: start now, not after idle.
 const booting3d = document.documentElement.dataset.boot === '3d';
-if (booting3d) enter3d();
+// just after the first paint: the loader and hint show at once, and the desk's downloads
+// don't compete with the page's own first paint (a timer backs up rAF in covered windows)
+if (booting3d) {
+  let started = false;
+  const go = () => { if (!started) { started = true; enter3d(); } };
+  requestAnimationFrame(() => setTimeout(go, 0));
+  setTimeout(go, 120);
+}
 
 function afterIdle() {
   const nav = navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string }; deviceMemory?: number };
