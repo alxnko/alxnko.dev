@@ -230,27 +230,42 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
 
   /** World-space corners TL, TR, BR, BL of a UV sub-rectangle of a screen mesh (nearest
    *  vertices; the monitor strip is finely subdivided along its curve). */
-  const cornerIdx = new Map<string, { mesh: Mesh; idx: number[] }>();
-  const screenCorners = (obj: Object3D, u0 = 0, u1 = 1, v0 = 0, v1 = 1): Vector3[] => {
-    const key = `${obj.name}:${u0}:${u1}:${v0}:${v1}`;
-    let entry = cornerIdx.get(key);
-    if (!entry) {
+  // For each requested u, the nearest vertex on the screen's top edge (v≈0) and bottom edge
+  // (v≈1); points at any v are interpolated between them. Exact for any mesh that is subdivided
+  // along u only (curved strips have vertices only on the top and bottom edges).
+  const colIdx = new Map<string, { mesh: Mesh; top: number; bottom: number }>();
+  const column = (obj: Object3D, u: number) => {
+    const key = `${obj.name}:${u}`;
+    let c = colIdx.get(key);
+    if (!c) {
       const mesh = meshesOf(obj)[0];
       const uv = mesh.geometry.getAttribute('uv');
-      const idx = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]].map(([u, v]) => {
+      const near = (v: number) => {
         let best = 0, bd = Infinity;
         for (let i = 0; i < uv.count; i++) {
           const d = (uv.getX(i) - u) ** 2 + (uv.getY(i) - v) ** 2;
           if (d < bd) { bd = d; best = i; }
         }
         return best;
-      });
-      cornerIdx.set(key, (entry = { mesh, idx }));
+      };
+      colIdx.set(key, (c = { mesh, top: near(0), bottom: near(1) }));
     }
-    const { mesh, idx } = entry;
-    const pos = mesh.geometry.getAttribute('position');
-    mesh.updateWorldMatrix(true, false);
-    return idx.map((i) => new Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(mesh.matrixWorld));
+    return c;
+  };
+  /** World-space corners TL, TR, BR, BL of a UV sub-rectangle of a screen mesh. */
+  const screenCorners = (obj: Object3D, u0 = 0, u1 = 1, v0 = 0, v1 = 1): Vector3[] => {
+    const at = (u: number, v: number) => {
+      const { mesh, top, bottom } = column(obj, u);
+      const pos = mesh.geometry.getAttribute('position');
+      const uv = mesh.geometry.getAttribute('uv');
+      const vt = uv.getY(top), vb = uv.getY(bottom);
+      const k = vb === vt ? 0 : (v - vt) / (vb - vt);
+      const a = new Vector3(pos.getX(top), pos.getY(top), pos.getZ(top));
+      const b = new Vector3(pos.getX(bottom), pos.getY(bottom), pos.getZ(bottom));
+      mesh.updateWorldMatrix(true, false);
+      return a.lerp(b, k).applyMatrix4(mesh.matrixWorld);
+    };
+    return [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)];
   };
   // the live contacts panel covers the middle of the curved monitor (a short arc, so the flat
   // DOM panel sits on the curve within a few mm); the canvas draws the side panes around it
