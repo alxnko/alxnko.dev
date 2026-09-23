@@ -1,0 +1,254 @@
+/* graphite / scene mode (spec §3.3): the canvas owns the viewport, the DOM becomes overlay
+   chrome. Docking transforms are applied by the scene runtime through CSSOM; this file only
+   defines the states. Hooks: body[data-mode], and data-dock="off|screen|sheet" on #term and
+   #contacts (src/scene/dock.ts). Docked logical sizes match the canvas mirror
+   (screen-mirror.ts MIRROR 1280×800, font 24/30, pad 28, bar 40) and CONTACTS_DOCK. */
+
+:root {
+  --mirror-w: 1280px;
+  --mirror-h: 800px;
+  --mirror-font: 24px;
+  --mirror-lh: 30px;
+  --mirror-pad: 28px;
+  --mirror-bar: 40px;
+  --contacts-w: 1024px;
+  --contacts-h: 429px;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-stage);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--d-slow) var(--ease);
+}
+
+#stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+[data-mode="scene"] {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+[data-mode="scene"] #stage {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* chrome floats over the canvas */
+[data-mode="scene"] .bar {
+  position: fixed;
+  inset: 0 0 auto;
+  border-bottom-color: transparent;
+}
+
+[data-mode="scene"] .toggles {
+  margin-left: auto;
+}
+
+[data-mode="scene"] .bar-home,
+[data-mode="scene"] .bar-meta,
+[data-mode="scene"] .foot,
+[data-mode="scene"] .poster figcaption,
+[data-mode="scene"] .contacts .label-path {
+  display: none;
+}
+
+/* the poster matches the desk landmark and sits under the canvas until it fades in */
+[data-mode="scene"] .poster {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-stage) - 1);
+  padding: 0;
+}
+
+[data-mode="scene"] .poster img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+}
+
+[data-mode="scene"] .sheet {
+  position: static;
+  display: block;
+  padding: 0;
+}
+
+[data-mode="scene"] .identity {
+  position: fixed;
+  z-index: var(--z-chrome);
+  top: calc(env(safe-area-inset-top) + var(--sp-3));
+  left: var(--gutter);
+  padding: 0;
+  pointer-events: none;
+}
+
+[data-mode="scene"] .identity a {
+  pointer-events: auto;
+}
+
+[data-mode="scene"] .identity .eyebrow,
+[data-mode="scene"] .identity .facts dt,
+[data-mode="scene"] .identity .facts > div:nth-child(4) {
+  display: none;
+}
+
+[data-mode="scene"] .mark {
+  font-size: var(--fs-7);
+}
+
+[data-mode="scene"] .facts {
+  display: block;
+  margin-top: var(--sp-2);
+  padding: 0;
+  border: 0;
+  font-size: var(--fs-2);
+}
+
+/* docked overlays: the runtime sets transform/size; undocked they stay in the a11y tree
+   but are visually transparent, and focusing them flies the camera there */
+[data-mode="scene"] .term,
+[data-mode="scene"] .contacts {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--z-dock);
+  transform-origin: 0 0;
+  transition: opacity var(--d-fast) linear;
+}
+
+[data-mode="scene"] .term:not([data-dock="screen"]):not([data-dock="sheet"]),
+[data-mode="scene"] .contacts:not([data-dock="screen"]) {
+  opacity: 0;
+}
+
+/* docked on the laptop: the exact logical grid the mirror draws, mapped by matrix3d */
+[data-mode="scene"] .term[data-dock="screen"] {
+  width: var(--mirror-w);
+  height: var(--mirror-h);
+  border: 0;
+  border-radius: 0;
+  font-size: var(--mirror-font);
+  line-height: var(--mirror-lh);
+  --term-lh: 1.25;
+}
+
+[data-mode="scene"] .term[data-dock="screen"] .term-head {
+  height: var(--mirror-bar);
+  padding: 0 var(--mirror-pad);
+  font-size: inherit;
+}
+
+[data-mode="scene"] .term[data-dock="screen"] .term-screen {
+  flex: 1;
+  height: auto;
+  padding: var(--mirror-pad) var(--mirror-pad) 0;
+}
+
+[data-mode="scene"] .term[data-dock="screen"] .term-form {
+  padding: 0 var(--mirror-pad) var(--mirror-pad);
+  border-top: 0;
+  font-size: inherit;
+}
+
+[data-mode="scene"] .term[data-dock="screen"] .term-chips {
+  display: none;
+}
+
+[data-mode="scene"] .contacts {
+  width: var(--contacts-w);
+  height: var(--contacts-h);
+  padding: var(--sp-6);
+  background: var(--ansi-bg);
+  color: var(--ansi-fg);
+}
+
+/* narrow or touch: the docked terminal is a sheet over the lower half (the scene frames the
+   laptop above it); the landmark nav rides on top of the sheet so it stays reachable */
+@media (max-width: 719px), (pointer: coarse) {
+  [data-mode="scene"] .term[data-dock="sheet"] {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: var(--z-sheet);
+    height: 50dvh;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-width: 1px 0 0;
+    border-radius: var(--r-m) var(--r-m) 0 0;
+    transform: none !important;
+  }
+
+  [data-mode="scene"] .term[data-dock="sheet"] .term-screen {
+    flex: 1;
+    height: auto;
+  }
+
+  [data-mode="scene"]:has(.term[data-dock="sheet"]) .nav {
+    z-index: var(--z-sheet);
+    bottom: calc(50dvh + var(--sp-2));
+  }
+
+  [data-mode="scene"]:has(.term[data-dock="sheet"]) .hint {
+    display: none;
+  }
+}
+
+/* landmark nav + hint */
+[data-mode="scene"] .nav {
+  display: block;
+  position: fixed;
+  z-index: var(--z-chrome);
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + var(--sp-5));
+  transform: translateX(-50%);
+}
+
+.nav ul {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.nav button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--sp-3);
+  color: var(--c-fg-muted);
+  font-size: var(--fs-2);
+  border-bottom: 1px solid transparent;
+}
+
+.nav button:hover {
+  color: var(--c-fg);
+}
+
+.nav button[aria-current="true"] {
+  color: var(--c-fg);
+  border-bottom-color: var(--c-accent);
+}
+
+[data-mode="scene"] .hint {
+  display: block;
+  position: fixed;
+  z-index: var(--z-chrome);
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + var(--sp-5) + 52px);
+  color: var(--c-fg-subtle);
+  font-size: var(--fs-1);
+  text-align: center;
+  pointer-events: none;
+  transition: opacity var(--d-base) var(--ease);
+}
+
+[data-interacted] .hint {
+  opacity: 0;
+}

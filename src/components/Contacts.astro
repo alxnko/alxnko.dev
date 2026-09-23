@@ -1,0 +1,20 @@
+---
+import { CONTACTS } from '../content/site';
+import Icon from './Icon.astro';
+---
+<section id="contacts" class="contacts" aria-labelledby="contacts-h">
+  <h2 id="contacts-h" class="label">
+    <span>contacts</span><span class="label-path" aria-hidden="true">~/monitor/*.lnk</span>
+  </h2>
+  <ul>
+    {CONTACTS.map((c) => (
+      <li>
+        <a data-contact={c.id} href={c.href} rel={c.id === 'email' ? undefined : 'noopener noreferrer me'}>
+          <span class="c-key" aria-hidden="true">{c.short}</span>
+          <span class="c-val"><span class="visually-hidden">{c.label}: </span>{c.display}</span>
+          <Icon name="arrow" size={12} class="c-go" />
+        </a>
+      </li>
+    ))}
+  </ul>
+</section>

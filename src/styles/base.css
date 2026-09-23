@@ -1,0 +1,161 @@
+/* graphite / base: fonts, reset, type, focus, utilities. Token vars only (tokens.css). */
+
+/* Metric-matched stand-in while JetBrains Mono loads (no layout shift on swap). */
+@font-face {
+  font-family: "JetBrains Mono Fallback";
+  src: local("DejaVu Sans Mono"), local("Menlo"), local("Consolas");
+  size-adjust: 100%;
+  ascent-override: 102%;
+  descent-override: 30%;
+}
+
+/* VT323, subset to the seven glyphs of the mark `alxnko_` (664 bytes, preloaded). */
+@font-face {
+  font-family: "VT323";
+  src: url("../assets/fonts/vt323-mark.woff2") format("woff2");
+  font-display: block;
+  unicode-range: U+5F, U+61, U+6B-6C, U+6E-6F, U+78;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background: var(--c-bg);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--c-bg);
+  color: var(--c-fg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-3);
+  line-height: 1.6;
+  font-variant-ligatures: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, h3, p, dl, dd, ul, figure {
+  margin: 0;
+}
+
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+img, svg, picture {
+  display: block;
+  max-width: 100%;
+}
+
+.icon {
+  flex: none;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--c-accent-fill);
+  color: var(--c-on-accent);
+}
+
+/* One focus language everywhere: 2px accent, offset, always on :focus-visible. */
+:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: var(--r-s);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip {
+  position: fixed;
+  z-index: var(--z-skip);
+  top: calc(env(safe-area-inset-top) + var(--sp-2));
+  left: calc(env(safe-area-inset-left) + var(--sp-2));
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--sp-4);
+  background: var(--c-accent-fill);
+  color: var(--c-on-accent);
+  font-size: var(--fs-2);
+  border-radius: var(--r-s);
+  transform: translateY(calc(-100% - var(--sp-5)));
+}
+
+/* enters in 120 ms, leaves instantly */
+.skip:focus-visible {
+  transform: none;
+  transition: transform var(--d-fast) var(--ease);
+  outline-color: var(--c-fg);
+}
+
+/* tty cursor: a hard 1 Hz on/off, no fade. Visible at rest (reduced motion keeps it on). */
+.blink {
+  animation: blink 1s steps(1, end) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .blink {
+    animation: none !important;
+  }
+}

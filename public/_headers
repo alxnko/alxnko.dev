@@ -1,19 +1,29 @@
+# Cloudflare Pages headers. The CSP placeholder is replaced at build by scripts/postbuild-csp.ts
+# with a strict hash-based policy (spec §7.3): no inline allowance, no third-party origins.
+# One Cache-Control per path: Pages joins duplicate headers from overlapping rules.
 /*
+  Content-Security-Policy: __CSP__
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' https: data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
 
+# Content-hashed build output and scene assets: immutable for a year.
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
+/scene/*
+  Cache-Control: public, max-age=31536000, immutable
 
+# HTML: always revalidate in the browser, short edge cache.
 /
   Cache-Control: public, max-age=0, s-maxage=3600, stale-while-revalidate=86400
+/404.html
+  Cache-Control: public, max-age=0, s-maxage=3600, stale-while-revalidate=86400
 
-# Brand icons (packages/brand). Stable URLs but NOT content-hashed, so they get a
-# week of caching rather than the immutable year used for /_astro/*. One
-# Cache-Control per path, per the caveat above.
+# Brand icons: stable URLs, not content-hashed, so a week rather than immutable.
 /favicon.ico
   Cache-Control: public, max-age=604800
 /favicon.svg

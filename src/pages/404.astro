@@ -1,0 +1,19 @@
+---
+import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
+import { SITE } from '../content/site';
+const pre = `[${SITE.handle}@${SITE.host} `;
+const post = ']$ ';
+---
+<Base title="404 · alxnko.dev" description="No such file or directory." path="/404" index={false}>
+  <main class="nf" id="main">
+    <Icon name="cat" size={64} class="nf-cat" />
+    <h1 class="visually-hidden">page not found</h1>
+    <div class="nf-term" role="group" aria-label="terminal">
+      <p class="ln">{pre}<span class="c-green">~</span>{post}cd <span class="nf-path">/404</span></p>
+      <p class="ln">bash: cd: <span id="nf-path" class="nf-path">/404</span>: No such file or directory</p>
+      <p class="ln">{pre}<span class="c-green">~</span>{post}<a id="nf-home" href="/">cd ~</a><span class="caret blink" aria-hidden="true"> </span></p>
+    </div>
+    <p class="nf-note">error 404 · the path is not on this desk</p>
+  </main>
+</Base>

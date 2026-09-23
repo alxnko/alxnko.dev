@@ -1,0 +1,273 @@
+/* graphite / terminal: the one DOM terminal. Screens are dark in both themes (spec §4.3). */
+
+:root {
+  /* Rules inside the dark screen, derived from the ANSI palette (no new colors). */
+  --term-rule: color-mix(in srgb, var(--ansi-fg) 11%, var(--ansi-bg));
+  --term-rule-strong: color-mix(in srgb, var(--ansi-fg) 20%, var(--ansi-bg));
+  --term-fs: var(--fs-2);
+  --term-lh: 1.55;
+  --term-rows: 16;
+}
+
+.term {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--ansi-bg);
+  color: var(--ansi-fg);
+  border: 1px solid var(--term-rule-strong);
+  border-radius: var(--r-m);
+  font-size: var(--term-fs);
+  line-height: var(--term-lh);
+  overflow: hidden;
+}
+
+/* header strip: tty label left, KG local clock right. No window chrome. */
+.term-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  height: 32px;
+  padding: 0 var(--sp-3);
+  border-bottom: 1px solid var(--term-rule);
+  color: var(--ansi-muted);
+  font-size: var(--fs-1);
+  white-space: nowrap;
+}
+
+.term-title {
+  font-size: inherit;
+  font-weight: 400;
+  color: var(--ansi-fg);
+}
+
+.term-title .dim,
+.term-clock {
+  color: var(--ansi-muted);
+}
+
+.term-clock time {
+  display: inline-block;
+  min-width: 8ch;
+  color: var(--ansi-fg);
+}
+
+/* scrollback ------------------------------------------------------------------------ */
+.term-screen {
+  position: relative;
+  height: calc(var(--term-rows) * var(--term-lh) * 1em + 2 * var(--sp-3));
+  padding: var(--sp-3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--term-rule-strong) transparent;
+}
+
+.term-screen:focus-visible {
+  outline-offset: -2px;
+}
+
+.term .ln {
+  min-height: calc(var(--term-lh) * 1em);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.term-comp {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 2ch;
+  color: var(--ansi-muted);
+}
+
+.term-comp[hidden],
+.term-overlay[hidden] {
+  display: none;
+}
+
+/* full-screen toys (cmatrix) paint over the scrollback */
+.term-overlay {
+  position: absolute;
+  inset: 0;
+  padding: var(--sp-3);
+  overflow: hidden;
+  background: var(--ansi-bg);
+}
+
+.term-overlay .ln {
+  white-space: pre;
+}
+
+/* ansi palette ----------------------------------------------------------------------- */
+.c-fg { color: var(--ansi-fg); }
+.c-muted { color: var(--ansi-muted); }
+.c-dim { color: var(--ansi-dim); }
+.c-white { color: var(--ansi-white); }
+.c-green { color: var(--ansi-green); }
+.c-amber { color: var(--ansi-amber); }
+.c-red { color: var(--ansi-red); }
+.c-blue { color: var(--ansi-blue); }
+.c-magenta { color: var(--ansi-magenta); }
+.c-cyan { color: var(--ansi-cyan); }
+.term .b { font-weight: 700; }
+
+.term-lines a,
+.term-comp a {
+  text-decoration: underline;
+  text-decoration-color: var(--ansi-dim);
+  text-underline-offset: 3px;
+}
+
+.term-lines a:hover {
+  text-decoration-color: currentColor;
+}
+
+/* suggestion chips: above the input so they stay visible over a phone keyboard ---------- */
+.term-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--term-rule);
+}
+
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--term-rule-strong);
+  border-radius: var(--r-s);
+  color: var(--ansi-muted);
+  font-size: var(--fs-1);
+  transition: color var(--d-fast) var(--ease), border-color var(--d-fast) var(--ease);
+}
+
+/* 44px tall hit area; the 8px row gap keeps neighbours apart */
+.chip::after {
+  content: "";
+  position: absolute;
+  inset: -7px -4px;
+}
+
+.chip:hover {
+  color: var(--ansi-white);
+  border-color: var(--ansi-dim);
+}
+
+.chip:focus-visible {
+  outline-color: var(--ansi-green);
+}
+
+/* input line -------------------------------------------------------------------------- */
+.term-form {
+  display: flex;
+  align-items: baseline;
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border-top: 1px solid var(--term-rule);
+  cursor: text;
+}
+
+.term-form:has(input:focus-visible) {
+  outline: 2px solid var(--ansi-green);
+  outline-offset: -2px;
+  border-radius: 0 0 var(--r-m) var(--r-m);
+}
+
+.term-prompt {
+  flex: none;
+  white-space: pre;
+}
+
+.term-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.term-mirror {
+  overflow: hidden;
+  white-space: pre;
+  pointer-events: none;
+  color: var(--ansi-white);
+}
+
+.term-field input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  font: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  outline: none;
+  appearance: none;
+}
+
+.term-field input::selection {
+  background: color-mix(in srgb, var(--ansi-green) 35%, transparent);
+  color: transparent;
+}
+
+/* the tty block cursor: solid + 1 Hz while focused, hollow when not */
+.caret {
+  display: inline-block;
+  min-width: 1ch;
+  color: var(--ansi-bg);
+  background: var(--ansi-green);
+  animation: caret 1s steps(1, end) infinite;
+}
+
+/* off-phase shows the character under the block, like a real tty */
+@keyframes caret {
+  50% {
+    color: var(--ansi-white);
+    background: transparent;
+  }
+}
+
+.term-form:not(:focus-within) .caret {
+  color: inherit;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--ansi-dim);
+  animation: none;
+}
+
+.term-form[data-busy="true"] .term-prompt,
+.term-form[data-busy="true"] .caret {
+  visibility: hidden;
+}
+
+/* no JS: the transcript stays, the dead input and chips go */
+html:not(.js) .term-form,
+html:not(.js) .term-chips {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none !important;
+  }
+}
+
+/* phones: 16px input so iOS never zooms on focus */
+@media (max-width: 719px), (pointer: coarse) {
+  .term-form {
+    font-size: var(--fs-4);
+  }
+}
+
+@media (min-width: 768px) {
+  :root {
+    --term-fs: var(--fs-3);
+    --term-rows: 20;
+  }
+}

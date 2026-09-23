@@ -1,0 +1,491 @@
+/* graphite / page mode (Layer 1): identity, terminal, contacts. Mobile first. */
+
+:root {
+  --gutter: max(var(--sp-4), env(safe-area-inset-left));
+  --gutter-r: max(var(--sp-4), env(safe-area-inset-right));
+  --bar-h: 44px;
+}
+
+/* ---- top bar: a tty status line ------------------------------------------------- */
+.bar {
+  position: relative;
+  z-index: var(--z-chrome);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: calc(var(--bar-h) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) calc(var(--gutter-r) - var(--sp-2)) 0 var(--gutter);
+  border-bottom: 1px solid var(--c-line);
+  font-size: var(--fs-2);
+}
+
+.bar-home {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-right: auto;
+  color: var(--c-fg);
+}
+
+.bar-home:focus-visible,
+.toggle:focus-visible {
+  outline-offset: -2px;
+}
+
+.bar-home:hover {
+  color: var(--c-fg-muted);
+}
+
+.bar-meta {
+  display: none;
+  color: var(--c-fg-subtle);
+  font-size: var(--fs-1);
+}
+
+.bar-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-s);
+  font-size: var(--fs-2);
+  position: relative;
+}
+
+.bar-btn::after {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+
+.bar-btn:hover {
+  border-color: var(--c-fg-muted);
+}
+
+.bar-btn[hidden] {
+  display: none;
+}
+
+.toggles {
+  display: flex;
+  gap: var(--sp-1);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--sp-2);
+  color: var(--c-fg-subtle);
+  border-radius: var(--r-s);
+  font-size: var(--fs-1);
+  transition: color var(--d-fast) var(--ease);
+}
+
+.toggle:hover,
+.toggle[aria-pressed="true"] {
+  color: var(--c-fg);
+}
+
+.toggle-label {
+  display: none;
+  align-items: center;
+  gap: 6px;
+}
+
+/* A drafting checkbox: hollow when off, filled when pressed. */
+.toggle-label::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border: 1px solid currentColor;
+}
+
+.toggle[aria-pressed="true"] .toggle-label::before {
+  background: currentColor;
+}
+
+.toggle[aria-pressed="false"] .icon-wave {
+  opacity: 0.35;
+}
+
+/* ---- sheet ----------------------------------------------------------------------- */
+.sheet {
+  position: relative;
+  z-index: var(--z-chrome);
+  flex: 1;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "id" "term" "ct" "poster";
+  padding: 0 var(--gutter-r) 0 var(--gutter);
+}
+
+/* identity ------------------------------------------------------------------------- */
+.identity {
+  grid-area: id;
+  padding-block: var(--sp-6) var(--sp-5);
+}
+
+.eyebrow {
+  color: var(--c-fg-subtle);
+  font-size: var(--fs-1);
+  line-height: 1;
+}
+
+.mark-h {
+  margin-top: var(--sp-4);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.mark {
+  display: inline-block;
+  font-family: var(--font-mark);
+  font-size: var(--fs-7);
+  line-height: 0.8;
+  color: var(--c-fg);
+  /* VT323 sits high in its box; pull the baseline onto the 4px grid. */
+  transform: translateY(0.04em);
+}
+
+.mark .blink {
+  color: var(--c-accent);
+}
+
+.name {
+  margin-top: var(--sp-3);
+  color: var(--c-fg-muted);
+  font-size: var(--fs-4);
+  line-height: 1.5;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--sp-3);
+  margin-top: var(--sp-5);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--c-line);
+  font-size: var(--fs-3);
+  line-height: 1.6;
+}
+
+.facts > div {
+  display: contents;
+}
+
+.facts dt {
+  min-width: 6ch;
+  padding-block: 3px;
+  color: var(--c-fg-subtle);
+  text-align: right;
+}
+
+.facts dt::after {
+  content: ":";
+}
+
+.facts dd {
+  padding-block: 3px;
+  color: var(--c-fg);
+}
+
+.rank {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--c-line-strong);
+  transition: color var(--d-fast) var(--ease), border-color var(--d-fast) var(--ease);
+}
+
+/* 44px hit area without changing the line box. */
+.rank::after {
+  content: "";
+  position: absolute;
+  inset: -11px -6px;
+}
+
+.rank .icon {
+  color: var(--c-fg-subtle);
+}
+
+.rank:hover {
+  border-color: currentColor;
+}
+
+.rank:hover .icon {
+  color: var(--c-accent);
+}
+
+/* terminal slot -------------------------------------------------------------------- */
+.sheet > .term {
+  grid-area: term;
+}
+
+/* contacts ------------------------------------------------------------------------- */
+.contacts {
+  grid-area: ct;
+  padding-block: var(--sp-6) var(--sp-7);
+}
+
+.label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--c-line-strong);
+  color: var(--c-fg-muted);
+  font-size: var(--fs-1);
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.label-path {
+  color: var(--c-fg-subtle);
+}
+
+.contacts li {
+  border-bottom: 1px solid var(--c-line);
+}
+
+.contacts a {
+  display: grid;
+  grid-template-columns: 5ch minmax(0, 1fr) 12px;
+  align-items: center;
+  column-gap: var(--sp-3);
+  min-height: 48px;
+  padding-inline: var(--sp-1);
+  color: var(--c-fg);
+  transition: background-color var(--d-fast) var(--ease);
+}
+
+.contacts a:focus-visible {
+  outline-offset: -2px;
+}
+
+.c-key {
+  color: var(--c-fg-subtle);
+}
+
+.c-val {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c-go {
+  color: var(--c-fg-subtle);
+  transition: transform var(--d-fast) var(--ease), color var(--d-fast) var(--ease);
+}
+
+@media (hover: hover) {
+  .contacts a:hover {
+    background: var(--c-bg-elev);
+  }
+
+  .contacts a:hover .c-go {
+    color: var(--c-accent);
+    transform: translate(2px, -2px);
+  }
+}
+
+/* poster (baked render, LCP image when present) ---------------------------------------- */
+.poster {
+  grid-area: poster;
+  padding-bottom: var(--sp-6);
+}
+
+.poster img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-m);
+  background: var(--ansi-bg);
+}
+
+.poster figcaption {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+  color: var(--c-fg-subtle);
+  font-size: var(--fs-1);
+}
+
+.poster figcaption span {
+  color: var(--c-fg-muted);
+}
+
+/* footer --------------------------------------------------------------------------- */
+.foot {
+  position: relative;
+  z-index: var(--z-chrome);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--sp-1) var(--sp-4);
+  padding: var(--sp-4) var(--gutter-r) calc(var(--sp-4) + env(safe-area-inset-bottom)) var(--gutter);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-fg-subtle);
+  font-size: var(--fs-1);
+}
+
+/* scene-only chrome is inert in page mode */
+.nav,
+.hint {
+  display: none;
+}
+
+/* ---- 404 ------------------------------------------------------------------------ */
+.nf {
+  flex: 1;
+  width: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: var(--sp-5);
+  padding: var(--sp-7) var(--gutter-r) var(--sp-7) var(--gutter);
+  max-width: 880px;
+  margin-inline: auto;
+}
+
+.nf-cat {
+  color: var(--c-accent);
+}
+
+.nf-term {
+  width: 100%;
+  padding: var(--sp-4);
+  background: var(--ansi-bg);
+  color: var(--ansi-fg);
+  border: 1px solid var(--term-rule-strong);
+  border-radius: var(--r-m);
+  font-size: var(--fs-2);
+  line-height: 1.6;
+}
+
+.nf-term .ln {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.nf-term a {
+  display: inline-block;
+  min-height: 24px;
+  color: var(--ansi-white);
+  text-decoration: underline;
+  text-decoration-color: var(--ansi-dim);
+  text-underline-offset: 3px;
+}
+
+.nf-term a:hover {
+  text-decoration-color: var(--ansi-green);
+}
+
+.nf-term .caret {
+  display: inline-block;
+  width: 1ch;
+  margin-left: 1ch;
+  background: var(--ansi-green);
+}
+
+.nf-note {
+  color: var(--c-fg-subtle);
+  font-size: var(--fs-1);
+}
+
+@media (min-width: 720px) {
+  .poster img {
+    aspect-ratio: 16 / 10;
+  }
+}
+
+/* ---- ≥ 768 ---------------------------------------------------------------------- */
+@media (min-width: 768px) {
+  :root {
+    --gutter: max(var(--sp-6), env(safe-area-inset-left));
+    --gutter-r: max(var(--sp-6), env(safe-area-inset-right));
+  }
+
+  .bar-meta {
+    display: inline;
+  }
+
+  .toggle-label {
+    display: inline-flex;
+  }
+
+  .toggle {
+    padding: 0 var(--sp-3);
+  }
+
+  .identity {
+    padding-block: var(--sp-7) var(--sp-6);
+  }
+
+  .mark {
+    font-size: calc(var(--fs-7) * 1.6);
+  }
+
+
+  .nf-term {
+    padding: var(--sp-5);
+    font-size: var(--fs-3);
+  }
+}
+
+/* ---- ≥ 1024: two columns on a drafting grid --------------------------------------- */
+@media (min-width: 1024px) {
+  .sheet {
+    grid-template-columns: minmax(0, 38fr) minmax(0, 62fr);
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+      "id term"
+      "ct term"
+      "ct poster";
+    column-gap: var(--sp-8);
+    max-width: 1360px;
+    margin-inline: auto;
+  }
+
+  /* the column rule, running bar to footer */
+  .sheet::before {
+    content: "";
+    grid-column: 1;
+    grid-row: 1 / -1;
+    justify-self: end;
+    width: 1px;
+    margin-right: calc(var(--sp-8) / -2);
+    background: var(--c-line);
+  }
+
+  .identity {
+    padding-top: var(--sp-8);
+  }
+
+  .contacts {
+    align-self: start;
+    padding-top: var(--sp-5);
+  }
+
+  .sheet > .term {
+    align-self: start;
+    margin-top: var(--sp-8);
+  }
+
+  .poster {
+    padding-top: var(--sp-5);
+  }
+
+  .mark {
+    font-size: calc(var(--fs-7) * 2);
+  }
+}
