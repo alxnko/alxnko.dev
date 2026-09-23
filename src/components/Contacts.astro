@@ -9,9 +9,9 @@ import Icon from './Icon.astro';
   <ul>
     {CONTACTS.map((c) => (
       <li>
-        <a data-contact={c.id} href={c.href} rel={c.id === 'email' ? undefined : 'noopener noreferrer me'}>
+        <a data-contact={c.id} href={c.href} target={c.id === 'email' ? undefined : '_blank'} rel={c.id === 'email' ? undefined : 'noopener noreferrer me'}>
           <span class="c-key" aria-hidden="true">{c.short}</span>
-          <span class="c-val"><span class="visually-hidden">{c.label}: </span>{c.display}</span>
+          <span class="c-val"><span class="visually-hidden">{c.label}: </span>{c.display}{c.id !== 'email' && <span class="visually-hidden"> (opens in a new tab)</span>}</span>
           <Icon name="arrow" size={12} class="c-go" />
         </a>
       </li>

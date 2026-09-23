@@ -61,3 +61,16 @@ test.describe('page (no 3D)', () => {
     g.check();
   });
 });
+
+test('external links open in a new tab, safely; mail opens the mail app', async ({ page }) => {
+  await page.goto('/?lite');
+  await expect(page.locator('#term-lines')).toContainText('alxnko@nitro', { timeout: 5000 });
+  const links = await page.$$eval('a[href^="http"]', (as) => as.map((a) => [a.getAttribute('href'), a.getAttribute('target'), a.getAttribute('rel')]));
+  expect(links.length).toBeGreaterThan(4);
+  for (const [href, target, rel] of links) {
+    expect(target, href ?? '').toBe('_blank');
+    expect(rel ?? '', href ?? '').toContain('noopener');
+  }
+  const mail = await page.$$eval('a[href^="mailto:"]', (as) => as.map((a) => a.getAttribute('target')));
+  for (const t of mail) expect(t).not.toBe('_blank');
+});

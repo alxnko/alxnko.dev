@@ -16,8 +16,8 @@ const lc = (s: string) => s.toLowerCase();
     <div>
       <dt>rank</dt>
       <dd>
-        <a id="rank" class="rank" href={SITE.rank.href} rel="noopener noreferrer">
-          <span>{lc(SITE.rank.short)}</span><Icon name="arrow" size={12} />
+        <a id="rank" class="rank" href={SITE.rank.href} target="_blank" rel="noopener noreferrer">
+          <span>{lc(SITE.rank.short)}</span><span class="visually-hidden"> (opens in a new tab)</span><Icon name="arrow" size={12} />
         </a>
       </dd>
     </div>

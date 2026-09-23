@@ -37,7 +37,8 @@ function spans(line: Line, into: HTMLElement): HTMLElement {
     if (link) {
       el.setAttribute('href', s.href!);
       el.setAttribute('rel', 'noopener noreferrer');
-      el.setAttribute('target', '_blank');
+      // web links open a new tab; mailto: hands off to the mail app (a new tab would be left empty)
+      if (/^https?:/.test(s.href!)) el.setAttribute('target', '_blank');
     }
     if (s.fg && COLORS.has(s.fg)) el.classList.add(`c-${s.fg}`);
     if (s.bold) el.classList.add('b');
