@@ -1,5 +1,5 @@
 // Every surface is unlit: lighting is baked (spec §6.3). The few live effects are tiny shaders.
-import { AdditiveBlending, Color, ShaderMaterial, type Texture, Vector3 } from 'three';
+import { AdditiveBlending, Color, NoBlending, ShaderMaterial, type Texture, Vector3, Vector4 } from 'three';
 
 const vsUv = /* glsl */ `
 varying vec2 vUv;
@@ -121,5 +121,33 @@ export function skyMaterial(mix: number): ShaderMaterial {
         gl_FragColor = vec4(mix(day, night, uMix), 1.0);
         #include <colorspace_fragment>
       }`,
+  });
+}
+
+/**
+ * A screen with live DOM *behind* the canvas: inside each UV rect (x0, x1, y0, y1; y down,
+ * like the screen UVs) the fragment is fully transparent, so the pinned DOM shows through
+ * and anything in front of the screen (a cat, a laptop lid) still occludes it, because
+ * this surface writes depth like any other. Outside the rects it draws `map` (if any).
+ */
+export function windowMaterial(map: Texture | null, rects: [number, number, number, number][], base = '#050506'): ShaderMaterial {
+  const r = rects.slice(0, 4).map((q) => new Vector4(...q));
+  while (r.length < 4) r.push(new Vector4(2, 2, 2, 2));
+  return new ShaderMaterial({
+    uniforms: { map: { value: map }, uHasMap: { value: map ? 1 : 0 }, uBase: { value: new Color(base) }, uRects: { value: r } },
+    vertexShader: vsUv,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D map; uniform float uHasMap; uniform vec3 uBase; uniform vec4 uRects[4];
+      varying vec2 vUv;
+      void main() {
+        for (int i = 0; i < 4; i++) {
+          vec4 q = uRects[i];
+          if (vUv.x >= q.x && vUv.x <= q.y && vUv.y >= q.z && vUv.y <= q.w) { gl_FragColor = vec4(0.0); return; }
+        }
+        vec3 c = uHasMap > 0.5 ? texture2D(map, vUv).rgb : uBase;
+        gl_FragColor = vec4(c, 1.0);
+        #include <colorspace_fragment>
+      }`,
+    blending: NoBlending,
   });
 }

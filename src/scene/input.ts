@@ -3,7 +3,8 @@
 // Every gesture has a button alternative (the landmark nav), per spec §11.
 
 export interface InputHandlers {
-  canvas: HTMLCanvasElement;
+  /** The element that receives camera input (the stage layer under the pinned screens). */
+  canvas: HTMLElement;
   reducedMotion: boolean;
   /** Multiply the viewing distance by f (<1 closer). */
   zoom(f: number): void;

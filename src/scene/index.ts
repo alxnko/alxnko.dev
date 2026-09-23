@@ -9,7 +9,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import type { FanSpeed, Landmark, Ring, Theme, WorldState } from '../term/types';
 import { parseManifest, type Manifest } from './manifest';
 import { TERM_BG } from '../lib/tokens';
-import { bakedMaterial, emissiveMaterial, glowMaterial, screenMaterial, skyMaterial } from './materials';
+import { windowMaterial, bakedMaterial, emissiveMaterial, glowMaterial, screenMaterial, skyMaterial } from './materials';
 import { lerpPose, Rail, Spring, type Pose, type Vec3 } from './rail';
 import { FanDisplay, MonitorScreen } from './monitor-screen';
 import { catStep, clamp, easeOut, frameInterval, nextFlickIn, Tween, type CatState } from './anim';
@@ -62,6 +62,9 @@ export interface SceneHandle { world: SceneWorld; destroy(): void }
 const RING: Record<Ring, string> = { green: '#00ff82', purple: '#b061ff', off: '#161618' };
 const FAN_SPEED = [0, 7, 13, 20]; // rad/s
 const FAN_PCT = ['0', '40', '70', '100'];
+// UV rects (u0, u1, v0, v1; v down) of the monitor that the live DOM panels cover
+const MON_CONTACTS_UV = [0.24, 0.76, 0.12, 0.92] as const;
+const MON_INFO_UV = [0.765, 0.995, 0.12, 0.92] as const;
 const DEG = Math.PI / 180;
 
 export async function mount(o: SceneOptions): Promise<SceneHandle> {
@@ -82,7 +85,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const renderer = new WebGLRenderer({
     canvas,
     antialias: devicePixelRatio < 2,
-    alpha: false,
+    alpha: true, // screen regions are transparent windows onto the pinned DOM beneath
     powerPreference: o.mobile ? 'default' : 'high-performance',
   });
   renderer.outputColorSpace = SRGBColorSpace;
@@ -152,7 +155,8 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const monitor = new MonitorScreen(o.mobile);
   monitor.texture.flipY = false;
   const laptopScreen = node('screen_laptop'), monitorScreen = node('screen_monitor');
-  const laptopMat = emissiveMaterial(TERM_BG), monitorMat = screenMaterial(monitor.texture);
+  const laptopMat = windowMaterial(null, [[0, 1, 0, 1]], TERM_BG);
+  const monitorMat = windowMaterial(monitor.texture, o.infoEl ? [[...MON_CONTACTS_UV], [...MON_INFO_UV]] : [[...MON_CONTACTS_UV]]);
   meshesOf(laptopScreen).forEach((m) => (m.material = laptopMat));
   meshesOf(monitorScreen).forEach((m) => (m.material = monitorMat));
 
@@ -246,8 +250,8 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   };
   // the live contacts panel covers the middle of the curved monitor (a short arc, so the flat
   // DOM panel sits on the curve within a few mm); the canvas draws the side panes around it
-  const CONTACTS_UV = [0.24, 0.76, 0.12, 0.92] as const;
-  const INFO_UV = [0.765, 0.995, 0.12, 0.92] as const;
+  const CONTACTS_UV = MON_CONTACTS_UV;
+  const INFO_UV = MON_INFO_UV;
   const contactsCorners = () => screenCorners(monitorScreen, ...CONTACTS_UV);
   const infoCorners = () => screenCorners(monitorScreen, ...INFO_UV);
 
@@ -555,8 +559,6 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
         if (disposed) return;
         if (t === 'light') baked.uniforms.uDay.value = tx; else baked.uniforms.uNight.value = tx;
         mixTween = new Tween(mix, want, performance.now(), o.reducedMotion ? 0 : 600);
-        (monitorMat.uniforms.uRefl.value as Color).set(t === 'light' ? '#e9e8e4' : '#9aa3b5');
-        monitorMat.uniforms.uReflAmt.value = t === 'light' ? 0.16 : 0.1;
         invalidate();
       }).catch((e) => {
         // once the desk is up we never drop back to the page: keep the current lighting
@@ -594,7 +596,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
 
   // ---------- input ----------
   const detachInput = attachInput({
-    canvas,
+    canvas: o.stage,
     reducedMotion: o.reducedMotion,
     zoom(f) {
       lastInput = performance.now();
@@ -615,7 +617,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       pointer.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
       hasPointer = true;
       raycaster.setFromCamera(pointer, camera);
-      canvas.style.cursor = raycaster.intersectObjects(hits, true).length ? 'pointer' : '';
+      o.stage.style.cursor = raycaster.intersectObjects(hits, true).length ? 'pointer' : '';
       world.activity();
     },
     tap(x, y) {
@@ -643,7 +645,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   canvas.addEventListener('webglcontextlost', onLost);
   canvas.addEventListener('webglcontextrestored', onRestored);
 
-  o.stage.append(canvas);
+  o.stage.after(canvas); // above the pinned screens (they show through its windows)
   if (new URLSearchParams(location.search).has('test')) (window as any).__scene = { scene, camera, renderer, rail, flight, dest: () => dest, orbit, invalidate, world: () => world };
   sizeOverlays();
   applySize();

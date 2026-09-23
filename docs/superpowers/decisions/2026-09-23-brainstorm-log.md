@@ -138,3 +138,18 @@ Changed:
 | R18 | Flying to the monitor passes through the laptop | Flights go straight from the current view to the target (no rail through other landmarks). **In progress.** |
 | R19 | Paddle buttons under the desk should work: 1 lowest, 2 middle, 3 highest (▲▼ nudge) | Clickable `hit_paddle_*` targets run `desk N` through the shell (terminal shows it, desk moves, paddle LED lights). Hover shows a pointer on everything clickable. **Runtime done, hit boxes pending in model.** |
 | R20 | Never lose these comments; document lights/glow etc. | This table is the tracking list; each row is re-verified in the final review before PR. Lights/glow summary: monitor ring + wall wash, fan ring, laptop + keyboard backlights all share the ring colour (`ring green\|purple\|off`), breathe gently, pulse on `meow`; LEDs: paddle (amber while moving), server pattern, keyboard indicator. |
+| R21 | Text selectable only on the screen you're at (none at wide/desk) | `body[data-view]` + scene.css `user-select`. **Fixed.** |
+| R22 | Not everything clickable (sun icon, monitor from desk view); investigate all | Scene container click-through; every control's icon + label hit-tested in Chrome (29/29 ok); screens from afar are one button that flies you there. **Fixed.** |
+| R23 | "#1 committer" clickable everywhere, incl. monitor | Rank restored in 3D identity; monitor right pane is a live pinned panel with the link. **Fixed.** |
+| R24 | Remove "AIT Solutions" everywhere | Removed from site, terminal, JSON-LD, monitor; posters/og in Blender pass. **Site fixed, posters pending.** |
+| R25 | Invert vertical drag (grab-the-scene) | **Fixed.** |
+| R26 | Live screens can appear on top of 3D objects (laptop screen over fan/cat) | Canvas now sits *above* the pinned DOM; screen regions render as transparent depth-writing windows, so anything in front of a screen occludes it per pixel. Input moved to the stage layer beneath. **Fixed (verifying).** |
+| R27 | Cat's tail looks black, not green | Cat remodel in Blender pass; tail on the green material, verified in the unlit atlas render; no fan cable. **Model pending.** |
+
+### Lights & glow (owner asked to keep this written down)
+- **Monitor ring** (back of the ultrawide) + its **wall wash**: runtime-tinted, green by default, `ring green|purple|off`, breathes ±6 % over 8 s, pulses on `meow`.
+- **Fan ring** (front bezel): same tint as the monitor ring (shares its material).
+- **Fan display**: speed readout (`0/40/70/100`), follows `fan N`.
+- **Keyboard backlights** (96 % keyboard + laptop keyboard): additive glow between the keys, same tint as the ring; brighter at night, subtle by day; off with `ring off`.
+- **LEDs**: paddle LED amber while the desk moves; server LEDs change pattern every 2–6 s; keyboard indicator steady.
+- **Day/night**: baked atlases cross-fade in 600 ms; window sky switches; screens stay dark in both.
