@@ -31,6 +31,8 @@ test.describe('page (no 3D)', () => {
     expect(csp).not.toContain('unsafe-inline');
     expect(csp).not.toMatch(/https?:\/\//);
     expect(r.headers()['x-content-type-options']).toBe('nosniff');
+    // HTTPS only: a year of HSTS, subdomains included, eligible for the browser preload list
+    expect(r.headers()['strict-transport-security']).toMatch(/max-age=(3153600\d|[4-9]\d{7,}).*includeSubDomains.*preload/);
     expect(r.headers()['permissions-policy']).toContain('camera=()');
   });
 
