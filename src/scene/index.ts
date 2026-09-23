@@ -65,6 +65,8 @@ export interface SceneHandle { world: SceneWorld; destroy(): void }
 const RING: Record<Ring, string> = { green: '#00ff82', purple: '#b061ff', off: '#161618' };
 const FAN_SPEED = [0, 7, 13, 20]; // rad/s
 const FAN_PCT = ['0', '40', '70', '100'];
+/** Portrait phones: the laptop screen sits between the name block and the on-screen keyboard. */
+const PHONE_BAND: [number, number] = [0.2, 0.62];
 // UV rects (u0, u1, v0, v1; v down) of the monitor that the live DOM panels cover
 const MON_CONTACTS_UV = [0.24, 0.76, 0.12, 0.92] as const;
 const MON_INFO_UV = [0.765, 0.995, 0.12, 0.92] as const;
@@ -307,8 +309,9 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   // then reused while the desk moves.
   const ANGLES: [number, number][] = [[0, 0], [0, 10], [12, 0], [-12, 0], [12, 10], [-12, 10], [0, 20], [20, 12], [-20, 12], [0, 30], [25, 25], [-25, 25]];
   const viewChoice = new Map<string, [number, number]>();
-  /** `top` < 1 frames the screen into the top fraction of the view (phones: room for the keyboard). */
-  const fitScreen = (key: string, corners: Vector3[], margin: number, fov: number, top = 1): Pose => {
+  /** `band` = [top, bottom] fractions of the view the screen should occupy (phones: below the
+   *  name block and above the on-screen keyboard); the default is the whole view. */
+  const fitScreen = (key: string, corners: Vector3[], margin: number, fov: number, band: [number, number] = [0, 1]): Pose => {
     const [tl, tr, , bl] = corners;
     const c = corners.reduce((acc, v) => acc.add(v), new Vector3()).multiplyScalar(0.25);
     const w = tl.distanceTo(tr), h = tl.distanceTo(bl);
@@ -316,28 +319,24 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     // face the side the seated viewer (cam_desk) is on
     if (n.dot(new Vector3(...deskRef.pose.pos).sub(c)) < 0) n.negate();
     const t = Math.tan((fov * DEG) / 2);
-    const d = Math.max(h / (margin * top), w / (margin * camera.aspect)) / (2 * t);
-    const eyeFor = ([yaw, up]: [number, number]) => {
+    const span = band[1] - band[0];
+    const d = Math.max(h / (margin * span), w / (margin * camera.aspect)) / (2 * t);
+    // slide the view so the screen's centre sits at the middle of the band (0.5 = centred)
+    const up = tl.clone().sub(bl).normalize();
+    const shift = ((band[0] + band[1]) / 2 - 0.5) * 2 * d * t; // >0: screen higher in view
+    const eyeFor = ([yaw, lift]: [number, number]) => {
       const dir = n.clone().applyAxisAngle(upWorldConst, yaw * DEG);
       const right = new Vector3().crossVectors(dir, upWorldConst).normalize();
-      return c.clone().add(dir.applyAxisAngle(right, up * DEG).multiplyScalar(d));
+      return c.clone().add(dir.applyAxisAngle(right, lift * DEG).multiplyScalar(d)).addScaledVector(up, shift);
     };
-    const ck = `${key}:${camera.aspect.toFixed(3)}`;
+    // the line-of-sight test uses the final eye (after the band shift)
+    const ck = `${key}:${camera.aspect.toFixed(3)}:${band.join(',')}`;
     let choice = viewChoice.get(ck);
     if (!choice) {
-      choice = ANGLES.find((a) => clearView(eyeFor(a), corners)) ?? [0, 0];
+      choice = ANGLES.find((ang) => clearView(eyeFor(ang), corners)) ?? [0, 0];
       viewChoice.set(ck, choice);
     }
-    const eye = eyeFor(choice);
-    if (top < 1) {
-      // slide the view down so the screen's centre sits at the middle of the top band
-      const up = tl.clone().sub(bl).normalize();
-      const shift = (0.5 - top / 2) * 2 * d * t;
-      eye.addScaledVector(up, -shift);
-      const target = c.clone().addScaledVector(up, -shift);
-      return { pos: eye.toArray() as Vec3, target: target.toArray() as Vec3, fov };
-    }
-    return { pos: eye.toArray() as Vec3, target: c.toArray() as Vec3, fov };
+    return { pos: eyeFor(choice).toArray() as Vec3, target: c.clone().addScaledVector(up, shift).toArray() as Vec3, fov };
   };
   const upWorldConst = new Vector3(0, 1, 0);
 
@@ -349,7 +348,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     wide.target = [wide.target[0], wide.target[1] + rigDy, wide.target[2]];
     const desk = withRig({ ...deskRef.pose, fov: adaptFov(deskRef.pose.fov, deskRef.refAspect) }, rigDy);
     // portrait phones: the laptop screen sits in the top ~55 %, leaving room for the keyboard
-    const laptop = fitScreen('laptop', screenCorners(laptopScreen), 0.94, 34, camera.aspect < 1 ? 0.55 : 1);
+    const laptop = fitScreen('laptop', screenCorners(laptopScreen), 0.94, 34, camera.aspect < 1 ? PHONE_BAND : [0, 1]);
     // the whole ultrawide on landscape screens; on portrait phones the live contacts panel fills
     // the width (readable), and the side panes are a drag away
     const mon = camera.aspect < 1 ? fitScreen('contacts', contactsCorners(), 0.96, 34) : fitScreen('monitor', screenCorners(monitorScreen), 0.94, 34);
@@ -420,7 +419,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   // text stays readable when the screen fills the view); contacts match their arc's aspect
   const sizeOverlays = () => {
     const px = (el: HTMLElement, name: string, v: number) => el.style.setProperty(name, `${v}px`);
-    const tw = Math.round(clamp(innerWidth * 1.9, 640, 1280)), th = Math.round(tw * 0.625);
+    const tw = Math.round(clamp(innerWidth * 2.2, 640, 1280)), th = Math.round(tw * 0.625);
     px(o.termEl, '--screen-w', tw); px(o.termEl, '--screen-h', th);
     dock.setSize(o.termEl, tw, th);
     const [tl, tr, , bl] = contactsCorners();
