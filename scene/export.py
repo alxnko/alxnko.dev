@@ -24,18 +24,19 @@ import dims as D  # noqa: E402
 
 A = C.args()
 BAKED = ["static", "desk_baked", "fan_blades", "cat_body", "cat_head", "cat_tail"]
+SHADOWS = ["shadow_floor", "shadow_wall"]          # atlas-mapped multiply decals
 PADDLE_HITS = [f"hit_paddle_{k}" for k in ("1", "2", "3", "up", "down")]   # left -> right
 OVERLAYS = ["fan_ring", "fan_display", "kbd_glow", "laptop_kbd_glow"]
 RUNTIME = ["screen_laptop", "screen_monitor", "ring", "ring_glow", "led_paddle", "led_kbd",
            *[f"led_srv_{i}" for i in range(6)], "window_sky", "hit_laptop", "hit_monitor",
            *OVERLAYS, *PADDLE_HITS]
 CAMS = ["cam_wide", "cam_desk"]
-EXPORT = ["desk_rig"] + BAKED + RUNTIME + CAMS
+EXPORT = ["desk_rig"] + BAKED + SHADOWS + RUNTIME + CAMS
 MATERIAL_OF = {**{n: "baked" for n in BAKED}, "screen_laptop": "screen", "screen_monitor": "screen",
                "ring": "ring", "ring_glow": "glow", "window_sky": "sky", "hit_laptop": "hit",
                "hit_monitor": "hit", **{n: "led" for n in RUNTIME if n.startswith("led_")},
                "fan_ring": "ring", "fan_display": "screen", "kbd_glow": "glow", "laptop_kbd_glow": "glow",
-               **{n: "hit" for n in PADDLE_HITS}}
+               **{n: "hit" for n in PADDLE_HITS}, **{n: "shadow" for n in SHADOWS}}
 
 
 def g(v):
@@ -72,7 +73,7 @@ def main():
         ob = objs[n]
         me = ob.data
         # strip build-time attributes, keep UV0 only
-        for a in ("uvw", "room"):
+        for a in ("uvw", "room", "grp"):
             if a in me.attributes:
                 me.attributes.remove(me.attributes[a])
         while len(me.uv_layers) > 1:
@@ -122,10 +123,13 @@ def collect(objs):
         p = Vector((Mo["x"] + r_s * math.sin(th), Mo["front_y"] - Mo["radius"] + r_s * math.cos(th),
                     zc + dz * Mo["screen"][1] / 2))
         corners[k] = p
+    Sw = C.swivel(Mo["x"], D.mon_neck_y(), Mo.get("yaw", 0.0))   # same swivel as build.py
+    corners = {k: Sw @ p for k, p in corners.items()}
+    cc = Sw @ Vector((Mo["x"], Mo["front_y"] - Mo["radius"], zc))
     inv = sm.matrix_world.inverted()
     info["screenMonitor"] = {
         "w": Mo["screen"][0], "h": Mo["screen"][1], "radius": round(r_s, 5), "arcRad": round(2 * half, 5),
-        "curvatureCenterLocal": g(inv @ Vector((Mo["x"], Mo["front_y"] - Mo["radius"], zc))),
+        "curvatureCenterLocal": g(inv @ cc), "yawDeg": Mo.get("yaw", 0.0),
         "axisLocal": [0, 1, 0],
         "cornersLocal": {k: g(inv @ p) for k, p in corners.items()},
         "cornersRig": {k: g(rig.matrix_world.inverted() @ p) for k, p in corners.items()},
@@ -143,12 +147,19 @@ def collect(objs):
                    "note": "parts have identity rotation; headForward is the gaze in rig space"}
     ring = objs["ring"]
     info["ring"] = {"center": g(rig_local(ring, Vector())), "radius": D.MON["ring_r"],
-                    "tube": D.MON["ring_tube"], "facing": [0, 0, -1],
+                    "tube": D.MON["ring_tube"], "facing": rig_dir(ring, (0, 1, 0)),
                     "default": "green", "note": "not baked; emissive tint at runtime"}
     glow = objs["ring_glow"]
     info["ringGlow"] = {"center": g(rig_local(glow, Vector())), "size": 0.9,
                         "note": "quad on the wall, parented to desk_rig; additive radial glow from UV"}
     info.update(collect_overlays(objs))
+    for n, key in (("shadow_floor", "shadowFloor"), ("shadow_wall", "shadowWall")):
+        ob = objs[n]
+        a0, a1, b0, b1 = ob["decal_rect"]
+        info[key] = {"center": g(ob.matrix_world.translation if not ob.parent else rig_local(ob, Vector())),
+                     "parent": ob.parent.name if ob.parent else None,
+                     "size": [round(a1 - a0, 4), round(b1 - b0, 4)],
+                     "normal": rig_dir(ob, (0, 0, 1) if n == "shadow_floor" else (0, -1, 0))}
     info["leds"] = {n: g(objs[n].matrix_world.translation if not objs[n].parent
                          else rig_local(objs[n], Vector()))
                     for n in RUNTIME if n.startswith("led_")}

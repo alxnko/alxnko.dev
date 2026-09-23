@@ -172,7 +172,8 @@ def build_manifest(version, files, info, bake, crop, stats, sizes, quality):
             "monitor": {"w": sm["w"], "h": sm["h"], "radius": 1.5, "node": "screen_monitor",
                         "radiusMesh": sm["radius"], "arcRad": sm["arcRad"],
                         "curvatureCenterLocal": sm["curvatureCenterLocal"], "axisLocal": sm["axisLocal"],
-                        "cornersLocal": sm["cornersLocal"], "cornersRig": sm["cornersRig"], "uv": sm["uv"]},
+                        "cornersLocal": sm["cornersLocal"], "cornersRig": sm["cornersRig"], "uv": sm["uv"],
+                        "yawDeg": sm.get("yawDeg", 0.0)},
         },
         "files": {"glb": files["glb"], "atlas": files["atlas"], "poster": files["poster"], "og": "/og.png"},
         "posters": {
@@ -216,7 +217,18 @@ def build_manifest(version, files, info, bake, crop, stats, sizes, quality):
             "hit_paddle_up": "invisible tap target over the paddle's up arrow (see hit_paddle)",
             "hit_paddle_down": "invisible tap target over the paddle's down arrow (see hit_paddle)",
             "geometry": "each named mesh node keeps its authored TRS; its geometry is in a child '<name>__geo' (quantisation transform lives there). Traverse for meshes.",
-            "materials": "one unlit placeholder per role: baked, screen, ring, glow, led, sky, hit",
+            "shadow_floor": {**info["shadowFloor"], "role": "shadow",
+                             "note": "multiply decal (dst * src; white = no change), 1.5 mm above the floor under the desk, "
+                                     "unparented. UV0 into the same atlas (day/night like the baked meshes); texels = the "
+                                     "desk's floor shadow at preset 1 (sRGB-encoded linear ratio lit-with / lit-without the "
+                                     "desk), soft, exactly white at the border. The room (`static`) carries no desk shadow. "
+                                     "Runtime: scale x/z by ~1 + 0.35*dh about its centre and fade it with dh "
+                                     "(dh = deskHeight - 0.74; review renders used mix(1, src, 1 - 0.6*min(1, dh/0.46)))"},
+            "shadow_wall": {**info["shadowWall"], "role": "shadow",
+                            "note": "multiply decal (dst * src; white = no change), 1.5 mm in front of the back wall, "
+                                    "PARENTED to desk_rig so it rides up with the desk. UV0 into the atlas; texels = the shadow "
+                                    "the desk top / monitor / laptop cast on the wall at preset 1, soft, white at the border"},
+            "materials": "one unlit placeholder per role: baked, screen, ring, glow, led, sky, hit, shadow (multiply decal)",
         },
         "cameras": info["cameras"],
         "bounds": info["bounds"],

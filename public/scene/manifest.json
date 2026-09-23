@@ -1,5 +1,5 @@
 {
-  "version": "1a3bf206",
+  "version": "24bd284c",
   "deskBase": 0.74,
   "presets": [
     0.74,
@@ -46,24 +46,24 @@
       },
       "cornersRig": {
         "bl": [
-          -0.60147,
+          -0.54086,
           0.1237,
-          -0.20073
+          -0.05619
         ],
         "br": [
-          -0.25668,
+          -0.20761,
           0.1237,
-          -0.21277
+          -0.14549
         ],
         "tr": [
-          -0.25786,
+          -0.21636,
           0.33704,
-          -0.24654
+          -0.17813
         ],
         "tl": [
-          -0.60265,
+          -0.5496,
           0.33704,
-          -0.2345
+          -0.08883
         ]
       },
       "normalLocal": [
@@ -113,60 +113,61 @@
       },
       "cornersRig": {
         "bl": [
-          -0.19512,
+          -0.17638,
           0.11,
-          -0.1464
+          -0.14422
         ],
         "br": [
-          0.59512,
+          0.60797,
           0.11,
-          -0.1464
+          -0.24052
         ],
         "tr": [
-          0.59512,
+          0.60797,
           0.445,
-          -0.1464
+          -0.24052
         ],
         "tl": [
-          -0.19512,
+          -0.17638,
           0.445,
-          -0.1464
+          -0.14422
         ]
       },
-      "uv": "u runs along the arc (left->right); stored glTF v: 0 = top, 1 = bottom (standard)"
+      "uv": "u runs along the arc (left->right); stored glTF v: 0 = top, 1 = bottom (standard)",
+      "yawDeg": 7.0
     }
   },
   "files": {
-    "glb": "desk.1a3bf206.glb",
+    "glb": "desk.24bd284c.glb",
     "atlas": {
       "day": {
-        "2048": "atlas-day-2048.834b575b.webp",
-        "1024": "atlas-day-1024.e8545fa8.webp"
+        "2048": "atlas-day-2048.9af8559c.webp",
+        "1024": "atlas-day-1024.f83737c3.webp"
       },
       "night": {
-        "2048": "atlas-night-2048.0a97b646.webp",
-        "1024": "atlas-night-1024.28489513.webp"
+        "2048": "atlas-night-2048.1d8a2f4d.webp",
+        "1024": "atlas-night-1024.d3c319a4.webp"
       }
     },
     "poster": {
       "day": {
         "1600": {
-          "avif": "poster-day-1600.ad8e6ac3.avif",
-          "webp": "poster-day-1600.2e3c4637.webp"
+          "avif": "poster-day-1600.61932092.avif",
+          "webp": "poster-day-1600.2429aefd.webp"
         },
         "800": {
-          "avif": "poster-day-800.f1985876.avif",
-          "webp": "poster-day-800.4914cc8d.webp"
+          "avif": "poster-day-800.2ec81ec7.avif",
+          "webp": "poster-day-800.2727f884.webp"
         }
       },
       "night": {
         "1600": {
-          "avif": "poster-night-1600.e2fe83a5.avif",
-          "webp": "poster-night-1600.ab19322e.webp"
+          "avif": "poster-night-1600.d9251d69.avif",
+          "webp": "poster-night-1600.569bee02.webp"
         },
         "800": {
-          "avif": "poster-night-800.eaa7532b.avif",
-          "webp": "poster-night-800.f8497a2b.webp"
+          "avif": "poster-night-800.c331c2e7.avif",
+          "webp": "poster-night-800.a5c17072.webp"
         }
       }
     },
@@ -243,19 +244,19 @@
         0.25
       ],
       "neckPivot": [
-        -0.49069,
-        0.23042,
-        0.25642
+        -0.48363,
+        0.305,
+        0.25834
       ],
       "tailPivot": [
-        -0.5775,
-        0.16509,
-        0.25951
+        -0.47559,
+        0.205,
+        0.21951
       ],
       "headForward": [
-        0.7154,
-        0.1045,
-        0.6908
+        0.5578,
+        0.0698,
+        0.827
       ],
       "note": "parts have identity rotation; headForward is the gaze in rig space"
     },
@@ -263,23 +264,23 @@
     "cat_tail": "pivot = tail base (node origin)",
     "ring": {
       "center": [
-        0.2,
+        0.20286,
         0.2655,
-        -0.2525
+        -0.29768
       ],
       "radius": 0.09,
       "tube": 0.004,
       "facing": [
-        0,
-        0,
-        -1
+        -0.1219,
+        0.0,
+        -0.9926
       ],
       "default": "green",
       "note": "not baked; emissive tint at runtime"
     },
     "ring_glow": {
       "center": [
-        0.2,
+        0.20286,
         0.2655,
         -0.346
       ],
@@ -294,7 +295,7 @@
           0.2895
         ],
         "led_kbd": [
-          0.11,
+          0.17,
           0.0041,
           0.12625
         ],
@@ -413,7 +414,7 @@
     },
     "kbd_glow": {
       "center": [
-        0.10996,
+        0.16996,
         0.02727,
         0.12736
       ],
@@ -431,19 +432,19 @@
     },
     "laptop_kbd_glow": {
       "center": [
-        -0.42584,
-        0.0863,
-        -0.12412
+        -0.35237,
+        0.08609,
+        -0.0189
       ],
       "size": [
-        0.3356,
-        0.0994
+        0.3309,
+        0.1056
       ],
-      "tiles": 100,
+      "tiles": 103,
       "normal": [
-        0.0067,
+        0.0494,
         0.9816,
-        0.1907
+        0.1843
       ],
       "note": "not baked; flat backlight: one rect per key slot (tiles the key block) under the key tops, just above the plate / well, so it shows only between the caps; additive, tint = ring colour; hidden from below by the case. UV 0..1 unused (flat)"
     },
@@ -514,7 +515,45 @@
     "hit_paddle_up": "invisible tap target over the paddle's up arrow (see hit_paddle)",
     "hit_paddle_down": "invisible tap target over the paddle's down arrow (see hit_paddle)",
     "geometry": "each named mesh node keeps its authored TRS; its geometry is in a child '<name>__geo' (quantisation transform lives there). Traverse for meshes.",
-    "materials": "one unlit placeholder per role: baked, screen, ring, glow, led, sky, hit"
+    "shadow_floor": {
+      "center": [
+        0.125,
+        0.0015,
+        0.302
+      ],
+      "parent": null,
+      "size": [
+        2.35,
+        1.296
+      ],
+      "normal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "role": "shadow",
+      "note": "multiply decal (dst * src; white = no change), 1.5 mm above the floor under the desk, unparented. UV0 into the same atlas (day/night like the baked meshes); texels = the desk's floor shadow at preset 1 (sRGB-encoded linear ratio lit-with / lit-without the desk), soft, exactly white at the border. The room (`static`) carries no desk shadow. Runtime: scale x/z by ~1 + 0.35*dh about its centre and fade it with dh (dh = deskHeight - 0.74; review renders used mix(1, src, 1 - 0.6*min(1, dh/0.46)))"
+    },
+    "shadow_wall": {
+      "center": [
+        0.125,
+        0.335,
+        -0.3485
+      ],
+      "parent": "desk_rig",
+      "size": [
+        2.25,
+        1.75
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "role": "shadow",
+      "note": "multiply decal (dst * src; white = no change), 1.5 mm in front of the back wall, PARENTED to desk_rig so it rides up with the desk. UV0 into the atlas; texels = the shadow the desk top / monitor / laptop cast on the wall at preset 1, soft, white at the border"
+    },
+    "materials": "one unlit placeholder per role: baked, screen, ring, glow, led, sky, hit, shadow (multiply decal)"
   },
   "cameras": {
     "cam_wide": {
@@ -539,22 +578,22 @@
       "yfovDeg": 32.4967,
       "aspect": 1.6,
       "position": [
-        -0.02,
+        -0.04,
         1.42,
         1.55
       ],
       "target": [
-        -0.03,
+        -0.07,
         0.88,
         -0.02
       ],
       "positionRig": [
-        -0.02,
+        -0.04,
         0.68,
         1.55
       ],
       "targetRig": [
-        -0.03,
+        -0.07,
         0.14,
         -0.02
       ]
@@ -564,7 +603,7 @@
     "min": [
       -1.62,
       -0.00037,
-      -0.35
+      -0.35988
     ],
     "max": [
       2.6,
@@ -605,23 +644,23 @@
     }
   },
   "stats": {
-    "tris": 25508,
-    "verts": 29019,
+    "tris": 24610,
+    "verts": 26877,
     "bytes": {
-      "desk.1a3bf206.glb": 250012,
-      "atlas-day-2048.834b575b.webp": 162718,
-      "atlas-day-1024.e8545fa8.webp": 70216,
-      "atlas-night-2048.0a97b646.webp": 117640,
-      "atlas-night-1024.28489513.webp": 45794,
-      "poster-day-1600.ad8e6ac3.avif": 38417,
-      "poster-day-1600.2e3c4637.webp": 55544,
-      "poster-day-800.f1985876.avif": 20602,
-      "poster-day-800.4914cc8d.webp": 29198,
-      "poster-night-1600.e2fe83a5.avif": 33403,
-      "poster-night-1600.ab19322e.webp": 48954,
-      "poster-night-800.eaa7532b.avif": 15823,
-      "poster-night-800.f8497a2b.webp": 22210,
-      "../og.png": 466979
+      "desk.24bd284c.glb": 236568,
+      "atlas-day-2048.9af8559c.webp": 151126,
+      "atlas-day-1024.f83737c3.webp": 66532,
+      "atlas-night-2048.1d8a2f4d.webp": 101096,
+      "atlas-night-1024.d3c319a4.webp": 40480,
+      "poster-day-1600.61932092.avif": 38825,
+      "poster-day-1600.2429aefd.webp": 58380,
+      "poster-day-800.2ec81ec7.avif": 20605,
+      "poster-day-800.2727f884.webp": 30284,
+      "poster-night-1600.d9251d69.avif": 33786,
+      "poster-night-1600.569bee02.webp": 52032,
+      "poster-night-800.c331c2e7.avif": 15912,
+      "poster-night-800.a5c17072.webp": 23492,
+      "../og.png": 476919
     },
     "quality": {
       "atlas-day-2048": 82,

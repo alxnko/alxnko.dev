@@ -406,6 +406,12 @@ def join(objs, name):
     return ob
 
 
+def swivel(x: float, y: float, yaw_deg: float) -> Matrix:
+    """Rotation about the vertical axis through (x, y): + = counter-clockwise from above."""
+    return (Matrix.Translation((x, y, 0.0)) @ Matrix.Rotation(math.radians(yaw_deg), 4, "Z")
+            @ Matrix.Translation((-x, -y, 0.0)))
+
+
 def set_origin(obj, world_point) -> None:
     """Move the object origin to world_point without moving geometry."""
     wp = Vector(world_point)

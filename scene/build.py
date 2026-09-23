@@ -89,8 +89,8 @@ def build_materials():
     m["rubber"] = C.mat("rubber", "#0a0a0b", rough=0.9, bevel=0.0)
     m["laptop"] = C.mat("laptop", "#121214", edge=0.45, edge_hex=C.G["600"], bevel=0.002)
     m["laptop_lid"] = C.mat("laptop_lid", "#151517", edge=0.4, edge_hex=C.G["600"], bevel=0.002)
-    m["laptop_key"] = C.mat("laptop_key", "#1b1b1e", edge=0.4, edge_hex=C.G["600"], bevel=0.0005)
-    m["laptop_well"] = C.mat("laptop_well", "#08080a", bevel=0.0)
+    m["laptop_key"] = C.mat("laptop_key", "#141416", edge=0.4, edge_hex=C.G["600"], bevel=0.0005)
+    m["laptop_well"] = C.mat("laptop_well", "#060607", bevel=0.0)
     m["touchpad"] = C.mat("touchpad", "#19191c", edge=0.3, edge_hex=C.G["600"], bevel=0.0005)
     m["vent"] = C.mat("vent", "#050506", bevel=0.0)
     m["bezel"] = C.mat("bezel", "#0c0c0e", edge=0.35, edge_hex=C.G["600"], bevel=0.0015)
@@ -117,7 +117,8 @@ def build_materials():
     m["cable"] = C.mat("cable", "#101011", edge=0.0, bevel=0.0)
     m["metal_tip"] = C.mat("metal_tip", C.G["300"], bevel=0.0)
     # cat: a deeper, slightly desaturated green so the bake shades its facets (not a neon toy)
-    m["cat"] = C.mat("cat", "#14995a", rough=0.4, edge=0.25, edge_hex="#63d396", bevel=0.0)
+    m["shadow"] = C.mat("shadow", "#ffffff", rough=1.0, bevel=0.0)
+    m["cat"] = C.mat("cat", "#16b86a", rough=0.45, edge=0.18, edge_hex="#63d396", bevel=0.0)
     m["server"] = C.mat("server", C.G["850"], edge=0.4, edge_hex=C.G["500"], bevel=0.003)
     m["server_front"] = C.mat("server_front", C.G["800"], edge=0.35, edge_hex=C.G["500"], bevel=0.002)
     m["legend"] = C.mat("legend", C.G["300"], bevel=0.0)
@@ -485,49 +486,74 @@ def build_laptop_stand(m):
         Rg(p, 1.4 if "pad" not in p.name else 0.6)
 
 
-LAP_PM, LAP_PN, LAP_GAP = 0.0178, 0.0164, 0.003          # main pitch, numpad pitch, block gap
-LAP_X0 = -(15 * LAP_PM + LAP_GAP + 4 * LAP_PN) / 2
+# laptop keyboard (photo 3d-table-references/new/keyboard.jpg, Acer Nitro V16): all keys full
+# chiclets on one pitch; main block 14.5u, numpad 4 x 0.9u packed right after it (the right
+# arrow sits in the numpad's first column, under "1"); a short (0.8u) top row of 16 keys over
+# the main block (Esc, F1-F4 | F5-F8 | F9-F12, PrtSc Ins Del) + 4 media/power keys over the numpad
+LAP_PM = 0.0182                                         # main pitch
+LAP_PN = 0.9 * LAP_PM                                   # numpad pitch
+LAP_NGAP = 0.08 * LAP_PM                                # main block -> numpad
+LAP_MAIN_U = 14.5
+LAP_X0 = -(LAP_MAIN_U * LAP_PM + LAP_NGAP + 4 * LAP_PN) / 2
+LAP_KEY_GAP = 0.0025                                    # cap-to-cap gap
+LAP_FROW = 0.8                                          # top-row key height (u)
 
 
 def laptop_key_slots(y_bottom):
-    """(cx, cy, w, d) per laptop key slot, laptop-local. Rows bottom -> top."""
+    """(cx, cy, w, d) per laptop key slot, laptop-local (slots tile each row; the cap is the
+    slot minus LAP_KEY_GAP). y_bottom = centre of the bottom row. Rows bottom -> top."""
     pm, pn = LAP_PM, LAP_PN
-    xn = LAP_X0 + 15 * pm + LAP_GAP                     # numpad block left edge
+    xn = LAP_X0 + LAP_MAIN_U * pm + LAP_NGAP            # numpad block left edge
     main = [
-        [1.25, 1, 1, 1.25, 5.5, 1, 1],                  # bottom row; arrows appended below
-        [2.25] + [1] * 10 + [2.75],
-        [1.75] + [1] * 11 + [2.25],
-        [1.5] + [1] * 12 + [1.5],
-        [1] * 13 + [2],
+        [1, 1, 1, 1, 5.0, 1, 1, 1.5, 1, 1],            # Ctrl Fn Win Alt Space AltGr Menu Copilot < v
+        [2.0] + [1] * 10 + [1.5, 1],                    # LShift Z../ RShift ^ (above v)
+        [1.4] + [1] * 11 + [2.1],                       # Caps A..' Enter
+        [1.4] + [1] * 12 + [1.1],                       # Tab Q..] \
+        [1] * 13 + [1.5],                               # ` 1..= Backspace
     ]
     out = []
     for ri, row in enumerate(main):
+        assert abs(sum(row) - LAP_MAIN_U) < 1e-9, (ri, sum(row))
         y = y_bottom + ri * pm
         x = LAP_X0
         for wu in row:
             out.append((x + wu * pm / 2, y, wu * pm, pm))
             x += wu * pm
-        if ri == 0:                                      # arrows: left, up/down half height, right
-            out.append((x + pm / 2, y, pm, pm))
-            out.append((x + 1.5 * pm, y - pm / 4, pm, pm / 2))
-            out.append((x + 1.5 * pm, y + pm / 4, pm, pm / 2))
-            out.append((x + 2.5 * pm, y, pm, pm))
-    # numpad: 0 (2 wide) . | 1 2 3 | 4 5 6 | 7 8 9 | Num / * -  + Enter/+ 2 rows tall
+    # numpad (cols 0-3): row 0: > 0 . [Enter]; 1: 1 2 3 [Enter]; 2: 4 5 6 +; 3: 7 8 9 -; 4: N NumLk / *
     for ri in range(5):
         y = y_bottom + ri * pm
-        cols = {0: [(0, 2), (2, 1)], 1: [(0, 1), (1, 1), (2, 1)], 2: [(0, 1), (1, 1), (2, 1)],
-                3: [(0, 1), (1, 1), (2, 1)], 4: [(0, 1), (1, 1), (2, 1), (3, 1)]}[ri]
-        for c0, cw in cols:
-            out.append((xn + (c0 + cw / 2) * pn, y, cw * pn, pm))
-    for ri in (0, 2):                                    # Enter (rows 0-1), + (rows 2-3)
-        out.append((xn + 3.5 * pn, y_bottom + (ri + 0.5) * pm, pn, 2 * pm))
-    # F row: half height, 15 over the main block + 4 over the numpad
-    yf = y_bottom + 4 * pm + 0.75 * pm + 0.0015
-    for i in range(15):
-        out.append((LAP_X0 + (i + 0.5) * pm, yf, pm, pm / 2))
+        for c in range(4 if ri >= 2 else 3):
+            out.append((xn + (c + 0.5) * pn, y, pn, pm))
+    out.append((xn + 3.5 * pn, y_bottom + 0.5 * pm, pn, 2 * pm))     # Enter, 2 rows tall
+    # top row: 0.8u tall, 16 keys over the main block with two group gaps, 4 over the numpad
+    yf = y_bottom + 4 * pm + (1 + LAP_FROW) / 2 * pm
+    gg = 0.2 * pm
+    pf = (LAP_MAIN_U * pm - 2 * gg) / 16
+    x = LAP_X0
+    for i in range(16):
+        if i in (5, 9):                                 # after F4, after F8
+            x += gg
+        out.append((x + pf / 2, yf, pf, LAP_FROW * pm))
+        x += pf
     for i in range(4):
-        out.append((xn + (i + 0.5) * pn, yf, pn, pm / 2))
+        out.append((xn + (i + 0.5) * pn, yf, pn, LAP_FROW * pm))
     return out
+
+
+def bm_chiclet(bm, w, d, h, off, r=0.0011, sides=False):
+    """Add a flat keycap with small rounded corners (one chamfer step per corner) to bm, its
+    bottom centre at off. sides=False: the cap top only (the 1.6 mm walls are sub-pixel at
+    every camera; skipping them keeps the glb inside its budget)."""
+    ox, oy, oz = off
+    out = rounded_rect(w, d, r, 1) if r > 0 else [(w / 2, d / 2), (-w / 2, d / 2), (-w / 2, -d / 2), (w / 2, -d / 2)]
+    hi = [bm.verts.new((ox + x, oy + y, oz + h)) for x, y in out]
+    bm.faces.new(hi)
+    if sides:
+        lo = [bm.verts.new((ox + x, oy + y, oz)) for x, y in out]
+        n = len(out)
+        for i in range(n):
+            j = (i + 1) % n
+            bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
 
 
 def glow_tiles(name, slots, z, mat_):
@@ -558,27 +584,39 @@ def build_laptop(m):
     ref.matrix_world = M
     palm_wear(m["laptop"], ref)
     top = bh
-    # 16" gaming-laptop deck (photos ref-new/3,4): chiclet keys in a dark recessed well,
-    # main block 15u + a 4-column numpad, half-height F row and up/down arrows, large
-    # touchpad centred under the main block
-    kb_y0, kb_y1 = -0.012, 0.093
-    parts.append(C.box("lap_well", (0.342, kb_y1 - kb_y0, 0.0006),
+    # 16" gaming-laptop deck (photo 3d-table-references/new/keyboard.jpg): full-height chiclet
+    # keys recessed in a black well, main block + packed numpad, short top row, a speaker /
+    # vent grille strip above it and a wide touchpad centred under the main block
+    kb_y0 = -0.017
+    slots = laptop_key_slots(kb_y0 + LAP_PM / 2 + 0.001)
+    kb_y1 = max(c[1] + c[3] / 2 for c in slots) + 0.001
+    kw = LAP_MAIN_U * LAP_PM + LAP_NGAP + 4 * LAP_PN + 0.004
+    parts.append(C.box("lap_well", (kw, kb_y1 - kb_y0, 0.0006),
                        (0, (kb_y0 + kb_y1) / 2, top + 0.0002), bevel=0.0, mat_=m["laptop_well"]))
-    slots = laptop_key_slots(kb_y0 + 0.011)
-    for i, (cx, cy, w, d) in enumerate(slots):
-        parts.append(C.box(f"lk{i}", (w - 0.0030, d - 0.0030, 0.0016), (cx, cy, top + 0.0009),
-                           bevel=0.0, drop_bottom=True, taper=0.95, mat_=m["laptop_key"]))
-    # runtime backlight: one rect per key slot (the slots tile the block), 0.8 mm above the
+    kbm = bmesh.new()
+    for cx, cy, w, d in slots:
+        bm_chiclet(kbm, w - LAP_KEY_GAP, d - LAP_KEY_GAP, 0.0016, (cx, cy, top + 0.0002))
+    bmesh.ops.recalc_face_normals(kbm, faces=kbm.faces)
+    parts.append(obj_from_bm("lap_keys", kbm, m["laptop_key"]))
+    # speaker / vent grille strip along the top edge of the deck, above the top row
+    gy0, gy1 = kb_y1 + 0.004, bd / 2 - 0.016
+    parts.append(C.box("lap_grille", (kw, gy1 - gy0, 0.0005), (0, (gy0 + gy1) / 2, top + 0.0001),
+                       bevel=0.0, mat_=m["laptop_well"]))
+    for i in range(3):
+        yy = gy0 + (i + 1) * (gy1 - gy0) / 4
+        parts.append(C.box(f"lap_grille_rib{i}", (kw - 0.004, 0.0008, 0.0004), (0, yy, top + 0.0005),
+                           bevel=0.0, mat_=m["laptop"]))
+    # runtime backlight: one rect per key slot (the slots tile the rows), 0.9 mm above the
     # well, inside the key bodies: the key tops hide it, it shows only in the gaps between keys
-    zg = top + 0.0009
+    zg = top + 0.0011
     kglow = glow_tiles("laptop_kbd_glow", slots, zg, m["backlight"])
     kglow.matrix_world = M
     xs_ = [c[0] for c in slots]
     ys_ = [c[1] for c in slots]
     C.set_origin(kglow, M @ Vector(((min(xs_) + max(xs_)) / 2, (min(ys_) + max(ys_)) / 2, zg)))
-    main_cx = LAP_X0 + 15 * LAP_PM / 2
-    parts.append(C.box("touchpad", (0.126, 0.076, 0.0005), (main_cx, -0.066, top + 0.0001), bevel=0.0,
-                       mat_=m["touchpad"]))
+    main_cx = LAP_X0 + LAP_MAIN_U * LAP_PM / 2
+    parts.append(C.box("touchpad", (0.130, 0.084, 0.0005), (main_cx, kb_y0 - 0.008 - 0.042, top + 0.0001),
+                       bevel=0.0, mat_=m["touchpad"]))
     # rear vents and hinge bar
     for i in range(9):
         x = -0.12 + i * 0.03
@@ -683,10 +721,15 @@ def mon_geom():
                 pzc=zb - Mo["chin"] + (sh + Mo["bezel"] + Mo["chin"]) / 2)
 
 
+def mon_swivel():
+    return C.swivel(D.MON["x"], D.mon_neck_y(), D.MON["yaw"])
+
+
 def build_monitor(m):
     Mo = D.MON
     g = mon_geom()
     cx, fy, Rr = g["cx"], g["fy"], g["R"]
+    n0 = len(PARTS_RIG)
     # panel: rounded slab, bisected then wrapped to 1500R
     out = [(x, z + g["pzc"]) for x, z in rounded_rect(g["pw"], g["ph"], Mo["corner"], 3)]
     bm = slab_xz(out, 0.0, Mo["panel_t"])
@@ -720,6 +763,7 @@ def build_monitor(m):
     S_ = D.STAND
     nw, nd = S_["neck"]
     neck_y = back_y + 0.012 + nd / 2
+    assert abs(neck_y - D.mon_neck_y()) < 1e-9
     top_z = hz + 0.05
     base_z = D.DESK_H + D.PAD["size"][2]
     neck = C.box("stand_neck", (nw, nd, top_z - base_z), (cx, neck_y, base_z + (top_z - base_z) / 2),
@@ -729,7 +773,7 @@ def build_monitor(m):
              mat_=m["stand"]), 0.8)
     bw_, bd_, bt_ = S_["base"]
     bmb = bm_oval(bw_ / 2, bd_ / 2, bt_, 28)
-    bmesh.ops.translate(bmb, vec=(cx, S_["base_y"], base_z + bt_ / 2), verts=bmb.verts)
+    bmesh.ops.translate(bmb, vec=(cx, fy + S_["base_dy"], base_z + bt_ / 2), verts=bmb.verts)
     Rg(obj_from_bm("stand_base", bmb, m["stand_base"]), 0.9)
     Rg(C.box("stand_foot", (0.08, 0.05, 0.02), (cx, neck_y + 0.01, base_z + bt_ + 0.01), bevel=0.006,
              mat_=m["stand"]), 0.4)
@@ -781,9 +825,15 @@ def build_monitor(m):
     hit = C.box("hit_monitor", (g["pw"] + 0.02, 0.12, g["ph"] + 0.02), (cx, fy - 0.03, g["pzc"]),
                 bevel=0.0, mat_=m["hit"])
     C.set_origin(hit, (cx, fy - 0.03, g["pzc"]))
-    # glow quad on the wall behind the ring (runtime additive), UV 0..1
+    # swivel the whole monitor (panel, housing, stand, ring, screen, hit box) about the neck
+    Sw = mon_swivel()
+    for ob in PARTS_RIG[n0:] + [ring, screen, hit]:
+        xform(ob, Sw)
+    # glow quad on the wall behind the ring (runtime additive), UV 0..1: stays on the wall,
+    # centred straight behind the swivelled ring
     gs = 0.9
     wy = D.WALL_Y - 0.004
+    cx = ring.matrix_world.translation.x
     glow = plane("ring_glow", [(cx - gs / 2, wy, hz - gs / 2), (cx + gs / 2, wy, hz - gs / 2),
                                (cx + gs / 2, wy, hz + gs / 2), (cx - gs / 2, wy, hz + gs / 2)],
                  m["glow"], uvs=[(0, 1), (1, 1), (1, 0), (0, 0)])
@@ -1199,7 +1249,7 @@ def build_fan(m):
         Rg(p, 1.3)
 
     # runtime: RGB ring on the bezel face (tinted like the monitor ring) + speed readout
-    ring = obj_from_bm("fan_ring", bm_annulus_torus(r - 0.0052, 0.0026, 0.0011, fy - 0.0035), m["fan_ring"])
+    ring = obj_from_bm("fan_ring", bm_annulus_torus(r - 0.0052, 0.0026, 0.0011, fy - 0.0035, minor=4), m["fan_ring"])
     ring.matrix_world = M
     C.set_origin(ring, M @ Vector((0, fy - 0.0035, 0)))
     y_d = disc_front - 0.0004                        # 0.4 mm in front of the round display disc
@@ -1235,152 +1285,164 @@ def build_fan(m):
 
 
 def build_cat(m):
-    """Faceted low-poly cat in the brand-mark language (diamond head, right-triangle
-    ears, body split down the middle by a spine groove, wedge tail), posed like the
-    owner's plush in the photos: a loaf lying left-right over the fan's round top,
-    chest and front paws at the front edge (paws draping over the bezel), head
-    raised at the laptop end and turned towards the laptop / viewer, tail wrapped
-    round the hip and forward along the front edge.
-    Parts are world-oriented (identity rotation); cat_head pivots at the neck,
-    cat_tail at its base. ~0.17 m rump to chest along the arc.
-    Frame below: fan-local, x = right (towards the laptop), y = back, z = up,
-    origin on the housing top; the body follows the housing arc (angle phi from
-    the top, + towards the laptop)."""
-    F = D.FAN
-    Ct = D.CAT
-    rt = F["r"] + 0.001                               # housing top radius
-    base = Vector((F["x"], F["y"], D.DESK_H + F["center_h"] + rt))
-    Rot = C.euler((0, 0, F["yaw"])).to_3x3()
+    """Faceted low-poly cat SITTING UPRIGHT on top of the fan drum, built from the brand
+    mark (catuser.png): a diamond head (wider than tall) with two right-angle ears whose
+    outer edges are vertical, a slim shield-shaped torso whose front is the mark's two
+    body panels split by a crisp vertical groove and widening towards the haunches, and
+    the mark's slanted wedge as a tapered tail curling from the right haunch up the right
+    side. Faces the viewer, turned a little towards the laptop; the head a bit more.
+
+    Cat frame: origin on the drum top (fan x, y), x = cat's left->right as seen from the
+    front, y = back, z = up, the face looks down -y. Parts are world-oriented (identity
+    rotation); cat_head pivots at the neck (body top), cat_tail at its base. The runtime
+    gaze (yaw +-50, pitch +12/-20 deg about the neck) keeps the head clear of the body:
+    the head's lowest point sits ~9 mm above the neck pivot, the neck post is hidden in
+    the body's top."""
+    F, Ct = D.FAN, D.CAT
+    rt = F["r"] + 0.001                                # housing top radius
+    Mf = fan_matrix()
+    Mf_inv = Mf.inverted()
+    top_z = D.DESK_H + F["center_h"] + rt
+    Wc = M_at((F["x"], F["y"], top_z), yaw=Ct["yaw"])
 
     def W(p):
-        return base + Rot @ Vector(p)
+        return Wc @ Vector(p)
 
-    def A(phi, y, h):
-        """Point `h` above the housing surface at arc angle phi (deg), depth y."""
-        a = math.radians(phi)
-        rr = rt + h - 0.0025
-        return Vector((rr * math.sin(a), y, rr * math.cos(a) - rt))
+    def surf_z(p_cat):
+        """Drum top height (cat frame z) under a cat-frame point."""
+        q = Mf_inv @ W(p_cat)
+        xf = max(-rt, min(rt, q.x))
+        return (math.sqrt(rt * rt - xf * xf) - rt)
 
-    def tube(bm, pts, radii, n=6, cap0=True, tip=None):
-        """Faceted tube through fan-local points; radii = [(r_side, r_up)] per point."""
-        rings = []
-        prev = None
-        for i, c in enumerate(pts):
-            d = (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
-            ref = Vector((0, 1, 0)) if abs(d.y) < 0.9 else Vector((1, 0, 0))
-            u = (prev if prev is not None else d.cross(ref)).copy()
-            u = (u - d * u.dot(d)).normalized()
-            v = d.cross(u).normalized()
-            prev = u
-            r1, r2 = radii[i]
-            rings.append([bm.verts.new(W(c + u * (r1 * math.cos(2 * math.pi * k / n))
-                                         + v * (r2 * math.sin(2 * math.pi * k / n)))) for k in range(n)])
-        for i in range(len(rings) - 1):
-            for k in range(n):
-                bm.faces.new((rings[i][k], rings[i][(k + 1) % n], rings[i + 1][(k + 1) % n], rings[i + 1][k]))
-        if cap0:
-            bm.faces.new(list(reversed(rings[0])))
-        if tip is not None:
-            tv = bm.verts.new(W(tip))
-            for k in range(n):
-                bm.faces.new((rings[-1][k], rings[-1][(k + 1) % n], tv))
-        else:
-            bm.faces.new(rings[-1])
-        return rings
+    # ---- body: lofted 12-vertex sections. Front = the mark's two flat panels (the front legs /
+    # chest, narrower than the haunches) split by a crisp V groove; the haunches bulge at the
+    # lower sides; seen from the side the chest is near vertical and the back slopes from the
+    # shoulders down to the deep haunches (a seated cat's triangle)
+    H = Ct["body_h"]
+    # z (fraction of H), half-width (haunch/side), front-panel half-width, front depth, back depth
+    prof = [(0.00, 0.0282, 0.0250, 0.036, 0.038), (0.10, 0.0295, 0.0252, 0.037, 0.041),
+            (0.32, 0.0288, 0.0228, 0.034, 0.035), (0.55, 0.0240, 0.0202, 0.031, 0.022),
+            (0.78, 0.0222, 0.0186, 0.027, 0.010), (0.93, 0.0220, 0.0180, 0.022, 0.002),
+            (1.00, 0.0175, 0.0150, 0.016, -0.004)]
+    gw, gd = 0.0028, 0.0045                            # groove half-width at the surface, depth
 
-    # body: 9-vertex loaf sections across the fan depth (belly on the housing, flanks,
-    # a spine groove = the mark's body split down the middle)
-    yo = -0.004
+    def section(w, fw, df, db):
+        right = [(gw, -df), (fw, -0.95 * df), (w, -0.25 * df + 0.2 * db), (0.84 * w, 0.62 * db + 0.1 * df),
+                 (0.38 * w, db + 0.04 * df)]
+        left = [(-x, y) for x, y in reversed(right)]
+        return [(0.0, -df + gd)] + right + [(0.0, db + 0.05 * df)] + left
+
     bm = bmesh.new()
     rings = []
-    for phi, w, t in ((-56, 0.022, 0.030), (-47, 0.035, 0.046), (-35, 0.043, 0.056), (-20, 0.045, 0.058),
-                      (-4, 0.043, 0.055), (11, 0.040, 0.054), (23, 0.035, 0.053), (32, 0.027, 0.044)):
-        w *= 1.15                                     # the drum is 10 cm deep: fuller loaf
-        sec = [(-0.84 * w, 0.0), (-w, 0.42 * t), (-0.74 * w, 0.84 * t), (-0.16 * w, t), (0.0, t - 0.0045),
-               (0.16 * w, t), (0.74 * w, 0.84 * t), (w, 0.42 * t), (0.84 * w, 0.0)]
-        rings.append([bm.verts.new(W(A(phi, yo + y, h))) for y, h in sec])
-    n = 9
+    for zf, w, fw, df, db in prof:
+        z = zf * H
+        rings.append([bm.verts.new(W((x, y, z if zf > 0 else surf_z((x, y, 0)) - 0.0008)))
+                      for x, y in section(w, fw, df, db)])
+    n = len(rings[0])
     for i in range(len(rings) - 1):
         for j in range(n):
             bm.faces.new((rings[i][j], rings[i][(j + 1) % n], rings[i + 1][(j + 1) % n], rings[i + 1][j]))
-    rump = bm.verts.new(W(A(-63, yo, 0.016)))
-    chest = bm.verts.new(W(A(38, yo - 0.004, 0.020)))
+    cb = bm.verts.new(W((0, 0, surf_z((0, 0, 0)) - 0.0008)))
+    ct = bm.verts.new(W((0, -0.009, H + 0.0015)))
     for j in range(n):
-        bm.faces.new((rings[0][(j + 1) % n], rings[0][j], rump))
-        bm.faces.new((rings[-1][j], rings[-1][(j + 1) % n], chest))
-    # front legs: from the chest over the front edge, draping down the bezel, paws at the end
-    for phi in (27.0, 14.0):
-        top = A(phi, -0.036, 0.016)
-        pts = [top, A(phi + 1, -0.057, 0.010), A(phi + 2, -0.064, -0.004), A(phi + 2, -0.066, -0.013)]
-        tube(bm, [Vector(p) for p in pts], [(0.011, 0.012), (0.0105, 0.010), (0.010, 0.0095), (0.0115, 0.010)],
-             n=6, tip=A(phi + 2.5, -0.072, -0.019))
-    # hind leg: faceted haunch on the front flank at the hips, foot tucked in above the tail
-    tube(bm, [A(-37, -0.036, 0.027), A(-31, -0.050, 0.021)], [(0.016, 0.014), (0.011, 0.009)], n=6,
-         tip=A(-25, -0.057, 0.018))
+        bm.faces.new((rings[0][(j + 1) % n], rings[0][j], cb))
+        bm.faces.new((rings[-1][j], rings[-1][(j + 1) % n], ct))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     body = obj_from_bm("cat_body", bm, m["cat"])
     C.set_origin(body, W((0.0, 0.0, 0.0)))
     tag(body, 2.2)
 
-    # head: faceted diamond (the mark's head seen along the gaze) + ear prisms, raised at the
-    # laptop end of the loaf and turned towards the laptop / viewer
-    nphi = Ct["neck_phi"]
-    neck = A(nphi, yo - 0.002, 0.036)
-    Hm = (Matrix.Translation(neck) @ C.euler((0, 0, -90.0 + Ct["head_yaw"]))
-          @ C.euler((0, -Ct["head_tilt"], 0)))
-    s = Ct["head_w"] / 122.0                       # the mark's head is 122 px wide
-    hc = Vector((0.016, 0.0, 0.024))
-    hw, ht, hb = 61 * s, 52 * s, 45 * s
+    # ---- head: the mark's diamond as a faceted solid + right-angle ears, on a short neck
+    neck = Vector((0.0, -0.009, H))                    # pivot (cat frame) = top of the body
+    Hm = (Matrix.Translation(neck) @ C.euler((0, 0, Ct["head_yaw"])) @ C.euler((Ct["head_tilt"], 0, 0)))
+    hw, ht, hb, hd = Ct["head_w"] / 2, Ct["head_up"], Ct["head_down"], Ct["head_d"]
+    hc = Vector((0.0, -0.003, Ct["head_gap"] + hb))    # head centre above the pivot
 
-    def WH(p):  # head frame: x = gaze, y = left, z = up
+    def WH(p):  # head frame: x = right, y = back, z = up, face towards -y
         return W(Hm @ (hc + Vector(p)))
 
     bm = bmesh.new()
-    # outline octagon (L, TL, T, TR, R, BR, B, BL) at the widest plane, cheeks bulge a little
-    oct_ = [(0, hw, 0), (-0.002, 0.56 * hw, 0.56 * ht), (-0.003, 0, ht), (-0.002, -0.56 * hw, 0.56 * ht),
-            (0, -hw, 0), (0.003, -0.60 * hw, -0.52 * hb), (0.004, 0, -hb), (0.003, 0.60 * hw, -0.52 * hb)]
+    # outline (L, BL, B, BR, R, TR, T, TL) at the widest plane; the edge midpoints bulge 4 %
+    oct_ = [(-hw, 0, 0), (-0.52 * hw, 0.001, -0.52 * hb), (0, 0.002, -hb), (0.52 * hw, 0.001, -0.52 * hb),
+            (hw, 0, 0), (0.52 * hw, 0, 0.52 * ht), (0, 0, ht), (-0.52 * hw, 0, 0.52 * ht)]
     ring0 = [bm.verts.new(WH(p)) for p in oct_]
-    face = [bm.verts.new(WH((0.012 + 0.002 * (p[2] < 0), 0.52 * p[1], 0.52 * p[2] - 0.002))) for p in oct_]
-    nose = bm.verts.new(WH((0.020, 0.0, -0.007)))
-    back = [bm.verts.new(WH((-0.012, 0.55 * p[1], 0.55 * p[2] + 0.002))) for p in oct_]
-    kp = bm.verts.new(WH((-0.018, 0.0, 0.003)))
+    face = [bm.verts.new(WH((0.50 * x, -hd + 0.0015 * (z < 0), 0.50 * z - 0.001))) for x, _, z in oct_]
+    nose = bm.verts.new(WH((0.0, -hd - 0.0035, -0.0035)))
+    back = [bm.verts.new(WH((0.56 * x, 0.85 * hd, 0.56 * z + 0.001))) for x, _, z in oct_]
+    kp = bm.verts.new(WH((0.0, hd * 1.05, 0.002)))
     for i in range(8):
         j = (i + 1) % 8
-        bm.faces.new((ring0[i], ring0[j], face[j], face[i]))
-        bm.faces.new((face[i], face[j], nose))
-        bm.faces.new((ring0[j], ring0[i], back[i], back[j]))
-        bm.faces.new((back[j], back[i], kp))
-    gap = 2 * s
+        bm.faces.new((ring0[j], ring0[i], face[i], face[j]))
+        bm.faces.new((face[j], face[i], nose))
+        bm.faces.new((ring0[i], ring0[j], back[j], back[i]))
+        bm.faces.new((back[i], back[j], kp))
+    s = 2 * hw / 122.0                                 # the mark's head is 122 px wide
     for sgn in (1, -1):
-        # mark ear (px rel. head centre): vertical outer edge, hypotenuse parallel to the head edge
-        tri = [(sgn * 61 * s, 62 * s - gap), (sgn * 59 * s, 17 * s - gap), (sgn * 31 * s, 40 * s - gap)]
-        front = [bm.verts.new(WH((0.002, yy, zz))) for yy, zz in tri]
-        back_ = [bm.verts.new(WH((-0.007, yy * 0.94, zz - 0.003))) for yy, zz in tri]
-        bm.faces.new(front)
-        bm.faces.new(list(reversed(back_)))
+        # mark ear (px from the head centre): vertical outer edge, hypotenuse parallel to the
+        # head's upper edge; its lower edge sits 1 mm inside the head's outline (no gap)
+        sink = 10.5 * s
+        nx, nz = 0.649, 0.761
+        tri = [(61 + 1.25 * (x - 61), 17 + 1.25 * (z - 17)) for x, z in ((61, 62), (59, 17), (31, 40))]
+        tri = [(sgn * (x * s - sink * nx), z * s - sink * nz) for x, z in tri]
+        fr = [bm.verts.new(WH((x, -0.0012, z))) for x, z in tri]
+        bk = [bm.verts.new(WH((0.95 * x, 0.0048, z - 0.001))) for x, z in tri]
+        if sgn < 0:
+            fr, bk = fr[::-1], bk[::-1]
+        bm.faces.new(fr[::-1])
+        bm.faces.new(bk)
         for i in range(3):
-            bm.faces.new((front[i], back_[i], back_[(i + 1) % 3], front[(i + 1) % 3]))
-    # neck: short faceted tube from the shoulders up into the back of the head
-    tube(bm, [A(nphi - 5, yo - 0.002, 0.028), neck, Hm @ (hc + Vector((-0.010, 0, -0.010)))],
-         [(0.019, 0.017), (0.016, 0.015), (0.014, 0.013)], n=6, cap0=True)
+            j = (i + 1) % 3
+            bm.faces.new((fr[i], fr[j], bk[j], bk[i]))
+    # neck post (hexagonal), from inside the body top up into the head
+    k = 6
+    lo = [bm.verts.new(W(Hm @ Vector((0.0085 * math.cos(2 * math.pi * i / k), 0.0085 * math.sin(2 * math.pi * i / k), -0.010))))
+          for i in range(k)]
+    hi = [bm.verts.new(W(Hm @ Vector((0.008 * math.cos(2 * math.pi * i / k), -0.002 + 0.008 * math.sin(2 * math.pi * i / k),
+                                       Ct["head_gap"] + 0.006)))) for i in range(k)]
+    for i in range(k):
+        j = (i + 1) % k
+        bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
+    bm.faces.new(lo[::-1])
+    bm.faces.new(hi)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     head = obj_from_bm("cat_head", bm, m["cat"])
     C.set_origin(head, W(neck))
-    tag(head, 2.4)
+    tag(head, 2.6)
 
-    # tail: from the rump round the hip and forward along the front edge of the housing top,
-    # under the hind leg towards the front paws (the loaf's wrapped tail; faces the camera)
-    tpath = [A(-57, yo + 0.004, 0.020), A(-64, -0.016, 0.015), A(-63, -0.036, 0.011), A(-54, -0.046, 0.008),
-             A(-42, -0.050, 0.006), A(-30, -0.051, 0.005), A(-19, -0.051, 0.006)]
-    radii = [(0.0105, 0.0095), (0.0098, 0.0088), (0.0092, 0.0082), (0.0086, 0.0077), (0.008, 0.0072),
-             (0.0072, 0.0065), (0.0062, 0.0056)]
+    # ---- tail: the mark's slanted wedge, from the right haunch round and up the right side
+    pts = [(0.022, 0.024, 0.008), (0.039, 0.010, 0.008), (0.046, -0.012, 0.012), (0.048, -0.027, 0.028),
+           (0.045, -0.030, 0.050), (0.040, -0.027, 0.066)]
+    radii = [0.0088, 0.0084, 0.0077, 0.0068, 0.0057, 0.0044]
+    P = []
+    for (x, y, z), r in zip(pts, radii):
+        z = max(z, surf_z((x, y, 0)) + r * 0.8 + 0.0006)
+        P.append(Vector((x, y, z)))
+    tip = Vector((0.036, -0.024, 0.078))
     bm = bmesh.new()
-    tube(bm, tpath, radii, n=6, tip=A(-11, -0.049, 0.008))
+    rings = []
+    prev = None
+    k = 5
+    for i, c in enumerate(P):
+        d = (P[min(i + 1, len(P) - 1)] - P[max(i - 1, 0)]).normalized()
+        u = (prev if prev is not None else d.cross(Vector((0, 0, 1)))).copy()
+        u = (u - d * u.dot(d)).normalized()
+        v = d.cross(u).normalized()
+        prev = u
+        r = radii[i]
+        rings.append([bm.verts.new(W(c + u * (r * math.cos(2 * math.pi * q / k + 0.3))
+                                     + v * (0.8 * r * math.sin(2 * math.pi * q / k + 0.3)))) for q in range(k)])
+    for i in range(len(rings) - 1):
+        for q in range(k):
+            bm.faces.new((rings[i][q], rings[i][(q + 1) % k], rings[i + 1][(q + 1) % k], rings[i + 1][q]))
+    bm.faces.new(rings[0][::-1])
+    tv = bm.verts.new(W(tip))
+    for q in range(k):
+        bm.faces.new((rings[-1][q], rings[-1][(q + 1) % k], tv))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     tail = obj_from_bm("cat_tail", bm, m["cat"])
-    C.set_origin(tail, W(tpath[0]))
-    tag(tail, 1.6)
-    head_fwd = Rot @ (Hm.to_3x3() @ Vector((1, 0, 0)))
+    C.set_origin(tail, W(P[0]))
+    tag(tail, 1.8)
+    head_fwd = (Wc.to_3x3() @ Hm.to_3x3() @ Vector((0, -1, 0))).normalized()
     return body, head, tail, head_fwd
 
 
@@ -1429,6 +1491,35 @@ def grid_plane(name, us, vs, to3, mat_, near, w_near, w_far, flip=False):
             if flip:
                 pts = list(reversed(pts))
             S(plane(f"{name}_{i}{j}", pts, mat_), w_near if near(i, j) else w_far, room=True)
+
+
+# desk shadow decals (runtime multiply, white = no change). The room (`static`) is baked
+# without the rig's shadows; these quads carry the darkening the rig casts at preset 1, so the
+# floor one can be scaled/faded and the wall one rides up with the desk.
+SHADOW_FLOOR = dict(x=(-1.05, 1.30), y=(-0.95, D.WALL_Y - 0.004), z=0.0015)
+SHADOW_WALL = dict(x=(-1.00, 1.25), z=(0.20, 1.95), y=D.WALL_Y - 0.0015)
+
+
+def build_shadow_decals(m):
+    F, Wl = SHADOW_FLOOR, SHADOW_WALL
+    (x0, x1), (y0, y1), z = F["x"], F["y"], F["z"]
+    fl = plane("shadow_floor", [(x0, y0, z), (x1, y0, z), (x1, y1, z), (x0, y1, z)], m["shadow"])
+    fl["decal_rect"] = [x0, x1, y0, y1]
+    fl["decal_axes"] = "xy"
+    (x0, x1), (z0, z1), y = Wl["x"], Wl["z"], Wl["y"]
+    wl = plane("shadow_wall", [(x0, y, z0), (x1, y, z0), (x1, y, z1), (x0, y, z1)], m["shadow"])
+    wl["decal_rect"] = [x0, x1, z0, z1]
+    wl["decal_axes"] = "xz"
+    for ob, grp in ((fl, 0.5), (wl, 0.75)):
+        C.set_origin(ob, tuple(sum((ob.matrix_world @ v.co for v in ob.data.vertices), Vector()) / 4))
+        tag(ob, 0.30, room=True)
+        ob["bake"] = True
+        ob["shadow_decal"] = grp
+        # invisible to every ray: they must not occlude or bounce light in the bake
+        for a in ("visible_diffuse", "visible_glossy", "visible_transmission", "visible_volume_scatter",
+                  "visible_shadow"):
+            setattr(ob, a, False)
+    return fl, wl
 
 
 def build_room(m):
@@ -1611,6 +1702,7 @@ def main():
     # clean desk (owner): no charger, no cables on or under the desk, no cable_drop
     leds_srv = build_server(m)
     sky = build_room(m)
+    shadow_floor, shadow_wall = build_shadow_decals(m)
 
     # merge the baked groups
     static = C.join(PARTS_STATIC, "static")
@@ -1628,8 +1720,10 @@ def main():
     for ob in (cat_head, cat_tail):
         C.link(ob, runtime)
         C.parent_keep(ob, cat_body)
-    for ob in [sky] + leds_srv:
+    for ob in [sky, shadow_floor] + leds_srv:
         C.link(ob, runtime)
+    C.link(shadow_wall, runtime)
+    C.parent_keep(shadow_wall, rig)
     ref = bpy.data.objects.get("laptop_ref")
     if ref:
         C.link(ref, helpers)
@@ -1658,8 +1752,14 @@ def main():
     camera("cam_desk", D.CAM_DESK, parent=rig)
     if "debugcams" in a:
         dbg = C.coll("helpers")
-        for nm, spec in (("dbg_cat", dict(loc=(-0.30, -0.78, 1.16), target=(-0.50, -0.235, 0.96), hfov=26, aspect=1.6)),
-                         ("dbg_cat3q", dict(loc=(-0.05, -0.62, 1.10), target=(-0.50, -0.235, 0.94), hfov=24, aspect=1.6)),
+        cx, cy, cz = D.FAN["x"], D.FAN["y"], D.DESK_H + D.FAN["center_h"] + D.FAN["r"] + 0.075
+        for nm, spec in (("dbg_cat", dict(loc=(cx + 0.12, cy - 0.55, cz + 0.08), target=(cx, cy, cz), hfov=30, aspect=1.6)),
+                         ("dbg_cat3q", dict(loc=(cx + 0.42, cy - 0.40, cz + 0.10), target=(cx, cy, cz), hfov=30, aspect=1.6)),
+                         ("dbg_catside", dict(loc=(cx + 0.58, cy + 0.02, cz + 0.02), target=(cx, cy, cz), hfov=30, aspect=1.6)),
+                         ("dbg_lapkbd", dict(loc=tuple(laptop_matrix() @ Vector((0, 0.035, 0.50))),
+                                             target=tuple(laptop_matrix() @ Vector((0, 0.035, 0.025))), hfov=42, aspect=1.6)),
+                         ("dbg_top", dict(loc=(0.0, -0.02, 9.0), target=(0.0, 0.0, 0.74), hfov=11.5, aspect=1.6)),
+                         ("dbg_low", dict(loc=(-0.30, -0.85, 0.90), target=(-0.20, 0.10, 0.92), hfov=62, aspect=1.6)),
                          ("dbg_kbd", dict(loc=(0.45, -0.75, 1.05), target=(0.25, -0.05, 0.76), hfov=45, aspect=1.6)),
                          ("dbg_back", dict(loc=(0.78, 0.33, 1.2), target=(0.2, 0.26, 1.0), hfov=60, aspect=1.6)),
                          ("dbg_gp", dict(loc=(0.04, -0.28, 1.02), target=(-0.005, 0.07, 0.765), hfov=34, aspect=1.6)),
@@ -1701,6 +1801,8 @@ def preview(samples, cams=("cam_desk", "cam_wide"), rigs=("night", "day")):
     for ob in bpy.data.objects:
         if ob.get("runtime_overlay"):
             ob.hide_render = False
+        if ob.get("shadow_decal"):
+            ob.hide_render = True       # the preview keeps the full-scene shadows
     for rig_name in rigs:
         C.apply_rig(rig_name)
         sc.view_settings.exposure = 0.0 if rig_name == "day" else 1.2

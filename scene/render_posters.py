@@ -72,6 +72,25 @@ def image_emission(name, path, flip_v=False, strength=1.0, uv="UVMap"):
     return m
 
 
+def multiply_material(name, path, uv="UVMap"):
+    """Unlit multiply decal: a Transparent BSDF tinted by the atlas texel (dst * src)."""
+    m = bpy.data.materials.new(name)
+    nt = m.node_tree
+    for n in list(nt.nodes):
+        nt.nodes.remove(n)
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+    tex = nt.nodes.new("ShaderNodeTexImage")
+    tex.image = bpy.data.images.load(str(path), check_existing=True)
+    tex.interpolation = "Linear"
+    uvn = nt.nodes.new("ShaderNodeUVMap")
+    uvn.uv_map = uv
+    nt.links.new(uvn.outputs["UV"], tex.inputs["Vector"])
+    nt.links.new(tex.outputs["Color"], tr.inputs["Color"])
+    nt.links.new(tr.outputs["BSDF"], out.inputs["Surface"])
+    return m
+
+
 def flat_emission(name, hex_color, strength):
     return C.emission_mat(name, hex_color, strength)
 
@@ -202,6 +221,10 @@ def setup(rig, atlas_path, objects=None, window_fade=0.25, screens=True, uv="UVM
     for name in ("static", "desk_baked", "fan_blades", "cat_body", "cat_head", "cat_tail"):
         if name in objs:
             assign(objs[name], atlas)
+    for name in ("shadow_floor", "shadow_wall"):
+        if name in objs:
+            objs[name].hide_render = False
+            assign(objs[name], multiply_material(f"shadow_{rig}", atlas_path, uv=uv))
     black = flat_emission("off", "#050506", 1.0)
     if screens:
         assign(objs["screen_laptop"], image_emission("scr_l", C.WORK / "screen-laptop.png", uv=uv))
