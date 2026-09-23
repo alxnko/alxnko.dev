@@ -24,6 +24,48 @@ test.describe('terminal', () => {
     await expect(page.locator('#term-overlay')).toHaveAttribute('aria-hidden', 'true');
   });
 
+  test('block-art lines stay on the monospace grid (our font draws the blocks)', async ({ page }) => {
+    await run(page, 'fastfetch');
+    await expect(lines(page)).toContainText('tech lead');
+    await page.evaluate(() => document.fonts.ready);
+    // the block characters come from our JetBrains Mono subset, not a system fallback
+    // (both projects run Chromium: WebKit/iOS font matching is not covered here)
+    await page.evaluate(() => {
+      const el = [...document.querySelectorAll('#term-lines [aria-hidden="true"]')].find((e) => /[█▀▄]/.test(e.textContent ?? ''));
+      el?.setAttribute('data-probe', '');
+    });
+    await expect(page.locator('#term-lines [data-probe]')).toHaveCount(1);
+    const cdp = await page.context().newCDPSession(page);
+    const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
+    const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#term-lines [data-probe]' });
+    await cdp.send('CSS.enable');
+    const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+    expect(fonts.map((f: { familyName: string }) => f.familyName)).toEqual(['JetBrains Mono']);
+    // and every art span is exactly one cell per character
+    const off = await page.evaluate(() => {
+      const probe = document.createElement('span'); probe.textContent = 'x'.repeat(20);
+      document.getElementById('term-lines')!.append(probe);
+      const cell = probe.getBoundingClientRect().width / 20; probe.remove();
+      return [...document.querySelectorAll('#term-lines [aria-hidden="true"]')]
+        .map((e) => Math.abs(e.getBoundingClientRect().width - cell * (e.textContent ?? '').length))
+        .reduce((m, d) => Math.max(m, d), 0);
+    });
+    expect(off).toBeLessThan(0.5);
+  });
+
+  test('Russian replies are drawn by JetBrains Mono too', async ({ page }) => {
+    await run(page, 'echo мяу');
+    await expect(lines(page)).toContainText('мяу');
+    await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(() => [...document.querySelectorAll('#term-lines .ln')].reverse().find((e) => e.textContent === 'мяу')?.setAttribute('data-probe', ''));
+    const cdp = await page.context().newCDPSession(page);
+    const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
+    const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#term-lines [data-probe]' });
+    await cdp.send('CSS.enable');
+    const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+    expect(fonts.map((f: { familyName: string }) => f.familyName)).toEqual(['JetBrains Mono']);
+  });
+
   test('filesystem, pipes and did-you-mean', async ({ page }) => {
     await run(page, 'ls ~/monitor | grep git');
     await expect(lines(page)).toContainText('github.lnk');

@@ -8,6 +8,7 @@ import '../styles/terminal.css';
 import '../styles/scene.css';
 import jbRegular from '@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2?url';
 import markFont from '../assets/fonts/vt323-mark.woff2?url';
+import symbolsFont from '../assets/fonts/jetbrains-mono-symbols-400.woff2?url';
 import { CONTACTS, SITE } from '../content/site';
 import { TOKENS } from '../lib/tokens';
 import Toggles from '../components/Toggles.astro';
@@ -103,6 +104,7 @@ const ld = JSON.stringify(person).replace(/</g, '\\u003c');
     )}
     <link rel="preload" href={jbRegular} as="font" type="font/woff2" crossorigin />
     <link rel="preload" href={markFont} as="font" type="font/woff2" crossorigin />
+    {desk && <link rel="preload" href={symbolsFont} as="font" type="font/woff2" crossorigin />}
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

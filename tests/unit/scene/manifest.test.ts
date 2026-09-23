@@ -17,6 +17,12 @@ describe('parseManifest', () => {
     expect(parseManifest({ ...base, nodes: { shadow_floor: { runtime: { sunShiftPerMetre: [1, 'x', 0] } } } }).sunShift).toBeUndefined();
   });
 
+  it("reads the cat's resting gaze when baked", () => {
+    const m = parseManifest({ ...base, nodes: { cat_body: { headForward: [0.7154, 0.1045, 0.6908] } } });
+    expect(m.headForward).toEqual([0.7154, 0.1045, 0.6908]);
+    expect(parseManifest({ ...base, nodes: { cat_body: { headForward: [0, 0, 0] } } }).headForward).toBeUndefined();
+  });
+
   it('rejects a manifest missing required fields', () => {
     expect(() => parseManifest({ ...base, deskBase: 'x' })).toThrow();
   });

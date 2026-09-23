@@ -9,6 +9,30 @@
   descent-override: 30%;
 }
 
+/* JetBrains Mono's Russian letters, arrows, math operators, box drawing, block elements and
+   geometric shapes (the fontsource files are Latin-only). Without it, phones draw the
+   terminal's block-art cat, box lines and Russian replies in a fallback font of another
+   width and every column after them shifts. Every glyph is one 600-unit cell; bold spans use
+   the same glyphs (declared at 700 too, so nothing is synthesised or widened).
+   Built by scripts/subset-symbols-font.sh from JetBrains Mono 2.304 (OFL, licence embedded). */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  src: url("../assets/fonts/jetbrains-mono-symbols-400.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+0400-045F, U+2190-21FF, U+2200-22FF, U+2500-259F, U+25A0-25FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  src: url("../assets/fonts/jetbrains-mono-symbols-400.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+0400-045F, U+2190-21FF, U+2200-22FF, U+2500-259F, U+25A0-25FF;
+}
+
 /* VT323, subset to the seven glyphs of the mark `alxnko_` (664 bytes, preloaded). */
 @font-face {
   font-family: "VT323";

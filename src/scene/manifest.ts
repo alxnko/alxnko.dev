@@ -14,6 +14,8 @@ export interface Manifest {
   fanAxis: [number, number, number];
   /** How far the day floor shadow slides per metre the desk rises (glTF x/y/z), if baked. */
   sunShift?: [number, number, number];
+  /** The cat's resting gaze as posed in Blender (rig space = the cat body's frame), if baked. */
+  headForward?: [number, number, number];
 }
 
 const isStr = (v: unknown): v is string => typeof v === 'string' && /^[\w.-]+$/.test(v);
@@ -31,6 +33,7 @@ export function parseManifest(raw: unknown): Manifest {
     ['day', 'night'].every((t) => isStr(atlas?.[t]?.['2048']) && isStr(atlas?.[t]?.['1024']));
   if (!ok) throw new Error('bad scene manifest');
   const sun = m.nodes?.shadow_floor?.runtime?.sunShiftPerMetre;
+  const gaze = m.nodes?.cat_body?.headForward;
   const axis = Array.isArray(m.fanAxis) && m.fanAxis.length === 3 && m.fanAxis.every(isNum) ? m.fanAxis : [0, 0, 1];
   return {
     version: String(m.version ?? ''),
@@ -40,5 +43,6 @@ export function parseManifest(raw: unknown): Manifest {
     files: { glb: m.files.glb, atlas },
     fanAxis: axis as [number, number, number],
     ...(isVec3(sun) ? { sunShift: sun } : {}),
+    ...(isVec3(gaze) && Math.hypot(...gaze) > 0.5 ? { headForward: gaze } : {}),
   };
 }
