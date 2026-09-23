@@ -541,3 +541,8 @@
     display: none;
   }
 }
+
+/* phone typing mode: nothing floats over the terminal while the keyboard is up */
+[data-mode="scene"][data-typing] :is(.identity, .back, .nav, .hint, .toggles) {
+  visibility: hidden;
+}

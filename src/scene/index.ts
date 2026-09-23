@@ -348,7 +348,9 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     wide.target = [wide.target[0], wide.target[1] + rigDy, wide.target[2]];
     const desk = withRig({ ...deskRef.pose, fov: adaptFov(deskRef.pose.fov, deskRef.refAspect) }, rigDy);
     // portrait phones: the laptop screen sits in the top ~55 %, leaving room for the keyboard
-    const laptop = fitScreen('laptop', screenCorners(laptopScreen), 0.94, 34, camera.aspect < 1 ? PHONE_BAND : [0, 1]);
+    // typing on a phone (keyboard up, chrome hidden): the screen fills what's left of the view
+    const typing = document.body.dataset.typing !== undefined;
+    const laptop = fitScreen('laptop', screenCorners(laptopScreen), 0.94, 34, camera.aspect < 1 ? (typing ? [0.02, 0.98] : PHONE_BAND) : [0, 1]);
     // the whole ultrawide on landscape screens; on portrait phones the live contacts panel fills
     // the width (readable), and the side panes are a drag away
     const mon = camera.aspect < 1 ? fitScreen('contacts', contactsCorners(), 0.96, 34) : fitScreen('monitor', screenCorners(monitorScreen), 0.94, 34);
