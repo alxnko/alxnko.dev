@@ -652,6 +652,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       invalidate();
     },
     setDesk(h) {
+      hold = null; // a typed/clicked preset takes over from a held arrow
       const target = clamp(h, manifest.range[0], manifest.range[1]);
       deskDone?.();
       const from = rigDy + manifest.deskBase;

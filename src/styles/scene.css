@@ -546,3 +546,25 @@
 [data-mode="scene"][data-typing] :is(.identity, .back, .nav, .hint, .toggles) {
   visibility: hidden;
 }
+
+/* transitions that follow the scene: chrome colours cross-fade with the 3D day/night mix
+   (600 ms), the back button fades instead of popping, the active tab's rule slides */
+[data-mode="scene"] :is(.identity, .identity a, .toggle, .nav button, .hint, .back) {
+  transition-property: color, border-color, background-color, text-shadow, opacity;
+  transition-duration: var(--d-slow);
+  transition-timing-function: var(--ease);
+}
+
+[data-mode="scene"] .back:not([hidden]) {
+  transition: opacity var(--d-base) var(--ease), color var(--d-slow) var(--ease);
+}
+
+@starting-style {
+  [data-mode="scene"] .back:not([hidden]) {
+    opacity: 0;
+  }
+}
+
+.nav button {
+  transition: color var(--d-fast) var(--ease), border-color var(--d-base) var(--ease);
+}
