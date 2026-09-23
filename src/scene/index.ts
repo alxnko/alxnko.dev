@@ -140,7 +140,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   let dprScale = 1;
   // CPU WebGL: pixel budgets for moving and settled frames (the pinned screens are DOM text,
   // always sharp; only the 3D behind them uses these)
-  const SW_MOVE_PX = 380_000, SW_STILL_PX = 2_400_000, SW_SETTLE_MS = 180;
+  const SW_MOVE_PX = 260_000, SW_STILL_PX = 1_400_000, SW_SETTLE_MS = 180;
   const SW_FRAME_MS = 40, SW_SPIN_MS = 66, SW_IDLE_MS = 200;
   let sharp = !o.softwareGL;
   // CPU WebGL: something changed since the last drawn frame (a settled, sharp view is not
@@ -630,7 +630,19 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     // fan
     fanSpeed = o.reducedMotion ? fanTarget : fanSpeed + (fanTarget - fanSpeed) * Math.min(1, dt * 1.5);
     if (Math.abs(fanTarget - fanSpeed) > 0.05) animating = true;
-    if (!o.reducedMotion || fanTarget !== fanSpeed) {
+    if (o.softwareGL) {
+      // CPU WebGL: a spinning fan is drawn as what a fast fan is to the eye, a blurred disc
+      // (blades plus trails spread across the gap between them), so it needs no redraws
+      const blur = fanSpeed > 0.05 ? 0.55 + 0.45 * clamp(fanSpeed / FAN_SPEED[3], 0, 1) : 0;
+      const gap = (2 * Math.PI) / 5 / (FAN_TRAILS + 1);
+      fan.quaternion.copy(fanQ0).multiply(q.setFromAxisAngle(fanAxis, fanAngle));
+      fanTrails.forEach(({ g, mat }, i) => {
+        g.visible = blur > 0;
+        if (!g.visible) return;
+        mat.uniforms.uAlpha.value = blur * 0.5;
+        g.quaternion.copy(fanQ0).multiply(q.setFromAxisAngle(fanAxis, fanAngle - gap * (i + 1)));
+      });
+    } else if (!o.reducedMotion || fanTarget !== fanSpeed) {
       const drift = o.reducedMotion ? 1 : 1 + 0.04 * Math.sin(now / 3100);
       // capped per frame below half the 72° blade spacing, so a slow frame never turns the
       // spin into a backwards-looking strobe
@@ -747,7 +759,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     };
     dock.update([quad(screenCorners(laptopScreen)), quad(contactsCorners()), ...(o.infoEl ? [quad(infoCorners())] : [])]);
 
-    const spinning = fanSpeed > 0.05 && !o.reducedMotion && fanInView();
+    const spinning = !o.softwareGL && fanSpeed > 0.05 && !o.reducedMotion && fanInView();
     if (o.softwareGL) {
       // light frames while anything moves; one full-resolution frame once it has settled
       const moving = animating || spinning;
