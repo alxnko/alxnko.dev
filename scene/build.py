@@ -96,7 +96,7 @@ def build_materials():
     m["bezel"] = C.mat("bezel", "#0c0c0e", edge=0.35, edge_hex=C.G["600"], bevel=0.0015)
     m["mon_back"] = C.mat("mon_back", "#161618", edge=0.35, edge_hex=C.G["600"], bevel=0.004)
     m["stand"] = C.mat("stand", STAND_GREY, edge=0.25, edge_hex=C.G["200"], bevel=0.003)
-    m["stand_base"] = C.mat("stand_base", C.G["700"], edge=0.3, edge_hex=C.G["400"], bevel=0.003)
+    m["stand_base"] = C.mat("stand_base", "#131315", rough=0.55, bevel=0.0)   # flat black: no wear lines, no bevel
     m["plastic"] = C.mat("plastic", C.G["850"], edge=0.4, edge_hex=C.G["600"], bevel=0.002)
     m["plastic_mid"] = C.mat("plastic_mid", C.G["750"], edge=0.35, edge_hex=C.G["500"], bevel=0.0015)
     m["plastic_light"] = C.mat("plastic_light", C.G["600"], edge=0.3, edge_hex=C.G["400"], bevel=0.001)
@@ -767,15 +767,22 @@ def build_monitor(m):
     neck_y = back_y + 0.012 + nd / 2
     assert abs(neck_y - D.mon_neck_y()) < 1e-9
     top_z = hz + 0.05
-    base_z = D.DESK_H + D.PAD["size"][2]
+    base_z = D.DESK_H                                   # the base plate stands on the desk
     neck = C.box("stand_neck", (nw, nd, top_z - base_z), (cx, neck_y, base_z + (top_z - base_z) / 2),
                  bevel=0.006, segs=2, mat_=m["stand"])
     Rg(neck, 1.0)
     Rg(C.box("stand_bracket", (0.085, 0.03, 0.10), (cx, back_y + 0.005, hz), bevel=0.006, segs=2,
              mat_=m["stand"]), 0.8)
     bw_, bd_, bt_ = S_["base"]
-    bmb = bm_oval(bw_ / 2, bd_ / 2, bt_, 28)
-    bmesh.ops.translate(bmb, vec=(cx, fy + S_["base_dy"], base_z + bt_ / 2), verts=bmb.verts)
+    bmb = bmesh.new()                                   # flat rectangular slab, square corners
+    out = [(bw_ / 2, bd_ / 2), (-bw_ / 2, bd_ / 2), (-bw_ / 2, -bd_ / 2), (bw_ / 2, -bd_ / 2)]
+    lo = [bmb.verts.new((cx + x, fy + S_["base_dy"] + y, base_z)) for x, y in out]
+    hi = [bmb.verts.new((cx + x, fy + S_["base_dy"] + y, base_z + bt_)) for x, y in out]
+    bmb.faces.new(hi)
+    for i in range(len(out)):
+        j = (i + 1) % len(out)
+        bmb.faces.new((lo[i], lo[j], hi[j], hi[i]))
+    bmesh.ops.recalc_face_normals(bmb, faces=bmb.faces)
     Rg(obj_from_bm("stand_base", bmb, m["stand_base"]), 0.9)
     Rg(C.box("stand_foot", (0.08, 0.05, 0.02), (cx, neck_y + 0.01, base_z + bt_ + 0.01), bevel=0.006,
              mat_=m["stand"]), 0.4)
@@ -922,7 +929,12 @@ def build_keyboard(m):
     front = -D.TOP[1] / 2 + K["front_from_edge"]
     cy = front + kd / 2
     lift = kd / 2 * math.sin(R(K["pitch"])) + 0.0005
-    M = M_at((K["x"], cy, D.DESK_H + lift), yaw=K["yaw"]) @ C.euler((K["pitch"], 0, 0))
+    M = M_at((K["x"], cy, D.DESK_H + lift), yaw=K["yaw"])
+    if K.get("rest_on_pad"):
+        # numpad end on the pad: roll up by the pad thickness about the case's left bottom edge
+        roll = math.degrees(math.atan2(D.PAD["size"][2] + 0.0005, kw))
+        M = M @ Matrix.Translation((-kw / 2, 0, 0)) @ C.euler((0, -roll, 0)) @ Matrix.Translation((kw / 2, 0, 0))
+    M = M @ C.euler((K["pitch"], 0, 0))
     case = C.box("kbd_case", (kw, kd, kh), (0, 0, kh / 2), bevel=0.004, segs=2, mat_=m["kbd_case"],
                  drop_bottom=True)
     for v in case.data.vertices:                         # slight front slope

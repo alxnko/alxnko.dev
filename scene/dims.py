@@ -42,7 +42,8 @@ LSTAND = dict(xs=0.112, bar=(0.011, 0.004), pad=0.0015, rail=(-0.126, 0.104))
 MON = dict(x=0.20, front_y=0.17, yaw=-12.0, screen=(0.80, 0.335), radius=1.5, bezel=0.006,
            chin=0.016, corner=0.008, screen_bottom=0.11, panel_t=0.013,
            back=(0.54, 0.27, 0.038), ring_r=0.09, ring_tube=0.004)
-STAND = dict(neck=(0.075, 0.03), base=(0.25, 0.14, 0.012), base_dy=0.02)   # base centre behind front_y
+# base: a plain flat black rectangular plate on the desk (photo 20), swivels with the monitor
+STAND = dict(neck=(0.075, 0.03), base=(0.26, 0.18, 0.006), base_dy=0.0)   # base centre behind front_y
 
 
 def mon_neck_y():
@@ -50,11 +51,16 @@ def mon_neck_y():
     return MON["front_y"] + MON["panel_t"] + MON["back"][2] - 0.002 + 0.012 + STAND["neck"][1] / 2
 
 # --- input -------------------------------------------------------------------
-KBD = dict(x=0.17, front_from_edge=0.105, yaw=-2.0, size=(0.400, 0.1375, 0.022),
-           unit=0.01905, pitch=3.0)
-PAD = dict(x=0.415, y=0.06, size=(0.36, 0.36, 0.003), yaw=1.5)
-MOUSE = dict(x=0.45, y=-0.05, yaw=-14.0, size=(0.105, 0.072, 0.07), tilt=57.0)
-GAMEPAD = dict(x=0.05, y=0.085, yaw=-9.0, width=0.161)
+# pass 7 (photo images/20): keyboard well forward, square to the desk edge, a little left
+# of the monitor centre; its numpad end rests on the big pad's left edge (rest_on_pad: the
+# case rolls up by the pad thickness about its left bottom edge). Pad rotated a few degrees,
+# from under the monitor's right half to the front; mouse on it right of the keyboard;
+# gamepad behind the keyboard towards the laptop.
+KBD = dict(x=0.12, front_from_edge=0.055, yaw=0.0, size=(0.400, 0.1375, 0.022),
+           unit=0.01905, pitch=3.0, rest_on_pad=True)
+PAD = dict(x=0.42, y=-0.11, size=(0.32, 0.30, 0.003), yaw=-4.0)
+MOUSE = dict(x=0.475, y=-0.13, yaw=-8.0, size=(0.105, 0.072, 0.07), tilt=57.0)
+GAMEPAD = dict(x=0.0, y=0.02, yaw=-5.0, width=0.161)
 
 # --- fan + cat ------------------------------------------------------------------
 FAN = dict(x=-0.487, y=-0.25, yaw=6.0, r=0.09, depth=0.10, center_h=0.106)
