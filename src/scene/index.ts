@@ -237,7 +237,9 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     shadowFloor.scale.set(floorScale0.x * k, floorScale0.y, floorScale0.z * k);
     shadowFloor.position.copy(floorPos0);
     if (sunShift) shadowFloor.position.add(new Vector3(sunShift[0], sunShift[1], sunShift[2]).multiplyScalar(up * day));
-    shadowMat.uniforms.uFade.value = Math.min(0.6, up * 1.4) * (sunShift ? mix : 1);
+    // uFade is shared by both decals: with a sun-aware bake (sunShift) the night shadows only
+    // widen as the desk rises (the screens rise with it), they do not get lighter
+    shadowMat.uniforms.uFade.value = sunShift ? 0 : Math.min(0.6, up * 1.4);
   };
   const fanRing = opt('fan_ring');
   if (fanRing) meshesOf(fanRing).forEach((m) => (m.material = ringMat));
