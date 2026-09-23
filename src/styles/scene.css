@@ -523,11 +523,20 @@
   text-shadow: 0 0 1px var(--halo), 0 0 3px var(--halo), 0 0 10px var(--halo-soft);
 }
 
-/* day: a pale halo's wide blur washes out the small hint text (mid-gray on a pale smudge),
-   so the hint gets darker ink and only the tight part of the halo */
+/* day: the hint sits over the dark floor under the desk, where no halo can separate small
+   gray text (a pale halo there only makes a muddy smudge), so it gets a small frosted chip
+   in the page colour with full-strength ink */
 :root[data-theme="light"] [data-mode="scene"] .hint {
-  color: var(--c-fg-muted);
-  text-shadow: 0 0 1px var(--halo), 0 0 2px var(--halo);
+  color: var(--c-fg);
+  text-shadow: none;
+}
+
+:root[data-theme="light"] [data-mode="scene"] .hint > span {
+  padding: 3px 10px;
+  border-radius: var(--r-m);
+  background: color-mix(in srgb, var(--c-bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
 
 [data-mode="scene"] .toggles .icon,
