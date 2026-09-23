@@ -36,7 +36,7 @@ Executors read both.
 ## Global constraints (verbatim from the spec, apply to every task)
 - **Public facts only:**
   - Alex Neko (`alxnko`)
-  - tech lead at AIT Solutions
+  - tech lead
   - Kyrgyzstan
   - #1 committer in Kyrgyzstan (committers.top)
   - contacts: gh `https://github.com/alxnko`, tg `https://t.me/ALXNK0`,
@@ -181,8 +181,8 @@ export interface Command {
 ```ts
 // src/content/site.ts
 export const SITE = {
-  name: 'Alex Neko', handle: 'alxnko', role: 'tech lead', company: 'AIT Solutions',
-  country: 'Kyrgyzstan', coords: '42.87°N 74.59°E', host: 'nitro', os: 'meowOS',
+  name: 'Alex Neko', handle: 'alxnko', role: 'tech lead',
+  country: 'Kyrgyzstan', host: 'nitro', os: 'meowOS',
   rank: { text: '#1 committer in Kyrgyzstan', href: 'https://committers.top/kyrgyzstan_private' },
 } as const;
 export const CONTACTS = [
@@ -512,8 +512,8 @@ Command behavior (all must be covered by tests in `commands.test.ts`, run throug
   - `whoami`: `alxnko`. `whoami -v`: the full identity line.
   - `fastfetch`: ASCII cat mark (8 lines, green) beside key/value rows:
     `alxnko@nitro`, `os meowOS x86_64`, `host nitro`, `kernel 7.2.6-meow`,
-    `uptime <since page load>`, `shell bash 5.3`, `role tech lead @ AIT Solutions`,
-    `loc Kyrgyzstan 42.87°N 74.59°E`, `rank #1 committer in KG`, then contacts
+    `uptime <since page load>`, `shell bash 5.3`, `role tech lead`,
+    `loc Kyrgyzstan`, `rank #1 committer in KG`, then contacts
     (links), plus a colour-block row of 8 ANSI swatches.
   - `uname` → `Linux`; `uname -a` → `Linux nitro 7.2.6-meow #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux`.
   - `uptime`, `date`, `echo`, `hostname`.
@@ -600,7 +600,7 @@ Command behavior (all must be covered by tests in `commands.test.ts`, run throug
 
 - [ ] **Step 1:** Page-mode layout, mobile first:
   - Identity block (VT323 `alxnko_` mark at 40 px with a blinking `_`; lines in
-    `--fs-3` muted: `tech lead · ait solutions`, `kyrgyzstan · 42.87°n 74.59°e`, a
+    `--fs-3` muted: `tech lead`, `kyrgyzstan`, a
     rank badge link)
   - Poster figure (aspect-ratio reserved)
   - Terminal panel (dark always; header strip `tty1 — alxnko@nitro` with tabular-num

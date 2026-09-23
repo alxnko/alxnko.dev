@@ -29,7 +29,7 @@ Success means:
 | Topic | Decision |
 |---|---|
 | Site role | Terminal-first experience. No projects/portfolio section for now. |
-| Public facts | Name **Alex Neko** (handle `alxnko`), **tech lead at AIT Solutions**, **Kyrgyzstan**, **#1 committer in Kyrgyzstan** (committers.top), contacts. Nothing else. |
+| Public facts | Name **Alex Neko** (handle `alxnko`), **tech lead**, **Kyrgyzstan**, **#1 committer in Kyrgyzstan** (committers.top), contacts. Nothing else. |
 | Repo | Standalone `alxnko.dev` repo. The site gets its **own new design system** ("graphite"), independent of `@meowerse/ui`. |
 | Visual direction | "A1 Graphite": neutral black/graphite hardware and UI with **no green tint**. Green `#00ff82` is a *signal only* (prompt, cursor, active state, links, the cat, one LED, the ring light). One amber. Dark and light themes: the light theme is "daytime at the desk", and screens stay dark in both. |
 | 3D | Hero object, lazy loaded: the owner's full desk (from reference photos), **built and baked in headless Blender via Python scripts committed to the repo**. |
@@ -51,7 +51,7 @@ Success means:
 
 ### 3.2 Load sequence
 1. **0 ms.** HTML + critical CSS paint: identity block (`alxnko_` with blinking cursor,
-   "tech lead · AIT Solutions · Kyrgyzstan", #1-in-KG badge), the live terminal, and
+   "tech lead · Kyrgyzstan", #1-in-KG badge), the live terminal, and
    contacts. A baked **poster render** of the desk (AVIF/WebP, current theme) sits
    behind as the LCP image.
 2. **Interactive.** The terminal works immediately. The 3D decision (§6.6) runs after
@@ -450,7 +450,7 @@ are exactly the defaults every generated dev site ships, so they are **banned he
   icons
 - "crafted with ❤️/code" footers, typewriter headline effects, cursor-follow blobs,
   particle backgrounds
-- generic stock props in the scene (headphones, coffee cup, succulents, "code on
+- generic stock props in the scene (coffee cup, succulents, "code on
   screen" textures). Every object must exist on the owner's real desk (the server is
   the one declared exception).
 - more than one accent. Green appears at most ~5 times per viewport.
