@@ -1,5 +1,5 @@
 // Every surface is unlit: lighting is baked (spec §6.3). The few live effects are tiny shaders.
-import { AdditiveBlending, Color, NoBlending, ShaderMaterial, type Texture, Vector3, Vector4 } from 'three';
+import { AdditiveBlending, Color, CustomBlending, DstColorFactor, NoBlending, OneFactor, ZeroFactor, ShaderMaterial, type Texture, Vector3, Vector4 } from 'three';
 
 const vsUv = /* glsl */ `
 varying vec2 vUv;
@@ -149,5 +149,34 @@ export function windowMaterial(map: Texture | null, rects: [number, number, numb
         #include <colorspace_fragment>
       }`,
     blending: NoBlending,
+  });
+}
+
+/**
+ * A baked shadow decal (floor / wall) that darkens whatever is beneath it: result = dst · src,
+ * where the atlas stores white for "no shadow". uFade eases it toward white (desk raised →
+ * the shadow softens and fades). Destination alpha is kept, so it never opens a window.
+ */
+export function shadowMaterial(day: Texture, night: Texture, mix: number): ShaderMaterial {
+  return new ShaderMaterial({
+    uniforms: { uDay: { value: day }, uNight: { value: night }, uMix: { value: mix }, uFade: { value: 0 } },
+    vertexShader: vsUv,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D uDay; uniform sampler2D uNight; uniform float uMix; uniform float uFade;
+      varying vec2 vUv;
+      void main() {
+        vec3 c = mix(texture2D(uDay, vUv).rgb, texture2D(uNight, vUv).rgb, uMix);
+        gl_FragColor = vec4(mix(c, vec3(1.0), uFade), 1.0);
+      }`,
+    transparent: true,
+    depthWrite: false,
+    blending: CustomBlending,
+    blendSrc: DstColorFactor,
+    blendDst: ZeroFactor,
+    blendSrcAlpha: ZeroFactor,
+    blendDstAlpha: OneFactor,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
   });
 }

@@ -9,7 +9,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import type { FanSpeed, Landmark, Ring, Theme, WorldState } from '../term/types';
 import { parseManifest, type Manifest } from './manifest';
 import { TERM_BG } from '../lib/tokens';
-import { windowMaterial, bakedMaterial, emissiveMaterial, glowMaterial, screenMaterial, skyMaterial } from './materials';
+import { shadowMaterial, windowMaterial, bakedMaterial, emissiveMaterial, glowMaterial, screenMaterial, skyMaterial } from './materials';
 import { lerpPose, Rail, Spring, type Pose, type Vec3 } from './rail';
 import { FanDisplay, MonitorScreen } from './monitor-screen';
 import { catStep, constrainGaze, clamp, easeOut, frameInterval, nextFlickIn, Tween, type CatState } from './anim';
@@ -182,6 +182,12 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const srvLeds = [0, 1, 2, 3, 4, 5].map((i) => led(`led_srv_${i}`, i === 0 ? '#00ff82' : LED_OFF));
   // optional nodes (older scene builds lack them): the fan's glowing bezel and speed display,
   // and the keyboard backlights. All follow the ring colour, like the real RGB does.
+  // movable baked shadows (newer builds): the floor one softens/spreads as the desk rises,
+  // the wall one rides up with the desk (it is parented to desk_rig)
+  const shadowMat = shadowMaterial(firstAtlas, firstAtlas, mix);
+  const shadowFloor = opt('shadow_floor'), shadowWall = opt('shadow_wall');
+  for (const sh of [shadowFloor, shadowWall]) if (sh) meshesOf(sh).forEach((m) => { m.material = shadowMat; m.renderOrder = 1; });
+  const floorScale0 = shadowFloor?.scale.clone();
   const fanRing = opt('fan_ring');
   if (fanRing) meshesOf(fanRing).forEach((m) => (m.material = ringMat));
   const backlight = glowMaterial();
@@ -301,7 +307,9 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     wide.target = [wide.target[0], wide.target[1] + rigDy, wide.target[2]];
     const desk = withRig({ ...deskRef.pose, fov: adaptFov(deskRef.pose.fov, deskRef.refAspect) }, rigDy);
     const laptop = fitScreen(screenCorners(laptopScreen), 0.94, 34);
-    const mon = fitScreen(screenCorners(monitorScreen), 0.94, 34); // the whole ultrawide, any aspect
+    // the whole ultrawide on landscape screens; on portrait phones the live contacts panel fills
+    // the width (readable), and the side panes are a drag away
+    const mon = camera.aspect < 1 ? fitScreen(contactsCorners(), 0.96, 34) : fitScreen(screenCorners(monitorScreen), 0.94, 34);
     rail.setPoses({ wide, desk, laptop, monitor: mon });
   }
 
@@ -343,6 +351,11 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const setDeskHeight = (h: number) => {
     rigDy = h - manifest.deskBase;
     rig.position.y = rigBaseY + rigDy;
+    if (shadowFloor && floorScale0) {
+      const up = Math.max(0, rigDy);
+      shadowFloor.scale.set(floorScale0.x * (1 + 0.35 * up), floorScale0.y, floorScale0.z * (1 + 0.35 * up));
+      shadowMat.uniforms.uFade.value = Math.min(0.6, up * 1.4);
+    }
     if (cable) cable.scale.y = Math.max(0.2, (cableLen0 + rigDy) / cableLen0);
   };
   setDeskHeight(clamp(o.initial.desk, manifest.range[0], manifest.range[1]));
@@ -427,6 +440,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     if (mixTween) {
       mix = mixTween.value(now);
       baked.uniforms.uMix.value = mix;
+      shadowMat.uniforms.uMix.value = mix;
       sky.uniforms.uMix.value = mix;
       scene.background = (scene.background as Color).set('#e9e8e4').lerp(new Color('#0a0a0b'), mix);
       animating = true;
@@ -599,7 +613,8 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       const want = t === 'light' ? 0 : 1;
       atlas(themeKey(t)).then((tx) => {
         if (disposed) return;
-        if (t === 'light') baked.uniforms.uDay.value = tx; else baked.uniforms.uNight.value = tx;
+        if (t === 'light') baked.uniforms.uDay.value = shadowMat.uniforms.uDay.value = tx;
+        else baked.uniforms.uNight.value = shadowMat.uniforms.uNight.value = tx;
         mixTween = new Tween(mix, want, performance.now(), o.reducedMotion ? 0 : 600);
         invalidate();
       }).catch((e) => {

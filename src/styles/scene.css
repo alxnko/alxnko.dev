@@ -206,20 +206,23 @@
 [data-mode="scene"] .contacts {
   width: var(--contacts-w);
   height: var(--contacts-h);
-  padding: 40px 56px;
+  padding: 44px 56px;
   background: var(--ansi-bg);
   color: var(--ansi-fg);
-  font-size: 30px;
-  line-height: 1.4;
+  font-size: 46px;
+  line-height: 1.3;
 }
 
 [data-mode="scene"] .contacts .label {
   color: var(--ansi-dim);
+  font-size: 28px;
+  padding-bottom: 12px;
 }
 
 [data-mode="scene"] .contacts a {
   min-height: 0;
-  padding: 12px 0;
+  padding: 26px 0;
+  grid-template-columns: 5ch minmax(0, 1fr) 24px;
   color: var(--ansi-fg);
   border-color: var(--term-rule, #232326);
 }
@@ -448,7 +451,7 @@
   width: var(--info-w, 480px);
   height: var(--info-h, 740px);
   margin: 0;
-  padding: 96px 48px 0;
+  padding: 100px 40px 0;
   transform-origin: 0 0;
   backface-visibility: hidden;
   background: var(--ansi-bg);
@@ -464,7 +467,7 @@
 
 .mon-info dl { margin: 0; }
 .mon-info div { margin-bottom: 44px; }
-.mon-info dt { color: var(--ansi-dim); font-size: 24px; }
+.mon-info dt { color: var(--ansi-dim); font-size: 26px; }
 .mon-info dd { margin: 0; }
 
 .mon-info a {
