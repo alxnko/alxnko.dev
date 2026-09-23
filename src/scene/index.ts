@@ -348,20 +348,22 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   // logical overlay sizes: the laptop terminal is a 16:10 grid (fewer columns on phones so
   // text stays readable when the screen fills the view); contacts match their arc's aspect
   const sizeOverlays = () => {
-    const tw = Math.round(clamp(innerWidth * 1.9, 640, 1280));
-    o.termEl.style.setProperty('--screen-w', `${tw}px`);
-    o.termEl.style.setProperty('--screen-h', `${Math.round(tw * 0.625)}px`);
+    const px = (el: HTMLElement, name: string, v: number) => el.style.setProperty(name, `${v}px`);
+    const tw = Math.round(clamp(innerWidth * 1.9, 640, 1280)), th = Math.round(tw * 0.625);
+    px(o.termEl, '--screen-w', tw); px(o.termEl, '--screen-h', th);
+    dock.setSize(o.termEl, tw, th);
     const [tl, tr, , bl] = contactsCorners();
-    const cw = 1120;
-    o.contactsEl.style.setProperty('--contacts-w', `${cw}px`);
-    o.contactsEl.style.setProperty('--contacts-h', `${Math.round((cw * tl.distanceTo(bl)) / tl.distanceTo(tr))}px`);
+    const cw = 1120, ch = Math.round((cw * tl.distanceTo(bl)) / tl.distanceTo(tr));
+    px(o.contactsEl, '--contacts-w', cw); px(o.contactsEl, '--contacts-h', ch);
+    dock.setSize(o.contactsEl, cw, ch);
     if (o.infoEl) {
       const [a, b, , d] = infoCorners();
-      const iw = 480;
-      o.infoEl.style.setProperty('--info-w', `${iw}px`);
-      o.infoEl.style.setProperty('--info-h', `${Math.round((iw * a.distanceTo(d)) / a.distanceTo(b))}px`);
+      const iw = 480, ih = Math.round((iw * a.distanceTo(d)) / a.distanceTo(b));
+      px(o.infoEl, '--info-w', iw); px(o.infoEl, '--info-h', ih);
+      dock.setSize(o.infoEl, iw, ih);
     }
   };
+
   const q = new Quaternion(), q2 = new Quaternion(), v = new Vector3(), v2 = new Vector3();
   const upWorld = new Vector3(0, 1, 0);
 
@@ -688,7 +690,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     },
   });
 
-  const onResize = () => { sizeOverlays(); dock.remeasure(); applySize(); };
+  const onResize = () => { sizeOverlays(); applySize(); };
   const onVis = () => { if (!hidden()) { last = performance.now(); invalidate(); } };
   // GPU context loss (driver reset, tab backgrounded on mobile): let the browser restore it
   // and redraw; the page never drops out of 3D once it has loaded

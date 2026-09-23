@@ -37,6 +37,20 @@ test.describe('3D desk', () => {
     await expect(page.locator('#back')).toBeHidden({ timeout: 5000 });
   });
 
+  test('pinned screens are screen-sized at the desk view (not page layout sizes)', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await page.locator('#nav [data-landmark="desk"]').click();
+    await page.waitForTimeout(1500);
+    const vw = page.viewportSize()!.width;
+    for (const id of ['#term', '#contacts', '#mon-info']) {
+      const box = await page.locator(id).boundingBox();
+      expect(box, id).not.toBeNull();
+      expect(box!.width, id).toBeLessThan(vw * 0.6);
+      expect(box!.width, id).toBeGreaterThan(8);
+    }
+  });
+
   test('cd monitor flies there, docks contacts, updates the nav', async ({ page }) => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });

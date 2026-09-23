@@ -16,16 +16,14 @@ export class Dock {
 
   constructor(private els: HTMLElement[]) {}
 
-  /** Logical (untransformed) size of each overlay, in CSS px; measured once per resize. */
+  /** Logical (untransformed) size of an overlay in CSS px: the exact size the runtime set on
+   *  it (never measured from the DOM, which may still be in page layout). Unset = not pinned. */
   size(el: HTMLElement): [number, number] {
-    let s = this.sizes.get(el);
-    if (!s || !s[0]) this.sizes.set(el, (s = [el.offsetWidth, el.offsetHeight]));
-    return s;
+    return this.sizes.get(el) ?? [0, 0];
   }
 
-  /** Call after the overlays' logical size changes (resize). */
-  remeasure() {
-    this.sizes.clear();
+  setSize(el: HTMLElement, w: number, h: number) {
+    this.sizes.set(el, [w, h]);
   }
 
   private pin(el: HTMLElement, s: ScreenQuad) {
