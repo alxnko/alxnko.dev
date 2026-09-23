@@ -58,8 +58,8 @@ def mon_neck_y():
 # gamepad behind the keyboard towards the laptop.
 KBD = dict(x=0.12, front_from_edge=0.055, yaw=0.0, size=(0.400, 0.1375, 0.022),
            unit=0.01905, pitch=3.0, rest_on_pad=True)
-PAD = dict(x=0.42, y=-0.11, size=(0.32, 0.30, 0.003), yaw=-4.0)
-MOUSE = dict(x=0.475, y=-0.13, yaw=-8.0, size=(0.105, 0.072, 0.07), tilt=57.0)
+PAD = dict(x=0.395, y=-0.12, size=(0.32, 0.30, 0.003), yaw=-4.0)
+MOUSE = dict(x=0.46, y=-0.13, yaw=-8.0, size=(0.105, 0.072, 0.07), tilt=57.0)
 GAMEPAD = dict(x=0.0, y=0.02, yaw=-5.0, width=0.161)
 
 # --- fan + cat ------------------------------------------------------------------
