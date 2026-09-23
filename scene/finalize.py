@@ -226,13 +226,18 @@ def build_manifest(version, files, info, bake, crop, stats, sizes, quality):
                              "runtime": {"sunShiftPerMetre": [1.56, 0.0, -0.76],
                                          "day": "position = pos0 + sunShiftPerMetre * dh (glTF x/z; the sun shadow of "
                                                 "a raised top slides along the sun's horizontal direction), scale 1, no fade",
-                                         "night": "scale x/z = 1 + 0.35*dh about the node origin, uFade = min(0.6, 1.4*dh)",
+                                         "night": "scale x/z = 1 + 0.35*dh about the node origin, uFade = 0 (pass 9: the "
+                                                  "screens rise with the top, so the shadow under it widens but stays as "
+                                                  "deep; uFade is shared with shadow_wall - fading it lightened both)",
                                          "mix": "blend the two by the theme mix (0 = day, 1 = night)",
                                          "dh": "deskHeight - 0.74 (>= 0)"}},
             "shadow_wall": {**info["shadowWall"], "role": "shadow",
-                            "note": "multiply decal (display-space dst * src; white = no change), 1.5 mm in front of the "
+                            "note": "multiply decal (display-space dst * src; white = no change), in front of the "
                                     "back wall, PARENTED to desk_rig so it rides up with the desk (a sun shadow on a vertical "
-                                    "wall moves up by exactly dh). UV0 into the atlas; soft, white at the border"},
+                                    "wall moves up by exactly dh). Stands 1.75 cm off the wall, in front of the skirting "
+                                    "(covers it) and reaches 0.5 m below the floor (hidden at preset 1; raised, it is the "
+                                    "leg shadow continued down). Carries the whole leg + top wall shadow. UV0 into the atlas; "
+                                    "white at its left / right / top border"},
             "materials": "one unlit placeholder per role: baked, screen, ring, glow, led, sky, hit, shadow (multiply decal)",
         },
         "cameras": info["cameras"],

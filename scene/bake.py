@@ -341,15 +341,17 @@ def point_nodes(objs, img):
         nt.nodes.active = node
 
 
-def run_bake(objs, kind, passes, margin=8):
+def run_bake(objs, kind, passes, margin=8, strip=None, local=True):
     """Bake `objs` into the shared target. Blender bakes a multi-object selection one object
     at a time, re-syncing the whole scene for each (the GPU idles most of the time), so the
     targets are first merged into world-space proxies, one per ray-visibility signature
     (same geometry, materials, UVs and attributes: the result is the same bake), and
     each proxy is baked once. Proxies with different signatures share the image
-    (use_clear only on the first)."""
+    (use_clear only on the first). `local`: the materials use per-object shading (Bevel
+    normals, the edge-wear AO with only_local): objects closer than LOCAL_GAP stay in separate
+    proxies so those see exactly what they saw before. The EMIT passes pass local=False."""
     t0 = time.perf_counter()
-    proxies, hidden = make_proxies(objs)
+    proxies, hidden = make_proxies(objs, strip, local)
     ctx = bpy.context
     try:
         for i, px in enumerate(proxies):
@@ -371,15 +373,47 @@ def ray_sig(o):
     return tuple(bool(getattr(o, a)) for a in RAYS)
 
 
-def make_proxies(objs):
+LOCAL_GAP = 0.01
+
+
+def world_box(o):
+    pts = [o.matrix_world @ Vector(c) for c in o.bound_box]
+    return (np.min(pts, axis=0) - LOCAL_GAP, np.max(pts, axis=0) + LOCAL_GAP)
+
+
+def near(a, b):
+    return bool(np.all(a[0] <= b[1]) and np.all(b[0] <= a[1]))
+
+
+def local_shading(o):
+    """True if a material of `o` looks at its own object only (Bevel, AO)."""
+    return any(n.type in ("BEVEL", "AMBIENT_OCCLUSION") for s in o.material_slots if s.material
+               for n in s.material.node_tree.nodes)
+
+
+def make_proxies(objs, strip=None, local=True):
+    """World-space joined copies of `objs`, one per ray-visibility signature. `strip`: a face
+    attribute; faces where it is set are left out (neither baked nor occluding)."""
     ctx = bpy.context
     ctx.view_layer.update()
     dg = ctx.evaluated_depsgraph_get()
     groups = {}
     for o in objs:
-        groups.setdefault(ray_sig(o), []).append(o)
-    proxies = []
-    for sig, members in groups.items():
+        bins = groups.setdefault(ray_sig(o), [])
+        box = world_box(o)
+        for b in bins:
+            if not local or not any((local_shading(o) or local_shading(q)) and near(box, bx)
+                                    for q, bx in zip(b[0], b[1])):
+                b[0].append(o)
+                b[1].append(box)
+                break
+        else:
+            bins.append(([o], [box]))
+    proxies, hidden = [], []
+    for sig, members in ((sig, b[0]) for sig, bins in groups.items() for b in bins):
+        if len(members) == 1 and not (strip and strip in members[0].data.attributes):
+            proxies.append(members[0])      # alone: bake the object itself
+            continue
         parts = []
         for o in members:
             me = bpy.data.meshes.new_from_object(o.evaluated_get(dg), preserve_all_data_layers=True, depsgraph=dg)
@@ -387,21 +421,36 @@ def make_proxies(objs):
             me.transform(o.matrix_world)
             if o.matrix_world.determinant() < 0:
                 me.flip_normals()
+            if strip and strip in me.attributes:
+                strip_faces(me, strip)
             p = bpy.data.objects.new("__px_" + o.name, me)
             ctx.scene.collection.objects.link(p)
             parts.append(p)
         px = parts[0] if len(parts) == 1 else C.join(parts, f"__px{len(proxies)}")
         for a, v in zip(RAYS, sig):
             setattr(px, a, v)
+        px["__proxy"] = True
         proxies.append(px)
-    hidden = [o for o in objs if not o.hide_render]
+        hidden += [o for o in members if not o.hide_render]
     for o in hidden:
         o.hide_render = True
     return proxies, hidden
 
 
+def strip_faces(me, attr):
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    lay = bm.faces.layers.float.get(attr)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f[lay] > 0.5], context="FACES")
+    bm.to_mesh(me)
+    bm.free()
+
+
 def drop_proxies(proxies, hidden):
     for px in proxies:
+        if not px.get("__proxy"):
+            continue
         me = px.data
         bpy.data.objects.remove(px)
         bpy.data.meshes.remove(me)
@@ -560,10 +609,11 @@ def compose(rig, light, color, pos, cov, room, decal=None):
     return dilate(out, cov > 0.5, 48)
 
 
-# shadow decals: darkening strength (1 = the full rig shadow) and the border ramp (fraction
-# of the quad's short side over which the darkening fades to exactly white)
-DECAL_STRENGTH = 0.92
-DECAL_EDGE = 0.14
+# shadow decals: darkening strength (1 = the full rig shadow: at preset 1 room * decal must
+# equal the full-scene bake) and the width (m) of the fade to white on the borders that fade
+DECAL_STRENGTH = 1.0
+DECAL_RAMP = 0.15
+EXT_Z = 0.004           # wall decal texels below this (under the floor) repeat the row above
 
 
 def box_blur(img, valid, r):
@@ -576,22 +626,58 @@ def box_blur(img, valid, r):
     return np.where(valid, a / np.maximum(w, 1e-6), img)
 
 
-def decal_values(rig, lw, lwo, pos, grp, rects):
-    """Per texel of the decal islands: sRGB-encoded linear ratio lit-with / lit-without."""
+def extend_down(r, pos, sel, z_src=(0.006, 0.03), step=0.004):
+    """Wall decal texels under the floor (hidden at preset 1): repeat, per x, the ratio just
+    above the floor. A raised desk moves its wall shadow up by dh; this is what slides into view
+    below it - the leg shadow continued straight down (a vertical column casts a vertical strip)."""
+    x = pos[..., 0]
+    z = pos[..., 2]
+    src = sel & (z >= z_src[0]) & (z < z_src[1])
+    dst = sel & (z < EXT_Z)
+    if not src.any() or not dst.any():
+        return r
+    x0 = float(x[sel].min())
+    nb = int((float(x[sel].max()) - x0) / step) + 2
+    bs = ((x[src] - x0) / step).astype(np.int64)
+    sums = np.bincount(bs, weights=r[src], minlength=nb)
+    cnts = np.bincount(bs, minlength=nb)
+    have = cnts > 0
+    prof = np.interp(np.arange(nb), np.nonzero(have)[0], sums[have] / cnts[have])
+    out = r.copy()
+    out[dst] = prof[np.clip(((x[dst] - x0) / step).astype(np.int64), 0, nb - 1)]
+    return out
+
+
+def decal_values(rig, lw, lwo, lwall, pos, grp, decals):
+    """Per texel of the decal islands: sRGB-encoded linear ratio lit-with / lit-without. The
+    floor decal divides by the room light (the static inner columns' floor shadow stays in the
+    room), the wall decal by the room light without those columns: the whole leg's wall shadow
+    is in the wall decal, continuous with the top's, and rises with it."""
     y_with = lw.mean(axis=-1)
-    y_wo = lwo.mean(axis=-1)
-    r = np.clip(y_with / np.maximum(y_wo, 1e-5), 0.0, 1.0)
-    out = np.ones(r.shape, dtype=np.float32)
-    sel_all = np.zeros(r.shape, dtype=bool)
-    for code, (axes, (a0, a1, b0, b1)) in rects.items():
+    out = np.ones(y_with.shape, dtype=np.float32)
+    sel_all = np.zeros(y_with.shape, dtype=bool)
+    fade = 1.0 - fade_mask(pos, np.ones_like(y_with), rig)
+    for code, (axes, (a0, a1, b0, b1), flags) in decals.items():
         sel = np.abs(grp - code) < 0.06
+        den = (lwall if axes == "xz" else lwo).mean(axis=-1)
+        # near-black texels (in the corners at night, inside the conduit) would give a noisy
+        # ratio of two tiny numbers: a small offset keeps them ~1 (their darkening is invisible)
+        eps = 0.03 * float(np.median(den[sel & (pos[..., 2] > 0.0)]))
+        r = np.clip((y_with + eps) / (den + eps), 0.0, 1.0)
         ia, ib = (0, 1) if axes == "xy" else (0, 2)
-        u = (pos[..., ia] - a0) / (a1 - a0)
-        v = (pos[..., ib] - b0) / (b1 - b0)
-        edge = np.minimum(np.minimum(u, 1 - u) * (a1 - a0), np.minimum(v, 1 - v) * (b1 - b0))
-        ramp = smoothstep(0.0, DECAL_EDGE * min(a1 - a0, b1 - b0), edge)
+        if axes == "xz":
+            r = extend_down(r, pos, sel)
+        pa, pb = pos[..., ia], pos[..., ib]
+        dist = np.full(r.shape, np.inf, dtype=np.float32)
+        for on, d in zip(flags, (pa - a0, a1 - pa, pb - b0, b1 - pb)):
+            if on:
+                dist = np.minimum(dist, d)
+        ramp = smoothstep(0.0, DECAL_RAMP, dist)
         rr = box_blur(r, sel, 3)
-        dark = (1.0 - rr) * DECAL_STRENGTH * ramp * (1.0 - fade_mask(pos, np.ones_like(r), rig))
+        dark = (1.0 - rr) * DECAL_STRENGTH * ramp * fade
+        # a fade must only happen where the desk casts (almost) nothing: report the worst case
+        lost = ((1.0 - rr) * fade * (1.0 - ramp))[sel]
+        print(f"[bake] {rig} decal {axes}: max darkening lost to the border fade {float(lost.max()):.3f}")
         out = np.where(sel, 1.0 - dark, out)
         sel_all |= sel
     # runtime: display-encoded frame * linear(texel) -> store ratio^(1/2.2), so the display-space
@@ -670,7 +756,10 @@ def main():
     rig_objs = [o for o in objs if group_of(o) in (GRP["rig"], GRP_BLADES)]
     room_objs = [o for o in objs if group_of(o) == GRP["static"]]
     decals = [o for o in objs if o.get("shadow_decal")]
-    passes = {"with": rig_objs + decals, "room": room_objs + decals}
+    # with: everything; room: the rig hidden from rays (the room's own light); wall: the room
+    # also without the static inner columns (`legcol`) - the light the back wall gets when the
+    # whole leg shadow comes from the wall decal (see decal_values)
+    passes = {"with": rig_objs + decals, "room": room_objs + decals, "wall": room_objs + decals}
     names = ["color", "pos", "flag", "nrm", "ao-with", "ao-room"] + [f"light-{r}-{p}" for r in ("day", "night") for p in passes]
     if "reuse" not in A or not all((CACHE / f"{n}.npy").exists() for n in names):
         t_bake = time.perf_counter()
@@ -683,7 +772,7 @@ def main():
         pm = emit_mat("__pos", pos_socket)
         fm = emit_mat("__flag", flag_socket)
         nm_ = emit_mat("__nrm", nrm_socket)
-        for nm, mt, margin in (("pos", pm, 8), ("flag", fm, 0), ("nrm", nm_, 8)):
+        for nm, mt, margin in (("pos", pm, 8), ("flag", fm, 0), ("nrm", nm_, 8)):   # geometry only
             for m in (pm, fm, nm_):
                 n = m.node_tree.nodes.get("__bake") or m.node_tree.nodes.new("ShaderNodeTexImage")
                 n.name = "__bake"
@@ -691,22 +780,22 @@ def main():
                 m.node_tree.nodes.active = n
             saved = swap_materials(objs, mt)
             sc.cycles.samples = 4
-            run_bake(objs, "EMIT", set(), margin=margin)
+            run_bake(objs, "EMIT", set(), margin=margin, local=nm == "nrm")
             restore_materials(objs, saved)
             np.save(CACHE / f"{nm}.npy", pixels(img).astype(np.float32 if nm in ("pos", "nrm") else np.float16))
         for rig in ("day", "night"):
             C.apply_rig(rig)
             sc.cycles.samples = SAMPLES
             for pname, targets in passes.items():
-                saved = hide_rig_from_rays() if pname == "room" else {}
+                saved = hide_rig_from_rays() if pname != "with" else {}
                 mv = moving_no_cast()
-                if rig == "day":
+                if rig == "day" and pname != "wall":
                     # contact occlusion (crisp near contact, 12 cm reach), same visibility as the light
                     sc.cycles.samples = AO_SAMPLES
                     run_bake(targets, "AO", set())
                     np.save(CACHE / f"ao-{pname}.npy", pixels(img)[..., :1].astype(np.float16))
                     sc.cycles.samples = SAMPLES
-                run_bake(targets, "DIFFUSE", {"DIRECT", "INDIRECT"})
+                run_bake(targets, "DIFFUSE", {"DIRECT", "INDIRECT"}, strip="legcol" if pname == "wall" else None)
                 restore_moving(mv)
                 restore_rays(saved)
                 raw = pixels(img)
@@ -724,8 +813,14 @@ def main():
     flag = np.load(CACHE / "flag.npy").astype(np.float32)
     cov, room, grp = flag[..., 0], flag[..., 1], flag[..., 2]
     nrm = np.load(CACHE / "nrm.npy").astype(np.float32) * 2.0 - 1.0
-    rects = {float(o["shadow_decal"]): (o["decal_axes"], tuple(o["decal_rect"])) for o in decals}
+    dinfo = {float(o["shadow_decal"]): (o["decal_axes"], tuple(o["decal_rect"]), tuple(o["decal_ramp"]))
+             for o in decals}
     is_room = (cov > 0.5) & (grp < 0.25)
+    # room texels the wall decal covers: behind its plane (back wall, skirting, socket), inside it
+    wd = next(o for o in decals if o["decal_axes"] == "xz")
+    wx0, wx1, _, wz1 = wd["decal_rect"]
+    wall_zone = is_room & (pos[..., 1] > wd.matrix_world.translation.y - 0.001) & \
+        (pos[..., 0] > wx0) & (pos[..., 0] < wx1) & (pos[..., 2] < wz1)
     blades = [o for o in objs if o.name == "fan_blades"]
     for rig in ("day", "night"):
         lw = np.load(CACHE / f"light-{rig}-with.npy").astype(np.float32)
@@ -736,14 +831,15 @@ def main():
         ar = np.load(CACHE / "ao-room.npy").astype(np.float32)
         lw = lw * (1.0 - AO_K * (1.0 - np.clip(aw, 0, 1)))
         lwo = lwo * (1.0 - AO_K * (1.0 - np.clip(ar, 0, 1)))
-        light = np.where(is_room[..., None], lwo, lw)
+        lwall = np.load(CACHE / f"light-{rig}-wall.npy").astype(np.float32) * (1.0 - AO_K * (1.0 - np.clip(ar, 0, 1)))
+        light = np.where(is_room[..., None], np.where(wall_zone[..., None], lwall, lwo), lw)
         for b in blades:
             M = b.matrix_world
             sel_b = (cov > 0.5) & (np.abs(grp - GRP_BLADES) < 0.03)
             light = radial_average(light, pos, nrm, sel_b, np.array(M.translation),
                                    np.array((M.to_3x3() @ Vector((0, 1, 0))).normalized()))
         light = dilate(light, cov > 0.5, 6)
-        dsel, dval = decal_values(rig, lw, lwo, pos, grp, rects)
+        dsel, dval = decal_values(rig, lw, lwo, lwall, pos, grp, dinfo)
         dsel &= cov > 0.5
         atlas = compose(rig, light, color, pos, cov, room, decal=(dsel, dval))
         path = C.WORK / f"atlas-{rig}-{SIZE}.png"

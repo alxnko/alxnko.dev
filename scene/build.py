@@ -119,6 +119,13 @@ def build_materials():
     m["metal_tip"] = C.mat("metal_tip", C.G["300"], bevel=0.0)
     # cat: a deeper, slightly desaturated green so the bake shades its facets (not a neon toy)
     m["shadow"] = C.mat("shadow", "#ffffff", rough=1.0, bevel=0.0)
+    # pass 9 props: QCY H3S light warm grey matte; slide insole / teeth / eyes / fin
+    m["hp"] = C.mat("hp", "#8e8a83", rough=0.6, edge=0.18, edge_hex="#aeaaa3", bevel=0.002)
+    m["hp_soft"] = C.mat("hp_soft", "#7f7b75", rough=0.8, edge=0.1, edge_hex="#98948d", bevel=0.003)
+    m["insole"] = C.mat("insole", "#e3e9e6", rough=0.9, bevel=0.002)
+    m["teeth"] = C.mat("teeth", "#f1f1ea", rough=0.6, bevel=0.0)
+    m["shark_eye"] = C.mat("shark_eye", "#17191e", rough=0.5, bevel=0.0)
+    m["shark_fin"] = C.mat("shark_fin", "#d9d67e", rough=0.7, bevel=0.001)
     m["cat"] = C.mat("cat", "#14995a", rough=0.4, edge=0.25, edge_hex="#63d396", bevel=0.0)
     m["server"] = C.mat("server", C.G["850"], edge=0.4, edge_hex=C.G["500"], bevel=0.003)
     m["server_front"] = C.mat("server_front", C.G["800"], edge=0.35, edge_hex=C.G["500"], bevel=0.002)
@@ -321,11 +328,14 @@ def build_desk(m):
                 v.co.z -= (abs(v.co.y) - 0.22) * 0.035
         S(foot, 0.6)
         for sy in (-1, 1):
-            S(C.cyl(f"leveler{sx}{sy}", 0.012, 0.006, (x, sy * 0.27, 0.003), segs=10,
+            S(C.cyl(f"leveler{sx}{sy}", 0.012, 0.006, (x, sy * 0.27, 0.003), segs=6,
                     mat_=m["plastic_mid"]), 0.3)
         lc = D.LOWER_COL
-        S(C.box(f"lower{sx}", (lc[0], lc[1], D.LOWER_TOP - fz), (x, 0, fz + (D.LOWER_TOP - fz) / 2),
-                bevel=0.004, mat_=m["steel"]), 0.6)
+        low = S(C.box(f"lower{sx}", (lc[0], lc[1], D.LOWER_TOP - fz), (x, 0, fz + (D.LOWER_TOP - fz) / 2),
+                      bevel=0.004, mat_=m["steel"]), 0.6)
+        # static inner column: its wall shadow is carried by the (rising) wall decal, see bake.py
+        a = low.data.attributes.new("legcol", "FLOAT", "FACE")
+        a.data.foreach_set("value", [1.0] * len(low.data.polygons))
         uc = D.UPPER_COL
         top_z = H - t - D.RAIL[2]
         Rg(C.box(f"upper{sx}", (uc[0], uc[1], top_z - D.UPPER_BOTTOM),
@@ -1118,23 +1128,23 @@ def build_gamepad(m):
                 bevel=0.0012, rot=sx * -18.0)
     # D-pad (upper left): shallow round well + four separate arrows
     dx, dy = -0.052, 0.004
-    add_cyl("gp_dpad_well", 0.0175, 0.0012, dx, dy, T - 0.0006, m["gp_well"], segs=24)
+    add_cyl("gp_dpad_well", 0.0175, 0.0012, dx, dy, T - 0.0006, m["gp_well"], segs=16)
     for i, (ox, oy) in enumerate(((0, 1), (1, 0), (0, -1), (-1, 0))):
         w, d = (0.0072, 0.0095) if ox == 0 else (0.0095, 0.0072)
         add_box(f"gp_dpad{i}", (w, d, 0.0038), dx + ox * 0.0078, dy + oy * 0.0078, T - 0.0004, m["gp_ctl"],
                 bevel=0.0013)
     # four face buttons (upper right), plain round
     bx, by = 0.052, 0.004
-    add_cyl("gp_btn_well", 0.0185, 0.0012, bx, by, T - 0.0006, m["gp_well"], segs=24)
+    add_cyl("gp_btn_well", 0.0185, 0.0012, bx, by, T - 0.0006, m["gp_well"], segs=16)
     for i, (ox, oy) in enumerate(((0, 1), (1, 0), (0, -1), (-1, 0))):
         add_cyl(f"gp_btn{i}", 0.0048, 0.0042, bx + ox * 0.0098, by + oy * 0.0098, T - 0.0004, m["gp_ctl"],
-                segs=16, bevel=0.0012)
+                segs=10, bevel=0.0012)   # pass 9: 16 -> 10 segs (glb budget for the new props)
     # analog sticks: symmetric, lower centre, each in a round well
     for sx in (-1, 1):
         x, y = sx * 0.024, -0.018
-        add_cyl(f"gp_stick_well{sx}", 0.0135, 0.0012, x, y, T - 0.0006, m["gp_well"], segs=24)
+        add_cyl(f"gp_stick_well{sx}", 0.0135, 0.0012, x, y, T - 0.0006, m["gp_well"], segs=16)
         add_cyl(f"gp_stick_stem{sx}", 0.0045, 0.009, x, y, T - 0.0004, m["gp_ctl"], segs=12)
-        add_cyl(f"gp_stick_cap{sx}", 0.0105, 0.0042, x, y, T + 0.0082, m["gp_ctl"], segs=24, bevel=0.0014)
+        add_cyl(f"gp_stick_cap{sx}", 0.0105, 0.0042, x, y, T + 0.0082, m["gp_ctl"], segs=16, bevel=0.0014)
         rim_ = C.bm_cyl(0.0082, 0.0012, 24)
         bmesh.ops.translate(rim_, vec=(x, y, T + 0.0130), verts=rim_.verts)
         ctl.append((f"gp_stick_dish{sx}", rim_, m["gp_well"]))
@@ -1458,6 +1468,233 @@ def build_cat(m):
 # ------------------------------------------------------------------ server + room
 # ------------------------------------------------------------------ server + room
 
+# ------------------------------------------------------------------ pass 9 props
+
+def bm_lathe_oval(layers, ry, rz, segs=20):
+    """Closed oval solid along +X: layers [(x, scale)] of the (ry, rz) oval, capped by fans."""
+    bm = bmesh.new()
+    rings = []
+    for x, k in layers:
+        rings.append([bm.verts.new((x, ry * k * math.cos(2 * math.pi * i / segs),
+                                    rz * k * math.sin(2 * math.pi * i / segs))) for i in range(segs)])
+    for a, b in zip(rings, rings[1:]):
+        for i in range(segs):
+            bm.faces.new((a[i], a[(i + 1) % segs], b[(i + 1) % segs], b[i]))
+    for ring, x in ((rings[0], layers[0][0]), (rings[-1], layers[-1][0])):
+        c = bm.verts.new((x, 0, 0))
+        for i in range(segs):
+            bm.faces.new((ring[i], ring[(i + 1) % segs], c))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
+
+
+def headphones_matrix():
+    H = D.HEADPHONES
+    return (M_at((H["x"], H["y"], D.DESK_H), yaw=H["yaw"]) @ C.euler((0, H["tilt"], 0))
+            @ C.euler((H["roll"], 0, 0)))
+
+
+def build_headphones(m):
+    """QCY H3S, light warm grey matte (photos headphones/1-6): a wide flat band with a padded
+    underside, sliders out of the band ends, big rounded-oval cups with thick cushions. Modelled
+    as worn (cups facing each other along X, band arc in the XZ plane), then laid down."""
+    H = D.HEADPHONES
+    Rb, bw, bt = H["band_r"], H["band_w"], H["band_t"]
+    ry, rz = H["cup"]
+    s0, s1 = H["shell"]
+    c0, c1 = H["cushion"]
+    cz = -0.072                                          # cup centres (band centre at 0)
+    parts = []
+    arc = [(Rb * math.cos(R(a)), 0.0, Rb * math.sin(R(a))) for a in range(-14, 195, 12)]
+    parts.append(C.sweep("hp_band", arc, rounded_rect(bt, bw, 0.004, seg=1), mat_=m["hp"], up=(0, 1, 0)))
+    pad = [((Rb - bt / 2 - 0.004) * math.cos(R(a)), 0.0, (Rb - bt / 2 - 0.004) * math.sin(R(a)))
+           for a in range(28, 153, 14)]
+    parts.append(C.sweep("hp_pad", pad, rounded_rect(0.009, bw - 0.006, 0.004, seg=1), mat_=m["hp_soft"],
+                         up=(0, 1, 0)))
+    for sx in (-1, 1):
+        # slider: from the band end straight down to the top of the cup's outer shell
+        top = Vector((sx * Rb * math.cos(R(14)), 0.0, -Rb * math.sin(R(14))))
+        bot = Vector((sx * (s0 + s1) / 2, 0.0, cz + rz * 0.55))
+        parts.append(C.sweep(f"hp_slider{sx}", [top + Vector((0, 0, 0.008)), bot],
+                             rounded_rect(0.008, 0.020, 0.003, seg=1), mat_=m["hp"], up=(0, 1, 0)))
+        # cup shell: flat outer plate with a rounded rim, a little narrower at the plate
+        shell = bm_lathe_oval([(s0, 1.0), (s0 + 0.55 * (s1 - s0), 1.0), (s1 - 0.004, 0.93), (s1, 0.80)],
+                              ry, rz, 16)
+        cush = bm_lathe_oval([(c0, 0.84), (c0 + 0.005, 0.97), ((c0 + c1) / 2, 1.02), (c1, 1.0)],
+                             ry * 0.97, rz * 0.97, 16)
+        for bm_, nm, mt in ((shell, "hp_cup", m["hp"]), (cush, "hp_cush", m["hp_soft"])):
+            if sx < 0:
+                bmesh.ops.scale(bm_, vec=(-1, 1, 1), verts=bm_.verts)
+                bmesh.ops.reverse_faces(bm_, faces=bm_.faces)
+            bmesh.ops.translate(bm_, vec=(0, 0, cz), verts=bm_.verts)
+            parts.append(obj_from_bm(f"{nm}{sx}", bm_, mt))
+    M = headphones_matrix()
+    for p in parts:
+        xform(p, M)
+    # rest the lowest point on the desk
+    zmin = min((p.matrix_world @ v.co).z for p in parts for v in p.data.vertices)
+    for p in parts:
+        p.matrix_world = Matrix.Translation((0, 0, D.DESK_H - zmin)) @ p.matrix_world
+        Rg(p, 1.1)
+    return parts
+
+
+def shark_material(name, ref):
+    """sharkslides gradient: blue toe / top -> pale yellow-green -> teal heel (baked albedo),
+    along the slide's own axis (`ref` empty: origin mid-sole, -Y = toe)."""
+    mm = bpy.data.materials.new(name)
+    nt, bsdf, _ = C._principled(mm)
+    bsdf.inputs["Roughness"].default_value = 0.7
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    tc.object = ref
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(tc.outputs["Object"], sep.inputs[0])
+    L = D.SLIDES["size"][1]
+    # t: 0 at the toe, 1 at the heel, pushed on (towards the pale middle) higher up the head
+    mad = nt.nodes.new("ShaderNodeMath"); mad.operation = "MULTIPLY_ADD"
+    mad.inputs[1].default_value = 1.0 / L
+    mad.inputs[2].default_value = 0.5
+    nt.links.new(sep.outputs["Y"], mad.inputs[0])
+    up = nt.nodes.new("ShaderNodeMath"); up.operation = "MULTIPLY_ADD"
+    up.inputs[1].default_value = 2.4
+    nt.links.new(sep.outputs["Z"], up.inputs[0])
+    nt.links.new(mad.outputs[0], up.inputs[2])
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    cr = ramp.color_ramp
+    cr.elements[0].position, cr.elements[0].color = 0.10, C.hex_lin("#7aa7e6")
+    cr.elements[1].position, cr.elements[1].color = 0.92, C.hex_lin("#29ab9e")
+    e = cr.elements.new(0.24); e.color = C.hex_lin("#93b6e2")
+    e = cr.elements.new(0.40); e.color = C.hex_lin("#dde8a2")
+    e = cr.elements.new(0.60); e.color = C.hex_lin("#c3e3a4")
+    e = cr.elements.new(0.80); e.color = C.hex_lin("#52bfa6")
+    nt.links.new(up.outputs[0], ramp.inputs["Fac"])
+    nt.links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
+    return mm
+
+
+def slide_outline(W, L, n=22):
+    """Top-view sole outline (x right, y back; toe at -L/2): rounder, wider toe, narrower waist."""
+    pts = []
+    for i in range(n):
+        a = 2 * math.pi * i / n
+        y = -0.5 * L * math.cos(a)
+        t = (y + L / 2) / L                              # 0 toe .. 1 heel
+        w = W / 2 * (1.0 - 0.16 * math.exp(-((t - 0.62) / 0.16) ** 2) - 0.08 * t)
+        x = w * math.sin(a) * (1.0 if math.sin(a) >= 0 else 1.0)
+        pts.append((x, y))
+    return pts
+
+
+def build_slides(m):
+    """sharkslides (photos sharks/1-4): thick foam sole, a closed shark-head dome over the toes
+    with the mouth (a row of white teeth) at the toe, eyes, an upright dorsal fin, side
+    pectoral fins, an open heel with a pale insole and a small forked tail at the heel."""
+    W, L = D.SLIDES["size"]
+    helpers = C.coll("helpers")
+    out = []
+    for k, (x, y, yaw) in enumerate(D.SLIDES["pair"]):
+        M = M_at((x, y, 0.0), yaw=yaw)
+        ref = bpy.data.objects.new(f"slide_ref{k}", None)
+        helpers.objects.link(ref)
+        ref.matrix_world = M
+        body = shark_material(f"shark{k}", ref)
+        parts = []
+        # sole: extruded outline, bottom dropped; its top is the insole (white), sides gradient
+        bm = bmesh.new()
+        outline = slide_outline(W, L)
+        h = 0.030
+        lo = [bm.verts.new((px, py, 0.0)) for px, py in outline]
+        hi = [bm.verts.new((px * 0.97, py * 0.985, h)) for px, py in outline]
+        top = bm.faces.new(hi)
+        n = len(outline)
+        for i in range(n):
+            bm.faces.new((lo[i], lo[(i + 1) % n], hi[(i + 1) % n], hi[i]))
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        sole = obj_from_bm(f"slide_sole{k}", bm, body)
+        sole.data.materials.append(m["insole"])
+        faces_material(sole, lambda c, nn: 1 if nn.z > 0.7 else 0)
+        parts.append(sole)
+        # shark head: the front of an ellipsoid dome over the toes, cut open towards the heel;
+        # it stops short of the toe, so the sole's pale front reads as the open mouth
+        dy, dry, drz, dz = -L * 0.10, L * 0.30, 0.042, h - 0.004
+        drx = W * 0.49
+        dome = hemi(drx, dry, drz, segs=18, rings=5)
+        bmesh.ops.bisect_plane(dome, geom=list(dome.verts) + list(dome.edges) + list(dome.faces),
+                               plane_co=(0, L * 0.06, 0), plane_no=(0, 1, 0), clear_outer=True)
+        edge = [e for e in dome.edges if e.is_boundary and all(v.co.y > L * 0.06 - 1e-5 for v in e.verts)]
+        # cap the opening: the foot entry (insole colour, faces the heel, away from the cameras)
+        bmesh.ops.contextual_create(dome, geom=edge)
+        bmesh.ops.translate(dome, vec=(0, dy, dz), verts=dome.verts)
+        bmesh.ops.recalc_face_normals(dome, faces=dome.faces)
+        hd = obj_from_bm(f"slide_head{k}", dome, body)
+        hd.data.materials.append(m["insole"])
+        faces_material(hd, lambda c, nn: 1 if nn.y > 0.95 else 0)
+        parts.append(hd)
+
+        def on_dome(yy, zz):
+            q = 1.0 - ((yy - dy) / dry) ** 2 - ((zz - dz) / drz) ** 2
+            return drx * math.sqrt(max(q, 0.0))
+        # teeth: white wedges round the mouth - upper row down from the head's front lip, lower
+        # row up from the sole's front edge
+        for j in range(7):
+            a = R(-54 + 18 * j)
+            for (rx_, ry_, cy_, zc, flip) in ((drx * 0.97, dry * 0.97, dy, dz + 0.004, -1),
+                                             (W * 0.44, L * 0.46, 0.0, h + 0.003, 1)):
+                px, py = rx_ * math.sin(a), cy_ - ry_ * math.cos(a)
+                tb = C.bm_cyl(0.0048, 0.007, 3, r2=0.0004)
+                if flip < 0:
+                    bmesh.ops.rotate(tb, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi, 3, "X"), verts=tb.verts)
+                C._xf(tb, (px, py, zc), (0, 0, math.degrees(-a)))
+                parts.append(obj_from_bm(f"slide_tooth{k}{j}{flip}", tb, m["teeth"]))
+        # eyes: small dark studs on the head's flanks, facing out
+        for sx in (-1, 1):
+            ey, ez = dy - dry * 0.45, dz + 0.020
+            ex = on_dome(ey, ez)
+            parts.append(C.cyl(f"slide_eye{k}{sx}", 0.0058, 0.004, (sx * (ex - 0.0005), ey, ez),
+                               rot=(0, 90, sx * -28), segs=8, mat_=m["shark_eye"]))
+        # dorsal fin: an upright rounded wedge on top of the head, leaning back
+        fin = bmesh.new()
+        base = [fin.verts.new(p) for p in ((0, -0.016, 0), (0.0055, 0.002, 0), (0, 0.014, 0), (-0.0055, 0.002, 0))]
+        tip = [fin.verts.new((0, 0.004, 0.017)), fin.verts.new((0, 0.012, 0.015))]
+        for i in range(4):
+            fin.faces.new((base[i], base[(i + 1) % 4], tip[0]))
+        fin.faces.new((base[1], base[2], tip[1], tip[0]))
+        fin.faces.new((base[2], base[3], tip[0], tip[1]))
+        bmesh.ops.delete(fin, geom=[f for f in fin.faces if len(f.verts) == 3 and base[2] in f.verts and tip[0] in f.verts], context="FACES_ONLY")
+        bmesh.ops.recalc_face_normals(fin, faces=fin.faces)
+        bmesh.ops.translate(fin, vec=(0, dy + 0.012, dz + drz - 0.004), verts=fin.verts)
+        parts.append(obj_from_bm(f"slide_fin{k}", fin, m["shark_fin"]))
+        # pectoral fins (flat, swept back) and the forked tail at the heel
+        for sx in (-1, 1):
+            pf = bmesh.new()
+            vs = [pf.verts.new(p) for p in ((0, -0.014, 0.0), (0, 0.012, 0.0), (sx * 0.016, 0.022, 0.003),
+                                              (0, -0.014, 0.008), (0, 0.012, 0.008))]
+            pf.faces.new((vs[0], vs[1], vs[2]))
+            pf.faces.new((vs[3], vs[4], vs[2]))
+            pf.faces.new((vs[0], vs[3], vs[2]))
+            pf.faces.new((vs[1], vs[4], vs[2]))
+            bmesh.ops.recalc_face_normals(pf, faces=pf.faces)
+            bmesh.ops.translate(pf, vec=(sx * W * 0.44, L * 0.02, 0.010), verts=pf.verts)
+            parts.append(obj_from_bm(f"slide_pfin{k}{sx}", pf, body))
+        tail = bmesh.new()
+        vs = [tail.verts.new(p) for p in ((-0.010, 0, 0.004), (0.010, 0, 0.004), (0.016, 0.022, 0.012),
+                                            (0.0, 0.012, 0.010), (-0.016, 0.022, 0.012),
+                                            (-0.010, 0, 0.020), (0.010, 0, 0.020))]
+        tail.faces.new((vs[0], vs[1], vs[2], vs[3], vs[4]))
+        tail.faces.new((vs[5], vs[4], vs[3], vs[2], vs[6]))
+        tail.faces.new((vs[0], vs[4], vs[5]))
+        tail.faces.new((vs[1], vs[6], vs[2]))
+        bmesh.ops.recalc_face_normals(tail, faces=tail.faces)
+        bmesh.ops.translate(tail, vec=(0, L * 0.47, 0.0), verts=tail.verts)
+        parts.append(obj_from_bm(f"slide_tail{k}", tail, body))
+        for p in parts:
+            xform(p, M)
+            S(p, 0.9, room=True)
+        out += parts
+    return out
+
+
+
 def build_server(m):
     Sv = D.SERVER
     w, d, h = Sv["size"]
@@ -1536,8 +1773,15 @@ def grid_plane(name, us, vs, to3, mat_, du, dv, holes=()):
 # desk shadow decals (runtime multiply, white = no change). The room (`static`) is baked
 # without the rig's shadows; these quads carry the darkening the rig casts at preset 1, so the
 # floor one can be scaled/faded and the wall one rides up with the desk.
-SHADOW_FLOOR = dict(x=(-1.05, 1.30), y=(-0.95, D.WALL_Y - 0.004), z=0.0015)
-SHADOW_WALL = dict(x=(-1.00, 1.25), z=(0.20, 1.95), y=D.WALL_Y - 0.0015)
+# pass 9: the wall quad stands just in front of the skirting (1.75 cm off the wall), so it
+# also covers the skirting's face and top: no unshadowed strip at the wall / floor join. It
+# reaches 0.5 m BELOW the floor (hidden under it at preset 1): raised, the desk's wall shadow
+# moves up by dh and that hidden strip (the shadow continued straight down) slides into view,
+# so the leg shadow still reaches the floor. The floor quad ends under the skirting. `ramp`
+# (a0, a1, b0, b1): which borders fade to white; no fade where the two quads meet (floor back
+# edge, wall bottom edge), and every fading border lies where the desk casts nothing.
+SHADOW_FLOOR = dict(x=(D.LEFT_X + 0.016, 1.50), y=(-0.95, D.WALL_Y - 0.004), z=0.0015, ramp=(1, 1, 1, 0))
+SHADOW_WALL = dict(x=(D.LEFT_X + 0.0005, 1.50), z=(-0.50, 1.95), y=D.WALL_Y - 0.0175, ramp=(1, 1, 0, 1))
 
 
 def build_shadow_decals(m):
@@ -1546,13 +1790,15 @@ def build_shadow_decals(m):
     fl = plane("shadow_floor", [(x0, y0, z), (x1, y0, z), (x1, y1, z), (x0, y1, z)], m["shadow"])
     fl["decal_rect"] = [x0, x1, y0, y1]
     fl["decal_axes"] = "xy"
+    fl["decal_ramp"] = list(F["ramp"])
     (x0, x1), (z0, z1), y = Wl["x"], Wl["z"], Wl["y"]
     wl = plane("shadow_wall", [(x0, y, z0), (x1, y, z0), (x1, y, z1), (x0, y, z1)], m["shadow"])
     wl["decal_rect"] = [x0, x1, z0, z1]
     wl["decal_axes"] = "xz"
+    wl["decal_ramp"] = list(Wl["ramp"])
     for ob, grp in ((fl, 0.5), (wl, 0.75)):
         C.set_origin(ob, tuple(sum((ob.matrix_world @ v.co for v in ob.data.vertices), Vector()) / 4))
-        tag(ob, 0.30, room=True)
+        tag(ob, 0.24, room=True)
         ob["bake"] = True
         ob["shadow_decal"] = grp
         # invisible to every ray: they must not occlude or bounce light in the bake
@@ -1767,6 +2013,8 @@ def main():
     cat_body, cat_head, cat_tail, head_fwd = build_cat(m)
     # clean desk (owner): no charger, no cables on or under the desk, no cable_drop
     leds_srv = build_server(m)
+    build_headphones(m)
+    build_slides(m)
     sky = build_room(m)
     shadow_floor, shadow_wall = build_shadow_decals(m)
 

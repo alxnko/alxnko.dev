@@ -73,7 +73,7 @@ def main():
         ob = objs[n]
         me = ob.data
         # strip build-time attributes, keep UV0 only
-        for a in ("uvw", "room", "grp", "uvfix", "fixuv"):
+        for a in ("uvw", "room", "grp", "uvfix", "fixuv", "legcol"):
             if a in me.attributes:
                 me.attributes.remove(me.attributes[a])
         while len(me.uv_layers) > 1:

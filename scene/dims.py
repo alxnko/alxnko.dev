@@ -71,6 +71,18 @@ FAN = dict(x=-0.487, y=-0.25, yaw=6.0, r=0.09, depth=0.10, center_h=0.106)
 CAT = dict(head_w=0.064, head_yaw=40.0, head_tilt=6.0,     # yaw: turned towards the laptop; tilt > 0: chin up
            y_shift=-0.015, phi_shift=-8.0, pivot=(0.0, 0.0, -0.008))
 
+# --- pass 9 props (owner photos 3d-table-references/headphones, sharks) -----------------
+# QCY H3S over-ear headphones lying on the desk in front of the laptop, right of the fan
+# (headphones/1.jpg): the band lying back, leaning; the cups at the front, one lower.
+# pose: roll about the cup axis (band leans back), then tilt about the front-back axis
+# (the left cup lower), then yaw; the lowest point rests on the desk.
+HEADPHONES = dict(x=-0.240, y=-0.170, yaw=-22.0, roll=-58.0, tilt=24.0,
+                  band_r=0.080, band_w=0.036, band_t=0.011,
+                  cup=(0.041, 0.050), shell=(0.036, 0.062), cushion=(0.012, 0.036))
+# sharkslides foam slides on the floor under the desk's right end, left of the right foot,
+# toes towards the viewer (sharks/4jpg), casually splayed. x/y centre, yaw (deg)
+SLIDES = dict(size=(0.105, 0.275), pair=((0.200, -0.070, 9.0), (0.402, -0.030, -5.0)))
+
 # --- misc -----------------------------------------------------------------------
 SERVER = dict(x=0.84, y=0.17, size=(0.45, 0.30, 0.18))
 
