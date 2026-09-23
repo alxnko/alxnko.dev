@@ -1,0 +1,691 @@
+{
+  "version": "31f91316",
+  "deskBase": 0.74,
+  "presets": [
+    0.74,
+    0.95,
+    1.12
+  ],
+  "range": [
+    0.7,
+    1.2
+  ],
+  "step": 0.05,
+  "fanAxis": [
+    0,
+    0,
+    1
+  ],
+  "screens": {
+    "laptop": {
+      "w": 0.345,
+      "h": 0.216,
+      "node": "screen_laptop",
+      "aspect": "16:10",
+      "cornersLocal": {
+        "bl": [
+          -0.1725,
+          -0.108,
+          0.0
+        ],
+        "br": [
+          0.1725,
+          -0.108,
+          0.0
+        ],
+        "tr": [
+          0.1725,
+          0.108,
+          0.0
+        ],
+        "tl": [
+          -0.1725,
+          0.108,
+          0.0
+        ]
+      },
+      "cornersRig": {
+        "bl": [
+          -0.55673,
+          0.1237,
+          -0.04778
+        ],
+        "br": [
+          -0.24934,
+          0.1237,
+          -0.2044
+        ],
+        "tr": [
+          -0.26468,
+          0.33704,
+          -0.23451
+        ],
+        "tl": [
+          -0.57207,
+          0.33704,
+          -0.07788
+        ]
+      },
+      "normalLocal": [
+        0,
+        0,
+        1
+      ]
+    },
+    "monitor": {
+      "w": 0.8,
+      "h": 0.335,
+      "radius": 1.5,
+      "node": "screen_monitor",
+      "radiusMesh": 1.4994,
+      "arcRad": 0.53333,
+      "curvatureCenterLocal": [
+        0.0,
+        0.0,
+        1.4994
+      ],
+      "axisLocal": [
+        0,
+        1,
+        0
+      ],
+      "cornersLocal": {
+        "bl": [
+          -0.39512,
+          -0.1675,
+          0.053
+        ],
+        "br": [
+          0.39512,
+          -0.1675,
+          0.053
+        ],
+        "tr": [
+          0.39512,
+          0.1675,
+          0.053
+        ],
+        "tl": [
+          -0.39512,
+          0.1675,
+          0.053
+        ]
+      },
+      "cornersRig": {
+        "bl": [
+          -0.21343,
+          0.11,
+          -0.20138
+        ],
+        "br": [
+          0.55954,
+          0.11,
+          -0.03709
+        ],
+        "tr": [
+          0.55954,
+          0.445,
+          -0.03709
+        ],
+        "tl": [
+          -0.21343,
+          0.445,
+          -0.20138
+        ]
+      },
+      "uv": "u runs along the arc (left->right); stored glTF v: 0 = top, 1 = bottom (standard)",
+      "yawDeg": -12.0
+    }
+  },
+  "files": {
+    "glb": "desk.31f91316.glb",
+    "atlas": {
+      "day": {
+        "2048": "atlas-day-2048.25d972be.webp",
+        "1024": "atlas-day-1024.f9888aae.webp"
+      },
+      "night": {
+        "2048": "atlas-night-2048.eec84b52.webp",
+        "1024": "atlas-night-1024.29998ffe.webp"
+      }
+    },
+    "poster": {
+      "day": {
+        "1600": {
+          "avif": "poster-day-1600.ce41255d.avif",
+          "webp": "poster-day-1600.247dc5ce.webp"
+        },
+        "800": {
+          "avif": "poster-day-800.416d3629.avif",
+          "webp": "poster-day-800.160fd8d5.webp"
+        }
+      },
+      "night": {
+        "1600": {
+          "avif": "poster-night-1600.2eab9c2c.avif",
+          "webp": "poster-night-1600.852ec089.webp"
+        },
+        "800": {
+          "avif": "poster-night-800.9ff371ad.avif",
+          "webp": "poster-night-800.ea548b70.webp"
+        }
+      }
+    },
+    "og": "/og.png"
+  },
+  "posters": {
+    "camera": "cam_desk",
+    "size": [
+      1600,
+      1000
+    ],
+    "deskHeight": 0.74,
+    "theme": {
+      "dark": "night",
+      "light": "day"
+    },
+    "portrait": {
+      "size": [
+        800,
+        1000
+      ],
+      "camera": "cam_desk",
+      "hfovDeg": 50.0,
+      "yfovDeg": 60.4745,
+      "aspect": 0.8,
+      "rule": "same position/target as cam_desk; keep hfov (50 deg) and widen yfov for aspect < 1.6"
+    },
+    "ring": "green",
+    "fanRing": "green",
+    "backlight": "green",
+    "fanDisplay": "100",
+    "screens": "laptop: `fastfetch --compact` terminal; monitor: bar + cat mark | contacts | role/loc/rank",
+    "note": "rendered from the baked atlas (unlit) + screens/ring/glow/fan ring/fan readout/keyboard backlights/LEDs, so the live scene matches at the desk landmark"
+  },
+  "axes": {
+    "units": "m",
+    "up": "+Y",
+    "right": "+X",
+    "front": "+Z (the viewer/chair side; the back wall is at -Z)",
+    "origin": "floor, under the centre of the desk top",
+    "handedness": "right (glTF)",
+    "fanAxis": "fan_blades local +Z",
+    "uvScreens": "screen_laptop / screen_monitor TEXCOORD_0 is standard glTF: stored (0,0) = top-left, (1,1) = bottom-right of the visible image (Blender UV (0,0) = bottom-left) -> CanvasTexture with flipY=false",
+    "uvSky": "window_sky / ring_glow TEXCOORD_0 stored (0,0) = bottom-left as seen from the room: vUv.y = up",
+    "uvAtlas": "TEXCOORD_0 standard glTF (flipY=false); atlas is display-referred sRGB: sample as SRGBColorSpace, output unlit, no tone mapping"
+  },
+  "nodes": {
+    "static": "merged baked mesh (room, floor, window frame, radiator, lower legs, feet, server body); atlas",
+    "desk_rig": {
+      "note": "group; set position.y = deskHeight (translation y = 0.74 at preset 1); everything on the desk rides along",
+      "baseY": 0.74
+    },
+    "desk_baked": "merged baked mesh (top, upper legs, rails, tray, paddle + button legends, laptop, monitor + stand, keyboard, mouse, pad, gamepad, fan body + bracket); atlas. Clean desk: no charger, no cables",
+    "screen_laptop": "flat 16:10 quad, runtime CanvasTexture + dock target; corners in manifest.screens.laptop",
+    "screen_monitor": "curved strip (R 1.5 m), runtime CanvasTexture + dock target",
+    "fan_blades": {
+      "pivot": [
+        -0.48658,
+        0.106,
+        0.25398
+      ],
+      "axisLocal": [
+        0,
+        0,
+        1
+      ],
+      "note": "spin about the node's local +Z (glTF); pivot = hub = node origin"
+    },
+    "cat_body": {
+      "hierarchy": "desk_rig > cat_body > (cat_head, cat_tail)",
+      "bodyOrigin": [
+        -0.487,
+        0.197,
+        0.25
+      ],
+      "neckPivot": [
+        -0.44671,
+        0.24489,
+        0.27785
+      ],
+      "tailPivot": [
+        -0.58323,
+        0.15185,
+        0.2752
+      ],
+      "headForward": [
+        0.7154,
+        0.1045,
+        0.6908
+      ],
+      "note": "parts have identity rotation; headForward is the gaze in rig space"
+    },
+    "cat_head": "pivot = neck (node origin)",
+    "cat_tail": "pivot = tail base (node origin)",
+    "ring": {
+      "center": [
+        0.19511,
+        0.2655,
+        -0.22301
+      ],
+      "radius": 0.09,
+      "tube": 0.004,
+      "facing": [
+        0.2079,
+        0.0,
+        -0.9781
+      ],
+      "default": "green",
+      "note": "not baked; emissive tint at runtime"
+    },
+    "ring_glow": {
+      "center": [
+        0.19511,
+        0.2655,
+        -0.346
+      ],
+      "size": 0.9,
+      "note": "quad on the wall, parented to desk_rig; additive radial glow from UV"
+    },
+    "leds": {
+      "positions": {
+        "led_paddle": [
+          0.42,
+          -0.04,
+          0.2895
+        ],
+        "led_kbd": [
+          0.11999,
+          0.00585,
+          0.17625
+        ],
+        "led_srv_0": [
+          0.84,
+          0.0,
+          -0.17
+        ],
+        "led_srv_1": [
+          0.84,
+          0.0,
+          -0.17
+        ],
+        "led_srv_2": [
+          0.84,
+          0.0,
+          -0.17
+        ],
+        "led_srv_3": [
+          0.84,
+          0.0,
+          -0.17
+        ],
+        "led_srv_4": [
+          0.84,
+          0.0,
+          -0.17
+        ],
+        "led_srv_5": [
+          0.84,
+          0.0,
+          -0.17
+        ]
+      },
+      "parent": {
+        "led_paddle": "desk_rig",
+        "led_kbd": "desk_rig",
+        "led_srv_0": null,
+        "led_srv_1": null,
+        "led_srv_2": null,
+        "led_srv_3": null,
+        "led_srv_4": null,
+        "led_srv_5": null
+      },
+      "roles": {
+        "led_paddle": "on while the desk moves",
+        "led_kbd": "steady (the one green LED)",
+        "led_srv_0..5": "decorative pattern, change every 2-6 s"
+      }
+    },
+    "fan_ring": {
+      "center": [
+        -0.48141,
+        0.106,
+        0.30321
+      ],
+      "radius": 0.0848,
+      "band": 0.0052,
+      "depth": 0.0022,
+      "axisLocal": [
+        0,
+        0,
+        1
+      ],
+      "facing": [
+        0.1045,
+        0.0,
+        0.9945
+      ],
+      "default": "green",
+      "note": "not baked; emissive band on the fan's front bezel, tint = the monitor ring's colour. Node local +Z (glTF) = the fan's front normal; `facing` is that normal in desk_rig space"
+    },
+    "fan_display": {
+      "center": [
+        -0.48148,
+        0.109,
+        0.30251
+      ],
+      "w": 0.024,
+      "h": 0.012,
+      "aspect": "2:1",
+      "cornersRig": {
+        "bl": [
+          -0.49342,
+          0.103,
+          0.30377
+        ],
+        "br": [
+          -0.46955,
+          0.103,
+          0.30126
+        ],
+        "tr": [
+          -0.46955,
+          0.115,
+          0.30126
+        ],
+        "tl": [
+          -0.49342,
+          0.115,
+          0.30377
+        ]
+      },
+      "normalLocal": [
+        0,
+        0,
+        1
+      ],
+      "facing": [
+        0.1045,
+        0.0,
+        0.9945
+      ],
+      "uv": "TEXCOORD_0 standard glTF like the screens: stored (0,0) = top-left, (1,1) = bottom-right of the readout -> CanvasTexture (256x128) with flipY=false",
+      "note": "not baked; flat quad 0.4 mm in front of the hub's round dark display disc, faces the viewer; runtime draws the fan speed (e.g. '100')"
+    },
+    "kbd_glow": {
+      "center": [
+        0.11979,
+        0.02902,
+        0.17736
+      ],
+      "size": [
+        0.381,
+        0.1183
+      ],
+      "tiles": 99,
+      "normal": [
+        -0.0087,
+        0.9986,
+        0.0523
+      ],
+      "note": "not baked; flat backlight: one rect per key slot (tiles the key block) under the key tops, just above the plate / well, so it shows only between the caps; additive, tint = ring colour; hidden from below by the case. UV 0..1 unused (flat)"
+    },
+    "laptop_kbd_glow": {
+      "center": [
+        -0.36461,
+        0.08609,
+        -0.05049
+      ],
+      "size": [
+        0.3309,
+        0.1056
+      ],
+      "tiles": 103,
+      "normal": [
+        0.0866,
+        0.9816,
+        0.17
+      ],
+      "note": "not baked; flat backlight: one rect per key slot (tiles the key block) under the key tops, just above the plate / well, so it shows only between the caps; additive, tint = ring colour; hidden from below by the case. UV 0..1 unused (flat)"
+    },
+    "hit_paddle": {
+      "centers": {
+        "hit_paddle_1": [
+          0.398,
+          -0.03166,
+          0.31518
+        ],
+        "hit_paddle_2": [
+          0.416,
+          -0.03166,
+          0.31518
+        ],
+        "hit_paddle_3": [
+          0.434,
+          -0.03166,
+          0.31518
+        ],
+        "hit_paddle_up": [
+          0.452,
+          -0.03166,
+          0.31518
+        ],
+        "hit_paddle_down": [
+          0.47,
+          -0.03166,
+          0.31518
+        ]
+      },
+      "size": {
+        "w": 0.016,
+        "h": 0.016,
+        "d": 0.015
+      },
+      "order": [
+        "hit_paddle_1",
+        "hit_paddle_2",
+        "hit_paddle_3",
+        "hit_paddle_up",
+        "hit_paddle_down"
+      ],
+      "parent": "desk_rig",
+      "note": "invisible tap targets over the paddle buttons 1, 2, 3, up, down (left to right; set visible=false, raycast only); box 1.6 wide x 1.6 tall x 1.5 cm deep, tilted with the paddle; origin = button centre"
+    },
+    "window_sky": {
+      "window": {
+        "center": [
+          -1.572,
+          1.45,
+          0.4
+        ],
+        "w": 0.9,
+        "h": 1.2
+      },
+      "fade": {
+        "day": 0.245,
+        "night": 0.655
+      },
+      "note": "procedural sky; mix the sky towards the page bg by `fade` (the room around it is faded by that amount)"
+    },
+    "hit_laptop": "invisible tap target (set visible=false)",
+    "hit_monitor": "invisible tap target (set visible=false)",
+    "hit_paddle_1": "invisible tap target over paddle button 1 (see hit_paddle)",
+    "hit_paddle_2": "invisible tap target over paddle button 2 (see hit_paddle)",
+    "hit_paddle_3": "invisible tap target over paddle button 3 (see hit_paddle)",
+    "hit_paddle_up": "invisible tap target over the paddle's up arrow (see hit_paddle)",
+    "hit_paddle_down": "invisible tap target over the paddle's down arrow (see hit_paddle)",
+    "geometry": "each named mesh node keeps its authored TRS; its geometry is in a child '<name>__geo' (quantisation transform lives there). Traverse for meshes.",
+    "shadow_floor": {
+      "center": [
+        0.058,
+        0.0015,
+        0.302
+      ],
+      "parent": null,
+      "size": [
+        2.884,
+        1.296
+      ],
+      "normal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "role": "shadow",
+      "note": "multiply decal, 1.5 mm above the floor under the desk, unparented. UV0 into the same atlas (day/night like the baked meshes); texels = the desk's floor shadow + contact occlusion at preset 1, stored for a DISPLAY-space multiply: runtime dst(display-encoded) * src(sampled linear) is correct as is; white = no change, exactly white at the border. The room (`static`) carries no desk shadow.",
+      "runtime": {
+        "sunShiftPerMetre": [
+          1.56,
+          0.0,
+          -0.76
+        ],
+        "day": "position = pos0 + sunShiftPerMetre * dh (glTF x/z; the sun shadow of a raised top slides along the sun's horizontal direction), scale 1, no fade",
+        "night": "scale x/z = 1 + 0.35*dh about the node origin, uFade = 0 (pass 9: the screens rise with the top, so the shadow under it widens but stays as deep; uFade is shared with shadow_wall - fading it lightened both)",
+        "mix": "blend the two by the theme mix (0 = day, 1 = night)",
+        "dh": "deskHeight - 0.74 (>= 0)"
+      }
+    },
+    "shadow_wall": {
+      "center": [
+        0.05025,
+        -0.015,
+        -0.3325
+      ],
+      "parent": "desk_rig",
+      "size": [
+        2.8995,
+        2.45
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "role": "shadow",
+      "note": "multiply decal (display-space dst * src; white = no change), in front of the back wall, PARENTED to desk_rig so it rides up with the desk (a sun shadow on a vertical wall moves up by exactly dh). Stands 1.75 cm off the wall, in front of the skirting (covers it) and reaches 0.5 m below the floor (hidden at preset 1; raised, it is the leg shadow continued down). Carries the whole leg + top wall shadow. UV0 into the atlas; white at its left / right / top border"
+    },
+    "materials": "one unlit placeholder per role: baked, screen, ring, glow, led, sky, hit, shadow (multiply decal)"
+  },
+  "cameras": {
+    "cam_wide": {
+      "parent": null,
+      "hfovDeg": 55.0,
+      "yfovDeg": 36.0451,
+      "aspect": 1.6,
+      "position": [
+        0.95,
+        1.85,
+        2.55
+      ],
+      "target": [
+        -0.15,
+        0.85,
+        0.0
+      ]
+    },
+    "cam_desk": {
+      "parent": "desk_rig",
+      "hfovDeg": 50.0,
+      "yfovDeg": 32.4967,
+      "aspect": 1.6,
+      "position": [
+        0.16,
+        1.42,
+        1.55
+      ],
+      "target": [
+        -0.06,
+        0.88,
+        -0.02
+      ],
+      "positionRig": [
+        0.16,
+        0.68,
+        1.55
+      ],
+      "targetRig": [
+        -0.06,
+        0.14,
+        -0.02
+      ]
+    }
+  },
+  "bounds": {
+    "min": [
+      -1.62,
+      -0.00037,
+      -0.35
+    ],
+    "max": [
+      2.6,
+      2.7,
+      3.65
+    ]
+  },
+  "bake": {
+    "samples": 512,
+    "size": 4096,
+    "exposure": {
+      "day": 1.1,
+      "night": 3.0
+    },
+    "fade": {
+      "center": [
+        -0.25,
+        -0.15,
+        0.95
+      ],
+      "axes": [
+        2.0,
+        1.6,
+        1.3
+      ],
+      "f0": {
+        "day": 0.62,
+        "night": 0.42
+      },
+      "f1": {
+        "day": 1.05,
+        "night": 0.98
+      }
+    },
+    "bg": {
+      "day": "#e9e8e4",
+      "night": "#0a0a0b"
+    }
+  },
+  "stats": {
+    "tris": 26260,
+    "verts": 28946,
+    "bytes": {
+      "desk.31f91316.glb": 254204,
+      "atlas-day-2048.25d972be.webp": 171632,
+      "atlas-day-1024.f9888aae.webp": 75206,
+      "atlas-night-2048.eec84b52.webp": 110478,
+      "atlas-night-1024.29998ffe.webp": 42648,
+      "poster-day-1600.ce41255d.avif": 43795,
+      "poster-day-1600.247dc5ce.webp": 65032,
+      "poster-day-800.416d3629.avif": 23547,
+      "poster-day-800.160fd8d5.webp": 34192,
+      "poster-night-1600.2eab9c2c.avif": 37196,
+      "poster-night-1600.852ec089.webp": 56986,
+      "poster-night-800.9ff371ad.avif": 17570,
+      "poster-night-800.ea548b70.webp": 25718,
+      "../og.png": 528946
+    },
+    "quality": {
+      "atlas-day-2048": 82,
+      "atlas-day-1024": 78,
+      "atlas-night-2048": 82,
+      "atlas-night-1024": 78,
+      "poster-day-1600-avif": 60,
+      "poster-day-1600-webp": 80,
+      "poster-day-800-avif": 60,
+      "poster-day-800-webp": 80,
+      "poster-night-1600-avif": 60,
+      "poster-night-1600-webp": 80,
+      "poster-night-800-avif": 60,
+      "poster-night-800-webp": 80
+    }
+  }
+}

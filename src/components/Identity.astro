@@ -1,0 +1,25 @@
+---
+import { SITE } from '../content/site';
+import Icon from './Icon.astro';
+const lc = (s: string) => s.toLowerCase();
+---
+<section id="identity" class="identity" aria-labelledby="mark-h">
+  <p class="eyebrow" aria-hidden="true">~/about.md</p>
+  <h1 id="mark-h" class="mark-h">
+    <span id="mark" class="mark" aria-hidden="true">{SITE.handle}<span class="blink">_</span></span>
+    <span class="visually-hidden">{SITE.name} ({SITE.handle})</span>
+  </h1>
+  <p class="name">{lc(SITE.name)}</p>
+  <dl class="facts">
+    <div><dt>role</dt><dd>{SITE.role}</dd></div>
+    <div><dt>based</dt><dd>{lc(SITE.country)}</dd></div>
+    <div>
+      <dt>rank</dt>
+      <dd>
+        <a id="rank" class="rank" href={SITE.rank.href} target="_blank" rel="noopener noreferrer">
+          <span>{lc(SITE.rank.short)}</span><span class="visually-hidden"> (opens in a new tab)</span><Icon name="arrow" size={12} />
+        </a>
+      </dd>
+    </div>
+  </dl>
+</section>

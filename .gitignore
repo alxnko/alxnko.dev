@@ -13,3 +13,7 @@ dist/
 !.env.example
 .DS_Store
 *.log
+.superpowers/
+.claude/worktrees/
+test-results/
+playwright-report/

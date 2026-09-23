@@ -1,0 +1,747 @@
+/* graphite / scene mode: the 3D desk owns the viewport. Layers: #stage (camera input) <
+   pinned screens (#term on the laptop, #contacts + #mon-info on the monitor; mapped onto the
+   3D screens every frame by src/scene/dock.ts via CSSOM matrix3d) < the WebGL canvas (whose
+   screen regions are transparent windows, so 3D objects occlude the screens) < chrome.
+   Hooks: body[data-mode|data-scene|data-view], data-dock="screen|off" on each pinned panel.
+   The laptop panel's logical grid is --screen-w/h (set by the runtime) at --screen-font. */
+
+:root {
+  --screen-w: 1280px;
+  --screen-h: 800px;
+  --screen-font: 24px;
+  --screen-lh: 30px;
+  --screen-pad: 28px;
+  --screen-bar: 40px;
+  --contacts-w: 1024px;
+  --contacts-h: 429px;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-stage);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--d-slow) var(--ease);
+}
+
+/* layer order in 3D: stage (input) 0 < pinned screens 1 < canvas 2 < chrome 10.
+   The canvas is click-through; its screen regions are transparent windows onto the pinned
+   DOM, so objects in front of a screen occlude it correctly. */
+.stage-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--d-slow) var(--ease);
+}
+
+[data-mode="scene"] .stage-canvas {
+  opacity: 1;
+}
+
+#stage {
+  touch-action: none;
+}
+
+[data-mode="scene"] {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+[data-mode="scene"] #stage {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* chrome floats over the canvas */
+[data-mode="scene"] .bar {
+  position: fixed;
+  inset: 0 0 auto;
+  border-bottom-color: transparent;
+}
+
+[data-mode="scene"] .toggles {
+  margin-left: auto;
+}
+
+[data-mode="scene"] .bar-home,
+[data-mode="scene"] .bar-meta,
+[data-mode="scene"] .foot,
+[data-mode="scene"] .poster figcaption,
+[data-mode="scene"] .contacts .label-path {
+  display: none;
+}
+
+/* the poster matches the desk landmark; it shows while the scene loads, then the live
+   scene replaces it (never both at once) */
+[data-scene="ready"] .poster {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--d-slow) var(--ease), visibility 0s linear var(--d-slow);
+}
+
+[data-mode="scene"] .poster {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-stage) - 1);
+  padding: 0;
+}
+
+[data-mode="scene"] .poster img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+}
+
+[data-mode="scene"] .sheet {
+  pointer-events: none; /* click-through: only real controls and the pinned screens take input */
+  position: static;
+  /* body is a flex container, where z-index applies even to static items: without this the
+     sheet would form a stacking context (z 10) and lift the pinned screens above the canvas,
+     so 3D objects in front of a screen could not hide it */
+  z-index: auto;
+  display: block;
+  padding: 0;
+}
+
+[data-mode="scene"] .identity {
+  position: fixed;
+  z-index: var(--z-chrome);
+  top: calc(env(safe-area-inset-top) + var(--sp-3));
+  left: var(--gutter);
+  padding: 0;
+  pointer-events: none;
+}
+
+[data-mode="scene"] .identity a {
+  pointer-events: auto;
+}
+
+[data-mode="scene"] .identity .eyebrow,
+[data-mode="scene"] .identity .facts dt {
+  display: none;
+}
+
+[data-mode="scene"] .mark {
+  font-size: var(--fs-7);
+}
+
+[data-mode="scene"] .facts {
+  display: block;
+  margin-top: var(--sp-2);
+  padding: 0;
+  border: 0;
+  font-size: var(--fs-2);
+}
+
+/* pinned screens: the live DOM terminal and contacts are mapped onto the laptop and monitor
+   screens with a projective matrix3d every frame, at every distance, so the screens always
+   show the real, interactive thing (no swapping, no popping). The runtime sets the logical
+   size (--screen-w/h, --contacts-w/h) and the transform; data-dock="off" only when a screen
+   faces away or is out of view. */
+[data-mode="scene"] .term,
+[data-mode="scene"] .contacts {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  margin: 0;
+  transform-origin: 0 0;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+[data-mode="scene"] .term[data-dock="off"],
+[data-mode="scene"] .contacts[data-dock="off"],
+[data-mode="scene"] .term:not([data-dock]),
+[data-mode="scene"] .contacts:not([data-dock]) {
+  visibility: hidden;
+}
+
+[data-mode="scene"] .term {
+  width: var(--screen-w);
+  height: var(--screen-h);
+  border: 0;
+  border-radius: 0;
+  font-size: var(--screen-font);
+  line-height: var(--screen-lh);
+  --term-lh: 1.25;
+}
+
+[data-mode="scene"] .term .term-head {
+  height: var(--screen-bar);
+  padding: 0 var(--screen-pad);
+  font-size: 0.8em;
+}
+
+[data-mode="scene"] .term .term-screen {
+  flex: 1;
+  height: auto;
+  padding: var(--screen-pad) var(--screen-pad) 0;
+}
+
+[data-mode="scene"] .term .term-form {
+  padding: 0 var(--screen-pad) var(--screen-pad);
+  border-top: 0;
+  font-size: inherit;
+}
+
+/* the screen is small from afar: the 16px phone input rule applies to the real input box,
+   which is the pinned one here, so keep it legible via the logical size instead */
+[data-mode="scene"] .term .term-form input {
+  font-size: inherit;
+}
+
+[data-mode="scene"] .term .term-chips {
+  display: none;
+}
+
+[data-mode="scene"] .contacts {
+  width: var(--contacts-w);
+  height: var(--contacts-h);
+  padding: 44px 56px;
+  background: var(--ansi-bg);
+  color: var(--ansi-fg);
+  font-size: 46px;
+  line-height: 1.3;
+}
+
+[data-mode="scene"] .contacts .label {
+  color: var(--ansi-dim);
+  font-size: 28px;
+  padding-bottom: 12px;
+}
+
+[data-mode="scene"] .contacts a {
+  min-height: 0;
+  padding: 26px 0;
+  grid-template-columns: 5ch minmax(0, 1fr) 24px;
+  color: var(--ansi-fg);
+  border-color: var(--term-rule, #232326);
+}
+
+[data-mode="scene"] .contacts a .c-key {
+  color: var(--ansi-green);
+}
+
+/* the monitor stays a dark screen in both themes: hover is a soft gray row, not the page's
+   (light-theme) surface colour */
+@media (hover: hover) {
+  [data-mode="scene"] .contacts a:hover {
+    background: color-mix(in srgb, var(--ansi-fg) 12%, var(--ansi-bg));
+  }
+}
+
+/* back to the desk view: appears whenever you have flown or looked away */
+.back {
+  display: none;
+}
+
+[data-mode="scene"] .back:not([hidden]) {
+  display: inline-flex;
+  position: fixed;
+  z-index: var(--z-chrome);
+  top: calc(env(safe-area-inset-top) + var(--sp-3));
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-m);
+  background: var(--c-bg-elev);
+  color: var(--c-fg);
+  font-size: var(--fs-2);
+}
+
+.back:hover {
+  border-color: var(--c-fg-subtle);
+}
+
+.back kbd {
+  color: var(--c-fg-subtle);
+  font-size: var(--fs-1);
+}
+
+@media (pointer: coarse) {
+  .back kbd { display: none; }
+}
+
+/* landmark nav + hint */
+[data-mode="scene"] .nav {
+  display: block;
+  position: fixed;
+  z-index: var(--z-chrome);
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + var(--sp-5));
+  transform: translateX(-50%);
+}
+
+.nav ul {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.nav button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--sp-3);
+  color: var(--c-fg-muted);
+  font-size: var(--fs-2);
+  border-bottom: 1px solid transparent;
+}
+
+.nav button:hover {
+  color: var(--c-fg);
+}
+
+.nav button[aria-current="true"] {
+  color: var(--c-fg);
+  border-bottom-color: var(--c-accent);
+}
+
+[data-mode="scene"] .hint {
+  display: block;
+  position: fixed;
+  z-index: var(--z-chrome);
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + var(--sp-5) + 52px);
+  color: var(--c-fg-subtle);
+  font-size: var(--fs-1);
+  text-align: center;
+  pointer-events: none;
+  transition: opacity var(--d-base) var(--ease);
+}
+
+[data-interacted] .hint {
+  opacity: 0;
+}
+
+/* ---- boot loader (3D-capable visits only; decided in <head> before first paint) -------- */
+.loader {
+  display: none;
+}
+
+[data-boot="3d"] .loader {
+  display: grid;
+  place-items: center;
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-skip) - 1);
+  padding: var(--gutter);
+  background: var(--c-bg);
+  transition: opacity var(--d-base) var(--ease), visibility 0s linear var(--d-base);
+}
+
+/* while the loader is up, the flat page underneath stays out of sight (and out of the tab order) */
+[data-boot="3d"] body:not([data-scene="ready"]) > :not(.loader):not(script) {
+  visibility: hidden;
+}
+
+/* the hint already shows under the loader: the visitor learns how to move while the desk
+   loads, and it stays put when the loader fades (it is the same line either way) */
+[data-boot="3d"] body:not([data-scene="ready"]) > #hint {
+  display: block;
+  position: fixed;
+  z-index: var(--z-skip);
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + var(--sp-5) + 52px);
+  visibility: visible;
+  color: var(--c-fg-subtle);
+  font-size: var(--fs-1);
+  text-align: center;
+  pointer-events: none;
+}
+
+[data-boot="3d"] body[data-scene="ready"] .loader {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.loader-tty {
+  width: min(560px, 100%);
+  padding: var(--sp-4) var(--sp-5) var(--sp-5);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-m);
+  background: var(--ansi-bg);
+  color: var(--ansi-fg);
+  font-size: var(--fs-2);
+  line-height: 1.7;
+}
+
+.loader-head {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 var(--sp-3);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--c-line);
+  color: var(--ansi-dim);
+  font-size: var(--fs-1);
+}
+
+.loader-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ansi-dim);
+}
+
+.loader-steps li {
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loader-steps li[data-state="run"] {
+  color: var(--ansi-fg);
+}
+
+.loader-steps li[data-state="ok"] {
+  color: var(--ansi-fg);
+}
+
+.loader-steps li[data-state="ok"] .st {
+  color: var(--ansi-green);
+}
+
+.loader-bar {
+  height: 2px;
+  margin-top: var(--sp-4);
+  background: var(--c-line);
+  overflow: hidden;
+}
+
+.loader-bar span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--ansi-green);
+  transform: scaleX(var(--p, 0));
+  transform-origin: 0 50%;
+  transition: transform var(--d-base) var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-boot="3d"] .loader,
+  .loader-bar span {
+    transition: none;
+  }
+}
+
+/* selection follows attention: in 3D only the screen you have flown to is selectable (the
+   terminal at the laptop, the contacts at the monitor); chrome and far-away screens are not.
+   Inputs stay typeable regardless (user-select does not affect editing). */
+[data-mode="scene"] {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+[data-mode="scene"][data-view="laptop"] .term,
+[data-mode="scene"][data-view="monitor"] .contacts {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* the pinned screens take input; every other part of the scene container lets clicks
+   through to the canvas and the chrome */
+[data-mode="scene"] .term,
+[data-mode="scene"] .contacts,
+[data-mode="scene"] .mon-info {
+  pointer-events: auto;
+}
+
+/* the monitor's right pane (role, location, rank link), pinned like the contacts */
+.mon-info {
+  display: none;
+}
+
+[data-mode="scene"] .mon-info {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: var(--info-w, 480px);
+  height: var(--info-h, 740px);
+  margin: 0;
+  padding: 100px 40px 0;
+  transform-origin: 0 0;
+  backface-visibility: hidden;
+  background: var(--ansi-bg);
+  color: var(--ansi-fg);
+  font-size: 30px;
+  line-height: 1.35;
+}
+
+[data-mode="scene"] .mon-info[data-dock="off"],
+[data-mode="scene"] .mon-info:not([data-dock]) {
+  visibility: hidden;
+}
+
+.mon-info dl { margin: 0; }
+.mon-info div { margin-bottom: 44px; }
+.mon-info dt { color: var(--ansi-dim); font-size: 26px; }
+.mon-info dd { margin: 0; }
+
+.mon-info a {
+  color: var(--ansi-amber);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--ansi-amber) 40%, transparent);
+  text-underline-offset: 6px;
+}
+
+.mon-info a:hover {
+  text-decoration-color: currentColor;
+}
+
+[data-mode="scene"][data-view="monitor"] .mon-info {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.hint-touch { display: none; }
+@media (pointer: coarse) {
+  .hint-fine { display: none; }
+  .hint-touch { display: inline; }
+}
+
+/* the stage (input layer) is what shows through any sub-pixel gap between a screen window
+   and its pinned DOM: keep it screen-black so day theme never shows light slivers */
+[data-scene="ready"] #stage {
+  background: var(--ansi-bg);
+}
+
+/* Chrome over the 3D: no fills, no boxes. A soft halo in the room's own colour hugs every
+   glyph and icon, so each letter separates from whatever is behind it (bright keyboard,
+   dark monitor, lit wall) while staying invisible over empty wall. Per-glyph by nature,
+   theme-aware, and never a glow. */
+[data-mode="scene"] {
+  --halo: color-mix(in srgb, var(--c-bg) 78%, transparent);
+  --halo-soft: color-mix(in srgb, var(--c-bg) 45%, transparent);
+}
+
+[data-mode="scene"] .identity,
+[data-mode="scene"] .toggles,
+[data-mode="scene"] .nav,
+[data-mode="scene"] .hint,
+[data-mode="scene"] .back {
+  text-shadow: 0 0 1px var(--halo), 0 0 3px var(--halo), 0 0 10px var(--halo-soft);
+}
+
+/* day: the hint sits over the dark floor under the desk, where no halo can separate small
+   gray text (a pale halo there only makes a muddy smudge), so it gets a small frosted chip
+   in the page colour with full-strength ink */
+:root[data-theme="light"] [data-mode="scene"] .hint {
+  color: var(--c-fg);
+  text-shadow: none;
+}
+
+:root[data-theme="light"] [data-mode="scene"] .hint > span {
+  padding: 3px 10px;
+  border-radius: var(--r-m);
+  background: color-mix(in srgb, var(--c-bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+[data-mode="scene"] .toggles .icon,
+[data-mode="scene"] .nav .icon {
+  filter: drop-shadow(0 0 1px var(--halo)) drop-shadow(0 0 4px var(--halo-soft));
+}
+
+/* the mark's blinking underscore and the active-tab rule keep their colour, just lifted */
+[data-mode="scene"] .nav button[aria-current="true"] {
+  box-shadow: 0 1px 3px var(--halo-soft);
+}
+
+/* Pinned panels must never scroll as a whole: focusing a link inside a clipped box would
+   otherwise scroll it and slide rows under the monitor bar. `clip` (unlike `hidden`) is not
+   a scroll container. The terminal's own output area (.term-screen) still scrolls. */
+[data-mode="scene"] .term,
+[data-mode="scene"] .contacts,
+[data-mode="scene"] .mon-info {
+  overflow: clip;
+}
+
+/* portrait phones at a screen: the screen is the content; the identity keeps just the mark */
+[data-mode="scene"][data-view="laptop"] .identity :is(.name, .facts),
+[data-mode="scene"][data-view="monitor"] .identity :is(.name, .facts) {
+  display: none;
+}
+
+/* phone typing mode: nothing floats over the terminal while the keyboard is up */
+[data-mode="scene"][data-typing] :is(.identity, .back, .nav, .hint, .toggles) {
+  visibility: hidden;
+}
+
+/* transitions that follow the scene: chrome colours cross-fade with the 3D day/night mix
+   (600 ms), the back button fades instead of popping, the active tab's rule slides */
+[data-mode="scene"] :is(.identity, .identity a, .toggle, .nav button, .hint, .back) {
+  transition-property: color, border-color, background-color, text-shadow, opacity;
+  transition-duration: var(--d-slow);
+  transition-timing-function: var(--ease);
+}
+
+[data-mode="scene"] .back:not([hidden]) {
+  transition: opacity var(--d-base) var(--ease), color var(--d-slow) var(--ease);
+}
+
+@starting-style {
+  [data-mode="scene"] .back:not([hidden]) {
+    opacity: 0;
+  }
+}
+
+.nav button {
+  transition: color var(--d-fast) var(--ease), border-color var(--d-base) var(--ease);
+}
+
+/* ---- view mode (no UI): the interface fades out, one quiet eye button brings it back ---- */
+.toggle-view { display: none; }
+[data-mode="scene"] .toggle-view { display: inline-flex; }
+
+[data-mode="scene"][data-noui] :is(.identity, .bar, .nav, .hint, .back) {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--d-base) var(--ease), visibility 0s linear var(--d-base);
+}
+
+.noui-exit { display: none; }
+
+[data-mode="scene"] .noui-exit:not([hidden]) {
+  display: grid;
+  place-items: center;
+  position: fixed;
+  z-index: var(--z-chrome);
+  right: calc(env(safe-area-inset-right) + var(--sp-4));
+  bottom: calc(env(safe-area-inset-bottom) + var(--sp-4));
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-l);
+  color: var(--c-fg-muted);
+  opacity: 0.55;
+  transition: opacity var(--d-base) var(--ease), color var(--d-base) var(--ease);
+  filter: drop-shadow(0 0 1px var(--halo)) drop-shadow(0 0 4px var(--halo-soft));
+}
+
+[data-mode="scene"] .noui-exit:not([hidden]):is(:hover, :focus-visible) {
+  opacity: 1;
+  color: var(--c-fg);
+}
+
+@starting-style {
+  [data-mode="scene"] .noui-exit:not([hidden]) { opacity: 0; }
+}
+
+/* ---- top row (scene): one 44px row under the safe area, three aligned zones ----------------
+   left: the mark · centre: ← desk · right: day / view / sound. Every control is a flat 44px
+   target in the same type size; the identity details hang under the mark on the same left
+   edge, on the 4/8 spacing grid. */
+[data-mode="scene"] {
+  --top-row: 44px;
+  --top-y: max(env(safe-area-inset-top), var(--sp-2));
+}
+
+[data-mode="scene"] .bar {
+  top: var(--top-y);
+  height: var(--top-row);
+  min-height: 0;
+  padding: 0 calc(var(--gutter-r) - var(--sp-2)) 0 var(--gutter);
+  align-items: center;
+  background: none;
+  border: 0;
+}
+
+[data-mode="scene"] .identity {
+  top: var(--top-y);
+  left: var(--gutter);
+}
+
+[data-mode="scene"] .identity .mark-h {
+  display: flex;
+  align-items: center;
+  height: var(--top-row);
+  margin: 0;
+}
+
+[data-mode="scene"] .identity .mark {
+  font-size: 32px;
+  line-height: 1;
+  transform: none;
+}
+
+[data-mode="scene"] .identity .name {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-3);
+  line-height: 20px;
+}
+
+[data-mode="scene"] .identity .facts {
+  margin-top: var(--sp-2);
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-items: start;
+  gap: var(--sp-1);
+  font-size: var(--fs-2);
+  line-height: 20px;
+}
+
+[data-mode="scene"] .identity .facts dd { padding: 0; }
+
+[data-mode="scene"] .toggles {
+  height: var(--top-row);
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+[data-mode="scene"] .toggle {
+  height: var(--top-row);
+  min-height: var(--top-row);
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-2);
+}
+
+/* ← desk: centred in the same row, flat like the toggles (no box) */
+[data-mode="scene"] .back:not([hidden]) {
+  top: var(--top-y);
+  height: var(--top-row);
+  min-height: 0;
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: var(--r-s);
+  background: none;
+  color: var(--c-fg);
+  font-size: var(--fs-2);
+  gap: var(--sp-2);
+}
+
+[data-mode="scene"] .back:not([hidden]):hover {
+  color: var(--c-fg);
+  background: color-mix(in srgb, var(--c-bg) 35%, transparent);
+}
+
+@media (max-width: 719px) {
+  [data-mode="scene"] .identity .mark { font-size: 26px; }
+  [data-mode="scene"] .toggle { padding: 0; min-width: 44px; justify-content: center; }
+  [data-mode="scene"] .toggle-label { display: none; }
+}
+
+/* desktop reads from further away: one step up for the whole chrome (phones keep theirs) */
+@media (min-width: 720px) and (pointer: fine) {
+  [data-mode="scene"] .identity .mark { font-size: 40px; }
+  [data-mode="scene"] .identity .name { font-size: var(--fs-5); line-height: 26px; }
+  [data-mode="scene"] .identity .facts { font-size: var(--fs-4); line-height: 24px; gap: var(--sp-1); }
+  [data-mode="scene"] :is(.toggle, .back:not([hidden]), .nav button) { font-size: 0.9375rem; }
+  [data-mode="scene"] .hint, [data-boot="3d"] body:not([data-scene="ready"]) > #hint { font-size: var(--fs-2); }
+}
