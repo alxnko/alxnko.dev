@@ -65,7 +65,8 @@ export type LoadStep = 'manifest' | 'geometry' | 'lighting' | 'screens';
 export interface SceneHandle { world: SceneWorld; destroy(): void }
 
 const RING: Record<Ring, string> = { green: '#00ff82', purple: '#b061ff', off: '#161618' };
-const FAN_SPEED = [0, 7, 13, 20]; // rad/s
+const FAN_SPEED = [0, 12, 20, 28]; // rad/s
+const FAN_MAX_STEP = 0.45; // rad per frame (5 blades: 72° apart)
 const FAN_PCT = ['0', '40', '70', '100'];
 /** Portrait phones: the laptop screen sits between the name block and the on-screen keyboard. */
 const PHONE_BAND: [number, number] = [0.2, 0.62];
@@ -541,7 +542,9 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     if (Math.abs(fanTarget - fanSpeed) > 0.05) animating = true;
     if (!o.reducedMotion || fanTarget !== fanSpeed) {
       const drift = o.reducedMotion ? 1 : 1 + 0.04 * Math.sin(now / 3100);
-      fanAngle = (fanAngle + fanSpeed * drift * dt) % (Math.PI * 2);
+      // capped per frame below half the 72° blade spacing, so a slow frame never turns the
+      // spin into a backwards-looking strobe
+      fanAngle = (fanAngle + Math.min(fanSpeed * drift * dt, FAN_MAX_STEP)) % (Math.PI * 2);
       fan.quaternion.copy(fanQ0).multiply(q.setFromAxisAngle(fanAxis, fanAngle));
     }
 
