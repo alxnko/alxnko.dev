@@ -381,6 +381,20 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   // zoom-to-cursor shifts what you orbit around toward the point under the cursor
   const pan = [new Spring(160), new Spring(160), new Spring(160)];
 
+  // the room's inside (three.js axes; scene/dims.py: left wall x -1.40 with the window,
+  // back wall z -0.35, floor 0, ceiling 2.7, open toward the viewer and the right) less a margin
+  const ROOM_MIN = new Vector3(-1.40 + 0.15, 0.12, -0.35 + 0.15), ROOM_MAX = new Vector3(Infinity, 2.7 - 0.15, Infinity);
+  /** Largest t in (0, 1] keeping tgt + off·t inside the room (tgt is inside). */
+  const roomFit = (tgt: Vector3, off: Vector3) => {
+    let t = 1;
+    for (const ax of ['x', 'y', 'z'] as const) {
+      const p = tgt[ax] + off[ax] * t;
+      if (p < ROOM_MIN[ax]) t = (ROOM_MIN[ax] - tgt[ax]) / off[ax];
+      else if (p > ROOM_MAX[ax]) t = (ROOM_MAX[ax] - tgt[ax]) / off[ax];
+    }
+    return Math.max(0.05, t);
+  };
+
   // normal limits; view mode widens them (still bounded to the front of the models)
   const LIM = { normal: { yaw: 40, up: 22, down: 10, dolly: [0.35, 1.9], pan: 0.9 }, free: { yaw: 75, up: 38, down: 12, dolly: [0.25, 2.6], pan: 1.3 } } as const;
   let lim: { yaw: number; up: number; down: number; dolly: readonly [number, number]; pan: number } = LIM.normal;
@@ -590,6 +604,16 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       off.applyAxisAngle(upWorld, orbit.yaw.value);
       const right = new Vector3().crossVectors(off, upWorld).normalize();
       off.applyAxisAngle(right, -orbit.pitch.value);
+      // stay inside the room: past a wall, the window or the ceiling, the camera slides in
+      // toward what it looks at (the desk side stays free), and the dolly follows so zooming
+      // back in answers at once instead of unwinding the overshoot first
+      const t = roomFit(tgt.clamp(ROOM_MIN, ROOM_MAX), off);
+      if (t < 1) {
+        off.multiplyScalar(t);
+        const d = orbit.dolly.value * t;
+        if (orbit.dolly.target > d) orbit.dolly.target = d;
+        if (orbit.dolly.value > d) orbit.dolly.snap(d);
+      }
       camera.position.copy(tgt).add(off);
       camera.lookAt(tgt);
       lookAt.copy(tgt);
