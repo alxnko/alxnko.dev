@@ -206,16 +206,19 @@ def collect_overlays(objs):
                          "normalLocal": [0, 0, 1], "facing": rig_dir(fd, (0, -1, 0)),
                          "uv": "TEXCOORD_0 standard glTF like the screens: stored (0,0) = top-left, (1,1) = "
                                "bottom-right of the readout -> CanvasTexture (256x128) with flipY=false",
-                         "note": "not baked; flat quad 0.4 mm in front of the hub's dark window, faces the viewer; "
+                         "note": "not baked; flat quad 0.4 mm in front of the hub's round dark display disc, faces the viewer; "
                                  "runtime draws the fan speed (e.g. '100')"}
     for n, key in (("kbd_glow", "kbdGlow"), ("laptop_kbd_glow", "laptopKbdGlow")):
         ob = objs[n]
         vs = local_verts(ob)
+        # per-key tiles in the node's local XY plane (Blender): overall extent
+        xs_, ys_ = [v.x for v in vs], [v.y for v in vs]
         out[key] = {"center": g(rig_local(ob, Vector())),
-                    "size": [round((vs[1] - vs[0]).length, 4), round((vs[2] - vs[1]).length, 4)],
+                    "size": [round(max(xs_) - min(xs_), 4), round(max(ys_) - min(ys_), 4)],
+                    "tiles": len(ob.data.polygons),
                     "normal": rig_dir(ob, (0, 0, 1)),
-                    "note": "not baked; flat backlight plane under the key tops (inset, just above the "
-                            "plate / well) that shows only between the caps; additive, tint = ring colour; "
+                    "note": "not baked; flat backlight: one rect per key slot (tiles the key block) under the key "
+                            "tops, just above the plate / well, so it shows only between the caps; additive, tint = ring colour; "
                             "hidden from below by the case. UV 0..1 unused (flat)"}
     hits = {}
     for n in PADDLE_HITS:

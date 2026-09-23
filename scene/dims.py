@@ -26,9 +26,13 @@ PADDLE = dict(x=0.42, size=(0.13, 0.045, 0.022), below=0.03)
 # --- laptop (16", 16:10) -----------------------------------------------------
 # placed so that from cam_desk and cam_wide its lid never covers the ultrawide's
 # screen, and the fan + cat in front-left never cover the laptop screen
-LAPTOP = dict(x=-0.40, y=0.05, yaw=2.0, base=(0.36, 0.265, 0.025), lid_t=0.008,
-              open_deg=105.0, screen=(0.345, 0.216), bezel_side=0.0075,
-              bezel_top=0.009, chin=0.02)
+# it sits on a black foldable scissor stand (photos ref-new/1-4): keyboard deck tilted
+# up towards the back (front bottom edge ~2.2 cm, rear ~7.7 cm above the desk), lid
+# opened so the screen leans back only a little in world space
+LAPTOP = dict(x=-0.425, y=0.09, yaw=2.0, base=(0.36, 0.265, 0.025), lid_t=0.008,
+              open_deg=110.0, screen=(0.345, 0.216), bezel_side=0.0075,
+              bezel_top=0.009, chin=0.02, tilt=11.0, front_z=0.028)
+LSTAND = dict(xs=0.112, bar=(0.011, 0.004), pad=0.0015, rail=(-0.126, 0.104))
 
 # --- ultrawide (34" 21:9, 1500R) ---------------------------------------------
 MON = dict(x=0.20, front_y=0.20, screen=(0.80, 0.335), radius=1.5, bezel=0.006,
@@ -37,15 +41,15 @@ MON = dict(x=0.20, front_y=0.20, screen=(0.80, 0.335), radius=1.5, bezel=0.006,
 STAND = dict(neck=(0.075, 0.03), base=(0.25, 0.14, 0.012), base_y=0.228)
 
 # --- input -------------------------------------------------------------------
-KBD = dict(x=0.12, front_from_edge=0.105, yaw=-2.0, size=(0.38, 0.135, 0.022),
-           unit=0.019, pitch=3.0)
+KBD = dict(x=0.11, front_from_edge=0.105, yaw=-2.0, size=(0.400, 0.1375, 0.022),
+           unit=0.01905, pitch=3.0)
 PAD = dict(x=0.415, y=0.06, size=(0.36, 0.36, 0.003), yaw=1.5)
 MOUSE = dict(x=0.45, y=-0.05, yaw=-14.0, size=(0.105, 0.072, 0.07), tilt=57.0)
 GAMEPAD = dict(x=-0.005, y=0.075, yaw=-9.0, width=0.161)
 
 # --- fan + cat ------------------------------------------------------------------
-FAN = dict(x=-0.525, y=-0.24, yaw=16.0, r=0.09, depth=0.07, center_h=0.118)
-CAT = dict(head_w=0.064, head_yaw=40.0, head_tilt=6.0)     # yaw: turned towards the laptop; tilt > 0: chin up
+FAN = dict(x=-0.487, y=-0.25, yaw=6.0, r=0.09, depth=0.10, center_h=0.106)
+CAT = dict(head_w=0.064, head_yaw=40.0, head_tilt=6.0, neck_phi=-2.0)     # yaw: turned towards the laptop; tilt > 0: chin up
 
 # --- misc -----------------------------------------------------------------------
 SERVER = dict(x=0.84, y=0.17, size=(0.45, 0.30, 0.18))

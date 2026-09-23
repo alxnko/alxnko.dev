@@ -84,6 +84,9 @@ def build_materials():
     m["key_lime"] = C.mat("key_lime", KEY_LIME, edge=0.3, edge_hex="#d6f36a", bevel=0.0008)
     m["kbd_case"] = C.mat("kbd_case", "#141416", edge=0.5, edge_hex=C.G["600"], bevel=0.002)
     m["alu"] = C.mat("alu", C.G["400"], edge=0.3, edge_hex=C.G["200"], bevel=0.0008)
+    # laptop stand: matte black powder-coated steel, rubber pads/feet
+    m["lstand"] = C.mat("lstand", "#131315", rough=0.75, edge=0.4, edge_hex="#4a4a50", bevel=0.001)
+    m["rubber"] = C.mat("rubber", "#0a0a0b", rough=0.9, bevel=0.0)
     m["laptop"] = C.mat("laptop", "#121214", edge=0.45, edge_hex=C.G["600"], bevel=0.002)
     m["laptop_lid"] = C.mat("laptop_lid", "#151517", edge=0.4, edge_hex=C.G["600"], bevel=0.002)
     m["laptop_key"] = C.mat("laptop_key", "#1b1b1e", edge=0.4, edge_hex=C.G["600"], bevel=0.0005)
@@ -393,9 +396,152 @@ def build_paddle(m):
 
 # ------------------------------------------------------------------ laptop
 
-def laptop_matrix():
+def laptop_floor():
+    """Frame on the desk under the laptop (yawed, not tilted): the stand lives here."""
     L = D.LAPTOP
     return M_at((L["x"], L["y"], D.DESK_H), yaw=L["yaw"])
+
+
+def laptop_lift():
+    """Height of the laptop's bottom-centre above the desk on the stand."""
+    L = D.LAPTOP
+    return L["front_z"] + L["base"][1] / 2 * math.sin(R(L["tilt"]))
+
+
+def laptop_matrix():
+    """Laptop base frame: origin = bottom centre, deck tilted up towards the back."""
+    L = D.LAPTOP
+    return laptop_floor() @ Matrix.Translation((0, 0, laptop_lift())) @ C.euler((L["tilt"], 0, 0))
+
+
+def build_laptop_stand(m):
+    """Black foldable steel laptop stand (photo ref-new/1): per side a flat-bar frame
+    seen from the side as a scissor - bottom rail on the desk, top rail under the
+    laptop (tilted with it), hinged together at the front, two crossed bars in an X
+    holding the rear up; a front stop/lip the laptop rests against, silicone strips on
+    the top rails, rubber feet, a round cross tube at the rear and at the front."""
+    L, St = D.LAPTOP, D.LSTAND
+    t = R(L["tilt"])
+    hc = laptop_lift()
+    hb, tb = St["bar"]
+    y0, y1 = St["rail"]
+    Mf = laptop_floor()
+    parts = []
+
+    def top_pt(yp, dzp):
+        """Tilted-frame point (y', z') -> floor frame (y, z)."""
+        return Vector((yp * math.cos(t) - dzp * math.sin(t), hc + yp * math.sin(t) + dzp * math.cos(t)))
+
+    def bar(name, x, a, b, h=hb, w=tb, ext=0.0, mat_=None):
+        d = b - a
+        ln = d.length + 2 * ext
+        ang = math.degrees(math.atan2(d.y, d.x))
+        c = (a + b) / 2
+        return C.box(name, (w, ln, h), (x, c.x, c.y), rot=(ang, 0, 0), bevel=0.0012, segs=1,
+                     mat_=mat_ or m["lstand"])
+
+    rail_c = -St["pad"] - hb / 2                       # top rail centre below the laptop bottom
+    for sx in (-1, 1):
+        xs = sx * St["xs"]
+        # top rail (tilted) + silicone strip on it
+        a, b = top_pt(y0, rail_c), top_pt(y1, rail_c)
+        parts.append(bar(f"ls_top{sx}", xs, a, b))
+        pa, pb = top_pt(y0 + 0.012, -St["pad"] / 2), top_pt(y1 - 0.004, -St["pad"] / 2)
+        parts.append(bar(f"ls_pad{sx}", xs, pa, pb, h=St["pad"], w=0.012, mat_=m["rubber"]))
+        # bottom rail on the desk, rubber feet at both ends
+        fz = 0.003 + hb / 2
+        ba, bb = Vector((y0 - 0.002, fz)), Vector((y1 + 0.004, fz))
+        parts.append(bar(f"ls_bot{sx}", xs, ba, bb))
+        for yy in (y0 + 0.006, y1 - 0.004):
+            parts.append(C.box(f"ls_foot{sx}{yy:.3f}", (0.010, 0.016, 0.003), (xs, yy, 0.0015), bevel=0.0008,
+                               mat_=m["rubber"]))
+        # front hinge link: top rail front end down to the bottom rail front end
+        hf = top_pt(y0 + 0.005, rail_c)
+        parts.append(bar(f"ls_hinge{sx}", xs + sx * tb, Vector((y0 + 0.004, fz)), hf, h=0.012, ext=0.004))
+        # front stop: an upturned lip in front of the laptop's front face, rubber faced
+        lp0, lp1 = top_pt(-L["base"][1] / 2 - 0.0035, rail_c - 0.002), top_pt(-L["base"][1] / 2 - 0.0035, 0.013)
+        parts.append(bar(f"ls_lip{sx}", xs, lp0, lp1, h=0.0045, w=0.02))
+        lr0, lr1 = top_pt(-L["base"][1] / 2 - 0.0008, -0.001), top_pt(-L["base"][1] / 2 - 0.0008, 0.0125)
+        parts.append(bar(f"ls_lipr{sx}", xs, lr0, lr1, h=0.0012, w=0.017, mat_=m["rubber"]))
+        # scissor: two crossed bars (outer one front-bottom -> rear-top, inner one rear-bottom -> front-top)
+        A0, A1 = Vector((-0.030, fz)), top_pt(y1 - 0.010, rail_c)
+        B0, B1 = Vector((y1 - 0.006, fz)), top_pt(-0.028, rail_c)
+        parts.append(bar(f"ls_xa{sx}", xs + sx * tb, A0, A1, ext=0.004))
+        parts.append(bar(f"ls_xb{sx}", xs - sx * tb, B0, B1, ext=0.004))
+        # crossing point of the two bars -> pivot bolt through all three layers
+        d1, d2 = A1 - A0, B1 - B0
+        den = d1.x * d2.y - d1.y * d2.x
+        k = ((B0.x - A0.x) * d2.y - (B0.y - A0.y) * d2.x) / den
+        X = A0 + d1 * k
+        for nm, p in (("x", X), ("a0", A0), ("a1", A1), ("b0", B0), ("b1", B1), ("hf", hf)):
+            parts.append(C.cyl(f"ls_bolt{nm}{sx}", 0.0032, 3 * tb + 0.004, (xs, p.x, p.y), rot=(0, 90, 0), segs=8,
+                               mat_=m["lstand"]))
+    # cross tubes tying the two side frames together (rear on the bottom rails, front at the hinge)
+    for nm, p in (("rear", Vector((y1 - 0.006, 0.003 + hb / 2))), ("front", top_pt(y0 + 0.005, rail_c))):
+        parts.append(C.cyl(f"ls_tube_{nm}", 0.0045, 2 * St["xs"] - tb, (0, p.x, p.y), rot=(0, 90, 0), segs=12,
+                           mat_=m["lstand"]))
+    for p in parts:
+        xform(p, Mf)
+        Rg(p, 1.4 if "pad" not in p.name else 0.6)
+
+
+LAP_PM, LAP_PN, LAP_GAP = 0.0178, 0.0164, 0.003          # main pitch, numpad pitch, block gap
+LAP_X0 = -(15 * LAP_PM + LAP_GAP + 4 * LAP_PN) / 2
+
+
+def laptop_key_slots(y_bottom):
+    """(cx, cy, w, d) per laptop key slot, laptop-local. Rows bottom -> top."""
+    pm, pn = LAP_PM, LAP_PN
+    xn = LAP_X0 + 15 * pm + LAP_GAP                     # numpad block left edge
+    main = [
+        [1.25, 1, 1, 1.25, 5.5, 1, 1],                  # bottom row; arrows appended below
+        [2.25] + [1] * 10 + [2.75],
+        [1.75] + [1] * 11 + [2.25],
+        [1.5] + [1] * 12 + [1.5],
+        [1] * 13 + [2],
+    ]
+    out = []
+    for ri, row in enumerate(main):
+        y = y_bottom + ri * pm
+        x = LAP_X0
+        for wu in row:
+            out.append((x + wu * pm / 2, y, wu * pm, pm))
+            x += wu * pm
+        if ri == 0:                                      # arrows: left, up/down half height, right
+            out.append((x + pm / 2, y, pm, pm))
+            out.append((x + 1.5 * pm, y - pm / 4, pm, pm / 2))
+            out.append((x + 1.5 * pm, y + pm / 4, pm, pm / 2))
+            out.append((x + 2.5 * pm, y, pm, pm))
+    # numpad: 0 (2 wide) . | 1 2 3 | 4 5 6 | 7 8 9 | Num / * -  + Enter/+ 2 rows tall
+    for ri in range(5):
+        y = y_bottom + ri * pm
+        cols = {0: [(0, 2), (2, 1)], 1: [(0, 1), (1, 1), (2, 1)], 2: [(0, 1), (1, 1), (2, 1)],
+                3: [(0, 1), (1, 1), (2, 1)], 4: [(0, 1), (1, 1), (2, 1), (3, 1)]}[ri]
+        for c0, cw in cols:
+            out.append((xn + (c0 + cw / 2) * pn, y, cw * pn, pm))
+    for ri in (0, 2):                                    # Enter (rows 0-1), + (rows 2-3)
+        out.append((xn + 3.5 * pn, y_bottom + (ri + 0.5) * pm, pn, 2 * pm))
+    # F row: half height, 15 over the main block + 4 over the numpad
+    yf = y_bottom + 4 * pm + 0.75 * pm + 0.0015
+    for i in range(15):
+        out.append((LAP_X0 + (i + 0.5) * pm, yf, pm, pm / 2))
+    for i in range(4):
+        out.append((xn + (i + 0.5) * pn, yf, pn, pm / 2))
+    return out
+
+
+def glow_tiles(name, slots, z, mat_):
+    """One flat rect per key slot at height z (the slots tile the key block, so the
+    rects only show through the gaps between caps)."""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new("UVMap")
+    for cx, cy, w, d in slots:
+        vs = [bm.verts.new((cx + sx * w / 2, cy + sy * d / 2, z)) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+        f = bm.faces.new(vs)
+        for loop, uv in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
+            loop[uvl].uv = uv
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6)
+    return obj_from_bm(name, bm, mat_)
 
 
 def build_laptop(m):
@@ -403,7 +549,7 @@ def build_laptop(m):
     bw, bd, bh = L["base"]
     M = laptop_matrix()
     parts = []
-    base = C.box("lap_base", (bw, bd, bh), (0, 0, bh / 2), bevel=0.004, segs=2, drop_bottom=True)
+    base = C.box("lap_base", (bw, bd, bh), (0, 0, bh / 2), bevel=0.004, segs=2)  # underside visible now
     base.data.materials.append(m["laptop"])
     parts.append(base)
     # palm-rest wear reference (texture space for the material)
@@ -412,42 +558,26 @@ def build_laptop(m):
     ref.matrix_world = M
     palm_wear(m["laptop"], ref)
     top = bh
-    kb_y0, kb_y1 = -0.034, 0.098
-    parts.append(C.box("lap_well", (0.342, kb_y1 - kb_y0 + 0.004, 0.0006),
+    # 16" gaming-laptop deck (photos ref-new/3,4): chiclet keys in a dark recessed well,
+    # main block 15u + a 4-column numpad, half-height F row and up/down arrows, large
+    # touchpad centred under the main block
+    kb_y0, kb_y1 = -0.012, 0.093
+    parts.append(C.box("lap_well", (0.342, kb_y1 - kb_y0, 0.0006),
                        (0, (kb_y0 + kb_y1) / 2, top + 0.0002), bevel=0.0, mat_=m["laptop_well"]))
-    pitch = 0.01785
-    rows = [
-        [1.5, 1, 1.25, 5.5, 1.25, 1.25, 0.25, 1, 1, 1, 0.25, 2, 1],        # bottom (arrows)
-        [2.25] + [1] * 10 + [1.75, 1, 0.25, 1, 1, 1, 1],
-        [1.75] + [1] * 11 + [2.25, 0.25, 1, 1, 1, 1],
-        [1.5] + [1] * 12 + [1.5, 0.25, 1, 1, 1, 1],
-        [1] * 13 + [2, 0.25, 1, 1, 1, 1],
-        [1] * 15 + [0.25, 1, 1, 1, 1],                                   # F row (half height)
-    ]
-    gaps = {6: {6, 10}, 1: {13}, 2: {13}, 3: {14}, 4: {14}, 5: {15}}
-    for ri, row in enumerate(rows):
-        total = sum(row)
-        x = -total * pitch / 2
-        y = kb_y0 + 0.009 + ri * pitch + (0.002 if ri == 5 else 0)
-        hgt = 0.5 if ri == 5 else 1.0
-        for ci, wu in enumerate(row):
-            is_gap = wu == 0.25
-            if not is_gap:
-                kw = wu * pitch - 0.0022
-                kd = hgt * pitch - 0.0022
-                cy = y - (pitch - hgt * pitch) / 2 if ri == 5 else y
-                parts.append(C.box(f"lk{ri}_{ci}", (kw, kd, 0.0016), (x + wu * pitch / 2, cy, top + 0.0009),
-                                   bevel=0.0005, top_only=True, drop_bottom=True, mat_=m["laptop_key"]))
-            x += wu * pitch
-    # runtime backlight under the laptop keys: above the well (top + 0.0005), below the
-    # key tops (top + 0.0017), inset so it only shows between the keys
+    slots = laptop_key_slots(kb_y0 + 0.011)
+    for i, (cx, cy, w, d) in enumerate(slots):
+        parts.append(C.box(f"lk{i}", (w - 0.0030, d - 0.0030, 0.0016), (cx, cy, top + 0.0009),
+                           bevel=0.0, drop_bottom=True, taper=0.95, mat_=m["laptop_key"]))
+    # runtime backlight: one rect per key slot (the slots tile the block), 0.8 mm above the
+    # well, inside the key bodies: the key tops hide it, it shows only in the gaps between keys
     zg = top + 0.0009
-    xg, yb, yt = 0.168, kb_y0 + 0.002, 0.064
-    kglow = plane("laptop_kbd_glow", [(-xg, yb, zg), (xg, yb, zg), (xg, yt, zg), (-xg, yt, zg)],
-                  m["backlight"], uvs=[(0, 0), (1, 0), (1, 1), (0, 1)])
+    kglow = glow_tiles("laptop_kbd_glow", slots, zg, m["backlight"])
     kglow.matrix_world = M
-    C.set_origin(kglow, M @ Vector((0, (yb + yt) / 2, zg)))
-    parts.append(C.box("touchpad", (0.122, 0.074, 0.0005), (-0.028, -0.086, top + 0.0001), bevel=0.0,
+    xs_ = [c[0] for c in slots]
+    ys_ = [c[1] for c in slots]
+    C.set_origin(kglow, M @ Vector(((min(xs_) + max(xs_)) / 2, (min(ys_) + max(ys_)) / 2, zg)))
+    main_cx = LAP_X0 + 15 * LAP_PM / 2
+    parts.append(C.box("touchpad", (0.126, 0.076, 0.0005), (main_cx, -0.066, top + 0.0001), bevel=0.0,
                        mat_=m["touchpad"]))
     # rear vents and hinge bar
     for i in range(9):
@@ -505,10 +635,10 @@ def palm_wear(material, ref):
     tc = nt.nodes.new("ShaderNodeTexCoord")
     tc.object = ref
     acc = None
-    for px in (-0.105, 0.075):
+    for px in (-0.125, 0.07):
         sub = nt.nodes.new("ShaderNodeVectorMath")
         sub.operation = "SUBTRACT"
-        sub.inputs[1].default_value = (px, -0.095, 0.025)
+        sub.inputs[1].default_value = (px, -0.085, 0.025)
         nt.links.new(tc.outputs["Object"], sub.inputs[0])
         sc = nt.nodes.new("ShaderNodeVectorMath")
         sc.operation = "MULTIPLY"
@@ -676,74 +806,135 @@ def bm_oval(rx, ry, t, segs):
 
 # ------------------------------------------------------------------ keyboard
 
+# 96% / "1800 compact" board as photographed (ref IMG_..._130902): 20u wide.
+# Each entry: (x in u from the left, width u, colour) with colour d dark, g grey, l lime.
+# Rows top (F row) -> bottom. The numpad '+' and Enter are 2 rows tall (KBD_TALL).
+def _row(*items, x=0.0):
+    out = []
+    for it in items:
+        if isinstance(it, (int, float)):                 # gap
+            x += it
+            continue
+        w, c = it
+        out.append((x, w, c))
+        x += w
+    return out
+
+
 KBD_ROWS = [
-    # (width_u, colour)  colour: d dark, g grey, l lime, - gap
-    [(1, "l"), (0.25, "-")] + [(1, "d")] * 4 + [(0.25, "-")] + [(1, "g")] * 4 + [(0.25, "-")]
-    + [(1, "d")] * 4 + [(0.25, "-"), (1, "g")],
-    [(1, "g")] + [(1, "d")] * 12 + [(2, "g"), (1, "g"), (1, "d"), (1, "d"), (1, "g")],
-    [(1.5, "g")] + [(1, "d")] * 12 + [(1.5, "d"), (1, "d"), (1, "d"), (1, "d"), (1, "l")],
-    [(1.75, "g")] + [(1, "d")] * 11 + [(2.25, "l"), (1, "d"), (1, "d"), (1, "d"), (1, "g")],
-    [(2.25, "g")] + [(1, "d")] * 10 + [(1.75, "g"), (1, "l"), (1, "d"), (1, "d"), (1, "d"), (1, "l")],
-    [(1.25, "g"), (1.25, "g"), (1.25, "g"), (6.25, "l"), (1, "g"), (1, "g"), (1, "g"),
-     (1, "l"), (1, "l"), (1, "l"), (1, "d"), (1, "g")],
+    _row((1, "l"), 0.5, *[(1, "d")] * 4, 0.5, *[(1, "g")] * 4, 0.5, *[(1, "d")] * 4, 0.5, (1, "g")),
+    _row(*[(1, "d")] * 13, (2, "l"), (1, "g"), (1, "g"), (1, "g"), (1, "g"), (1, "g")),
+    _row((1.5, "g"), *[(1, "d")] * 12, (1.5, "d"), (1, "g"), (1, "d"), (1, "d"), (1, "d")),
+    _row((1.75, "g"), *[(1, "d")] * 11, (2.25, "g"), (1, "g"), (1, "d"), (1, "d"), (1, "d")),
+    _row((2.25, "g"), *[(1, "d")] * 10, (1.75, "g"), (1, "l"), (1, "g"), (1, "d"), (1, "d"), (1, "d")),
+    _row((1.25, "g"), (1.25, "g"), (1.25, "g"), (6.25, "l"), (1, "g"), (1, "g"), (1, "g"),
+         (1, "l"), (1, "l"), (1, "l"), (2, "d"), (1, "d")),
 ]
+KBD_TALL = [(2, 19, "g"), (4, 19, "l")]                 # (top row, x u, colour): numpad + and Enter
+# OEM-like sculpt per row: cap height above the plate (m) and top-face angle (deg, >0 = back higher)
+KBD_PROFILE = {0: (0.0112, 9.0), 1: (0.0108, 7.0), 2: (0.0094, 3.0), 3: (0.0088, 0.0), 4: (0.0092, -4.0),
+               5: (0.0094, -7.0)}
+
+
+def bm_keycap(w, d, h, tilt, gap=0.0008):
+    """Low-poly sculpted cap: chamfered-rect skirt, tapered sides, top shifted back and
+    angled per row, a shallow dish (inner ring lowered). ~38 tris."""
+    bw, bd = w - gap, d - gap
+    tw, td = bw - 0.0046, bd - 0.0052
+    ty = 0.0008                                          # top sits a touch towards the back
+    k = math.tan(math.radians(tilt))
+
+    def ring(rw, rd, c, yoff, zf):
+        pts = [(rw / 2, -rd / 2 + c), (rw / 2, rd / 2 - c), (rw / 2 - c, rd / 2), (-rw / 2 + c, rd / 2),
+               (-rw / 2, rd / 2 - c), (-rw / 2, -rd / 2 + c), (-rw / 2 + c, -rd / 2), (rw / 2 - c, -rd / 2)]
+        return [(x, y + yoff, zf(y + yoff)) for x, y in pts]
+
+    bm = bmesh.new()
+    r0 = [bm.verts.new(p) for p in ring(bw, bd, 0.0012, 0.0, lambda y: 0.0)]
+    r1 = [bm.verts.new(p) for p in ring(tw, td, 0.0016, ty, lambda y: h + k * y)]
+    r2 = [bm.verts.new(p) for p in ring(tw - 0.003, td - 0.003, 0.0012, ty, lambda y: h + k * y - 0.0006)]
+    for a, b in ((r0, r1), (r1, r2)):
+        for i in range(8):
+            j = (i + 1) % 8
+            bm.faces.new((a[i], a[j], b[j], b[i]))
+    bm.faces.new(r2)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
 
 
 def build_keyboard(m):
     K = D.KBD
     kw, kd, kh = K["size"]
     u = K["unit"]
+    border = 0.0095
     front = -D.TOP[1] / 2 + K["front_from_edge"]
     cy = front + kd / 2
     lift = kd / 2 * math.sin(R(K["pitch"])) + 0.0005
     M = M_at((K["x"], cy, D.DESK_H + lift), yaw=K["yaw"]) @ C.euler((K["pitch"], 0, 0))
-    parts = [C.box("kbd_case", (kw, kd, kh), (0, 0, kh / 2), bevel=0.004, segs=2, mat_=m["kbd_case"],
-                   drop_bottom=True)]
+    case = C.box("kbd_case", (kw, kd, kh), (0, 0, kh / 2), bevel=0.004, segs=2, mat_=m["kbd_case"],
+                 drop_bottom=True)
+    for v in case.data.vertices:                         # slight front slope
+        if v.co.y < -kd / 2 + 0.006:
+            v.co.y += 0.004 * max(0.0, v.co.z) / kh
+    parts = [case]
+    x0 = -20 * u / 2
+    top_row_y = kd / 2 - border - u / 2
+    fgap = 0.004                                        # F row stands a little apart
+
+    def row_y(ri):
+        return top_row_y - ri * u - (fgap if ri > 0 else 0.0)
+
+    # raised rim around the plate (the photos' thick frame): hides the backlight edges
+    iy0, iy1 = row_y(5) - u / 2 - 0.0008, top_row_y + u / 2 + 0.0008
+    ix0, ix1 = x0 - 0.0008, -x0 + 0.0008
+    rh = 0.0045
+    for nm, (a, b, c, d_) in (("kbd_rim_f", (-kw / 2, kw / 2, -kd / 2, iy0)), ("kbd_rim_b", (-kw / 2, kw / 2, iy1, kd / 2)),
+                              ("kbd_rim_l", (-kw / 2, ix0, iy0, iy1)), ("kbd_rim_r", (ix1, kw / 2, iy0, iy1))):
+        parts.append(C.box(nm, (b - a, d_ - c, rh), ((a + b) / 2, (c + d_) / 2, kh + rh / 2 - 0.001), bevel=0.0015,
+                           mat_=m["kbd_case"], drop_bottom=True))
     colours = {"d": m["key_dark"], "g": m["key_grey"], "l": m["key_lime"]}
-    x0 = -19 * u / 2
-    top_row_y = kd / 2 - 0.0085 - u / 2
-    row_cap_idx = 0
-    knob_x = None
+    slots = []
+    n = 0
     for ri, row in enumerate(KBD_ROWS):
-        y = top_row_y - ri * u - (0.004 if ri > 0 else 0.0)
-        x = x0
-        for wu, col in row:
-            if col != "-":
-                h = 0.0088 + RNG.uniform(-0.0003, 0.0003) + (0.0006 if ri in (0, 5) else 0.0)
-                cap = C.box(f"cap{ri}_{row_cap_idx}", (wu * u - 0.0024, u - 0.0024, h),
-                            (x + wu * u / 2, y, kh + h / 2 - 0.0005), bevel=0.0011, top_only=True,
-                            taper=0.80 if wu < 3 else 0.93, drop_bottom=True, mat_=colours[col])
-                parts.append(cap)
-                row_cap_idx += 1
-            x += wu * u
-        if ri == 0:
-            knob_x = x
-    # knob cluster: top right, over the remaining width of the F row
-    span = x0 + 19 * u - knob_x
+        h, tilt = KBD_PROFILE[ri]
+        for xu, wu, col in row:
+            bm = bm_keycap(wu * u, u, h + RNG.uniform(-0.0002, 0.0002), tilt)
+            cx, cyy = x0 + (xu + wu / 2) * u, row_y(ri)
+            bmesh.ops.translate(bm, vec=(cx, cyy, kh - 0.0005), verts=bm.verts)
+            parts.append(obj_from_bm(f"cap{ri}_{n}", bm, colours[col]))
+            slots.append((cx, cyy, wu * u, u))
+            n += 1
+    for ri, xu, col in KBD_TALL:
+        h = (KBD_PROFILE[ri][0] + KBD_PROFILE[ri + 1][0]) / 2
+        bm = bm_keycap(u, 2 * u, h, 0.0)
+        cx, cyy = x0 + (xu + 0.5) * u, (row_y(ri) + row_y(ri + 1)) / 2
+        bmesh.ops.translate(bm, vec=(cx, cyy, kh - 0.0005), verts=bm.verts)
+        parts.append(obj_from_bm(f"capt{ri}", bm, colours[col]))
+        slots.append((cx, cyy, u, 2 * u))
+    # control panel over the numpad columns of the F row: alu plate, 3 small knobs + a big one
+    knob_x = x0 + 16 * u
+    span = 4 * u
     kx = knob_x + span / 2
-    parts.append(C.box("knob_plate", (span - 0.004, u - 0.003, 0.004), (kx, top_row_y, kh + 0.002),
+    parts.append(C.box("knob_plate", (span - 0.001, u - 0.002, 0.004), (kx, top_row_y, kh + 0.002),
                        bevel=0.0012, mat_=m["alu"]))
     for i in range(3):
         parts.append(C.cyl(f"knob_s{i}", 0.0042, 0.006, (kx - span / 2 + 0.010 + i * 0.012, top_row_y,
-                                                          kh + 0.007), segs=12, mat_=m["alu"],
+                                                          kh + 0.007), segs=12, mat_=m["key_dark"],
                            bevel=0.0006))
     parts.append(C.cyl("knob_big", 0.0085, 0.013, (kx + span / 2 - 0.012, top_row_y, kh + 0.0095),
-                       segs=18, mat_=m["alu"], bevel=0.001))
+                       segs=18, mat_=m["key_dark"], bevel=0.001))
     for p in parts:
         xform(p, M)
         Rg(p, 1.3 if p.name == "kbd_case" else 1.1)
-    led = C.box("led_kbd", (0.003, 0.003, 0.0015), (knob_x - 0.002, top_row_y + 0.008, kh + 0.0006),
+    led = C.box("led_kbd", (0.003, 0.003, 0.0015), (knob_x + 0.0035, top_row_y - u / 2 + 0.0035, kh + 0.0045),
                 bevel=0.0004, mat_=m["led_green"])
     xform(led, M)
-    # runtime backlight: one plane 1.2 mm above the plate, under the cap tops, inset so
-    # the outer caps + case walls hide its edges (shows only in the gaps between caps)
-    yt, yb = top_row_y + u / 2 - 0.003, top_row_y - 5 * u - 0.004 - u / 2 + 0.003
-    xl, xr = x0 + 0.003, x0 + 19 * u - 0.003
+    # runtime backlight: one rect per key slot 1.2 mm above the plate, under the cap tops;
+    # the slots tile the key block (none under the F-row gaps / knob panel), the rim hides the edges
     zg = kh + 0.0012
-    glow = plane("kbd_glow", [(xl, yb, zg), (xr, yb, zg), (xr, yt, zg), (xl, yt, zg)], m["backlight"],
-                 uvs=[(0, 0), (1, 0), (1, 1), (0, 1)])
+    glow = glow_tiles("kbd_glow", slots, zg, m["backlight"])
     glow.matrix_world = M
-    C.set_origin(glow, M @ Vector(((xl + xr) / 2, (yt + yb) / 2, zg)))
+    C.set_origin(glow, M @ Vector((0.0, (iy0 + iy1) / 2, zg)))
     return led, M, glow
 
 
@@ -946,23 +1137,23 @@ def build_fan(m):
     fy = -dep / 2                                    # front plane (fan-local, -Y faces the viewer)
     parts = [obj_from_bm("fan_housing", bm_tube(r, r - 0.006, dep, 48), m["fan"])]
     # rolled rear lip + flat front bezel (annulus slab) proud of the housing
-    parts.append(C.torus("fan_lip_back", r - 0.003, 0.0035, (0, dep / 2, 0), rot=(90, 0, 0), major=48,
-                         minor=6, mat_=m["fan"]))
+    parts.append(C.torus("fan_lip_back", r - 0.003, 0.0035, (0, dep / 2, 0), rot=(90, 0, 0), major=40,
+                         minor=4, mat_=m["fan"]))
     bez = bm_tube(r + 0.0006, r - 0.0105, 0.004, 48)
     bmesh.ops.translate(bez, vec=(0, fy - 0.0015, 0), verts=bez.verts)
     parts.append(obj_from_bm("fan_bezel", bez, m["fan_rim"]))
     parts.append(C.cyl("fan_rear", r - 0.006, 0.003, (0, dep / 2 - 0.006, 0), rot=(90, 0, 0), segs=36,
                        mat_=m["fan_back"]))
     for rr in (0.03, 0.055, 0.075):
-        parts.append(C.torus(f"fan_rgr{rr}", rr, 0.0012, (0, dep / 2 - 0.008, 0), rot=(90, 0, 0), major=32,
-                             minor=4, mat_=m["fan_grille"]))
+        parts.append(C.torus(f"fan_rgr{rr}", rr, 0.0012, (0, dep / 2 - 0.008, 0), rot=(90, 0, 0), major=28,
+                             minor=3, mat_=m["fan_grille"]))
     parts.append(C.cyl("fan_motor", 0.026, 0.03, (0, dep / 2 - 0.022, 0), rot=(90, 0, 0), segs=20,
                        mat_=m["fan_back"]))
     # front grille: fine concentric rings + four thin spokes
     gy = fy + 0.003
-    for i in range(7):
-        rr = 0.032 + i * (0.079 - 0.032) / 6
-        parts.append(C.torus(f"fan_gr{i}", rr, 0.0009, (0, gy, 0), rot=(90, 0, 0), major=44, minor=4,
+    for i in range(9):
+        rr = 0.035 + i * (0.0795 - 0.035) / 8
+        parts.append(C.torus(f"fan_gr{i}", rr, 0.0007, (0, gy, 0), rot=(90, 0, 0), major=32, minor=3,
                              mat_=m["fan_grille"]))
     for i in range(4):
         a = 2 * math.pi * i / 4 + R(45)
@@ -970,12 +1161,16 @@ def build_fan(m):
         parts.append(C.box(f"fan_spoke{i}", (r - 0.032, 0.0018, 0.0018),
                            (mid * math.cos(a), gy, mid * math.sin(a)),
                            rot=(0, -math.degrees(a), 0), bevel=0.0, mat_=m["fan_grille"]))
-    # hub: domed cap in housing graphite with a dark display window
-    parts.append(C.cyl("fan_cap", 0.027, 0.011, (0, fy + 0.0045, 0), rot=(90, 0, 0), segs=32,
-                       mat_=m["fan"], bevel=0.003))
+    # hub (photos): graphite rim around a round dark glass disc carrying the "100" readout,
+    # a small round button below the digits
+    parts.append(C.cyl("fan_cap", 0.030, 0.011, (0, fy + 0.0045, 0), rot=(90, 0, 0), segs=32,
+                       mat_=m["fan"], bevel=0.0025))
     dw, dh = FAN_DISPLAY
-    parts.append(C.box("fan_window", (dw + 0.004, 0.0012, dh + 0.003), (0, fy - 0.0012, 0), bevel=0.0012,
+    disc_front = fy - 0.001 - 0.0014                 # cap front (fy - 0.001) + 1.4 mm disc
+    parts.append(C.cyl("fan_disc", 0.0245, 0.0016, (0, disc_front + 0.0008, 0), rot=(90, 0, 0), segs=32,
                        mat_=m["fan_dark"]))
+    parts.append(C.cyl("fan_button", 0.0034, 0.0014, (0, disc_front - 0.0005, -0.0155), rot=(90, 0, 0),
+                       segs=12, mat_=m["fan_grille"], bevel=0.0004))
     # U bracket: wide flat band from the pivots straight down, round corners, flat on the desk
     bz = -F["center_h"] + 0.0035
     ax = r + 0.012
@@ -983,6 +1178,17 @@ def build_fan(m):
             (-ax + 0.034, 0, bz), (ax - 0.034, 0, bz), (ax - 0.016, 0, bz + 0.003), (ax - 0.004, 0, bz + 0.016),
             (ax, 0, bz + 0.045), (ax, 0, 0.012)]
     parts.append(C.sweep("fan_bracket", C.catmull(path, 5), C.rect_profile(0.028, 0.007), m["fan"]))
+    # flat base plate the U stands on (rounded rectangle in plan)
+    pw, pd, pt = 2 * ax + 0.014, 0.078, 0.005
+    pl = bmesh.new()
+    ring_ = [pl.verts.new((x, y, -F["center_h"])) for x, y in rounded_rect(pw, pd, 0.02, 3)]
+    top_ = [pl.verts.new((x, y, -F["center_h"] + pt)) for x, y in rounded_rect(pw, pd, 0.02, 3)]
+    pl.faces.new(top_)
+    for i in range(len(ring_)):
+        j = (i + 1) % len(ring_)
+        pl.faces.new((ring_[i], ring_[j], top_[j], top_[i]))
+    bmesh.ops.recalc_face_normals(pl, faces=pl.faces)
+    parts.append(obj_from_bm("fan_plate", pl, m["fan_rim"]))
     for sx in (-1, 1):
         parts.append(C.cyl(f"fan_arm{sx}", 0.018, 0.007, (sx * ax, 0, 0), rot=(0, 90, 0), segs=24,
                            mat_=m["fan"], bevel=0.0015))
@@ -996,10 +1202,10 @@ def build_fan(m):
     ring = obj_from_bm("fan_ring", bm_annulus_torus(r - 0.0052, 0.0026, 0.0011, fy - 0.0035), m["fan_ring"])
     ring.matrix_world = M
     C.set_origin(ring, M @ Vector((0, fy - 0.0035, 0)))
-    y_d = fy - 0.0012 - 0.0006 - 0.0004              # 0.4 mm in front of the window face
+    y_d = disc_front - 0.0004                        # 0.4 mm in front of the round display disc
     corners = [(-dw / 2, 0, -dh / 2), (dw / 2, 0, -dh / 2), (dw / 2, 0, dh / 2), (-dw / 2, 0, dh / 2)]
     disp = plane("fan_display", corners, m["screen"], uvs=[(0, 0), (1, 0), (1, 1), (0, 1)])
-    disp.matrix_world = M @ Matrix.Translation((0, y_d, 0))
+    disp.matrix_world = M @ Matrix.Translation((0, y_d, 0.003))
 
     # blades: separate node, pivot at hub, spin axis = local Blender Y (= glTF local Z)
     bm = bmesh.new()
@@ -1089,6 +1295,7 @@ def build_cat(m):
     rings = []
     for phi, w, t in ((-56, 0.022, 0.030), (-47, 0.035, 0.046), (-35, 0.043, 0.056), (-20, 0.045, 0.058),
                       (-4, 0.043, 0.055), (11, 0.040, 0.054), (23, 0.035, 0.053), (32, 0.027, 0.044)):
+        w *= 1.15                                     # the drum is 10 cm deep: fuller loaf
         sec = [(-0.84 * w, 0.0), (-w, 0.42 * t), (-0.74 * w, 0.84 * t), (-0.16 * w, t), (0.0, t - 0.0045),
                (0.16 * w, t), (0.74 * w, 0.84 * t), (w, 0.42 * t), (0.84 * w, 0.0)]
         rings.append([bm.verts.new(W(A(phi, yo + y, h))) for y, h in sec])
@@ -1103,13 +1310,13 @@ def build_cat(m):
         bm.faces.new((rings[-1][j], rings[-1][(j + 1) % n], chest))
     # front legs: from the chest over the front edge, draping down the bezel, paws at the end
     for phi in (27.0, 14.0):
-        top = A(phi, -0.026, 0.016)
-        pts = [top, A(phi + 1, -0.042, 0.010), A(phi + 2, -0.049, -0.004), A(phi + 2, -0.051, -0.013)]
+        top = A(phi, -0.036, 0.016)
+        pts = [top, A(phi + 1, -0.057, 0.010), A(phi + 2, -0.064, -0.004), A(phi + 2, -0.066, -0.013)]
         tube(bm, [Vector(p) for p in pts], [(0.011, 0.012), (0.0105, 0.010), (0.010, 0.0095), (0.0115, 0.010)],
-             n=6, tip=A(phi + 2.5, -0.057, -0.019))
+             n=6, tip=A(phi + 2.5, -0.072, -0.019))
     # hind leg: faceted haunch on the front flank at the hips, foot tucked in above the tail
-    tube(bm, [A(-37, -0.028, 0.027), A(-31, -0.039, 0.021)], [(0.016, 0.014), (0.011, 0.009)], n=6,
-         tip=A(-25, -0.044, 0.018))
+    tube(bm, [A(-37, -0.036, 0.027), A(-31, -0.050, 0.021)], [(0.016, 0.014), (0.011, 0.009)], n=6,
+         tip=A(-25, -0.057, 0.018))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     body = obj_from_bm("cat_body", bm, m["cat"])
     C.set_origin(body, W((0.0, 0.0, 0.0)))
@@ -1117,7 +1324,8 @@ def build_cat(m):
 
     # head: faceted diamond (the mark's head seen along the gaze) + ear prisms, raised at the
     # laptop end of the loaf and turned towards the laptop / viewer
-    neck = A(21, yo - 0.002, 0.036)
+    nphi = Ct["neck_phi"]
+    neck = A(nphi, yo - 0.002, 0.036)
     Hm = (Matrix.Translation(neck) @ C.euler((0, 0, -90.0 + Ct["head_yaw"]))
           @ C.euler((0, -Ct["head_tilt"], 0)))
     s = Ct["head_w"] / 122.0                       # the mark's head is 122 px wide
@@ -1153,7 +1361,7 @@ def build_cat(m):
         for i in range(3):
             bm.faces.new((front[i], back_[i], back_[(i + 1) % 3], front[(i + 1) % 3]))
     # neck: short faceted tube from the shoulders up into the back of the head
-    tube(bm, [A(16, yo - 0.002, 0.028), neck, Hm @ (hc + Vector((-0.010, 0, -0.010)))],
+    tube(bm, [A(nphi - 5, yo - 0.002, 0.028), neck, Hm @ (hc + Vector((-0.010, 0, -0.010)))],
          [(0.019, 0.017), (0.016, 0.015), (0.014, 0.013)], n=6, cap0=True)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     head = obj_from_bm("cat_head", bm, m["cat"])
@@ -1162,12 +1370,12 @@ def build_cat(m):
 
     # tail: from the rump round the hip and forward along the front edge of the housing top,
     # under the hind leg towards the front paws (the loaf's wrapped tail; faces the camera)
-    tpath = [A(-57, yo + 0.004, 0.020), A(-64, -0.012, 0.015), A(-63, -0.032, 0.011), A(-54, -0.046, 0.008),
-             A(-42, -0.052, 0.006), A(-30, -0.054, 0.005), A(-19, -0.054, 0.006)]
+    tpath = [A(-57, yo + 0.004, 0.020), A(-64, -0.016, 0.015), A(-63, -0.036, 0.011), A(-54, -0.046, 0.008),
+             A(-42, -0.050, 0.006), A(-30, -0.051, 0.005), A(-19, -0.051, 0.006)]
     radii = [(0.0105, 0.0095), (0.0098, 0.0088), (0.0092, 0.0082), (0.0086, 0.0077), (0.008, 0.0072),
              (0.0072, 0.0065), (0.0062, 0.0056)]
     bm = bmesh.new()
-    tube(bm, tpath, radii, n=6, tip=A(-11, -0.052, 0.008))
+    tube(bm, tpath, radii, n=6, tip=A(-11, -0.049, 0.008))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     tail = obj_from_bm("cat_tail", bm, m["cat"])
     C.set_origin(tail, W(tpath[0]))
@@ -1267,7 +1475,7 @@ def build_room(m):
     rx = x + 0.055
     for i in range(10):
         yy = Wn["y"] - 0.34 + i * 0.075
-        S(C.box(f"rad{i}", (0.07, 0.05, 0.5), (rx, yy, 0.40), bevel=0.012, segs=2, mat_=m["white"]), 0.35,
+        S(C.box(f"rad{i}", (0.07, 0.05, 0.5), (rx, yy, 0.40), bevel=0.012, segs=1, mat_=m["white"]), 0.35,
           room=True)
     for zz in (0.18, 0.62):
         S(C.cyl(f"radp{zz}", 0.012, 0.76, (rx, Wn["y"], zz), rot=(90, 0, 0), segs=10, mat_=m["white"]), 0.25,
@@ -1392,6 +1600,7 @@ def main():
     build_desk(m)
     led_paddle, hit_paddle = build_paddle(m)
     scr_l, hit_l, lap_glow = build_laptop(m)
+    build_laptop_stand(m)
     scr_m, hit_m, ring, glow = build_monitor(m)
     led_kbd, _kbd_M, kbd_glow = build_keyboard(m)
     build_pad(m)
