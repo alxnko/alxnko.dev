@@ -15,3 +15,5 @@ dist/
 *.log
 .superpowers/
 .claude/worktrees/
+test-results/
+playwright-report/
