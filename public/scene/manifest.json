@@ -1,5 +1,5 @@
 {
-  "version": "8a8344a6",
+  "version": "617a22d5",
   "deskBase": 0.74,
   "presets": [
     0.74,
@@ -138,36 +138,36 @@
     }
   },
   "files": {
-    "glb": "desk.8a8344a6.glb",
+    "glb": "desk.617a22d5.glb",
     "atlas": {
       "day": {
-        "2048": "atlas-day-2048.c98f3b7b.webp",
-        "1024": "atlas-day-1024.8bfe04cf.webp"
+        "2048": "atlas-day-2048.75583b29.webp",
+        "1024": "atlas-day-1024.12f05b64.webp"
       },
       "night": {
-        "2048": "atlas-night-2048.b95ce490.webp",
-        "1024": "atlas-night-1024.2110d868.webp"
+        "2048": "atlas-night-2048.2cb6f9b4.webp",
+        "1024": "atlas-night-1024.10e7ad2d.webp"
       }
     },
     "poster": {
       "day": {
         "1600": {
-          "avif": "poster-day-1600.d23b3ed7.avif",
-          "webp": "poster-day-1600.67d1a2d9.webp"
+          "avif": "poster-day-1600.7ecf3aa9.avif",
+          "webp": "poster-day-1600.7698fc3a.webp"
         },
         "800": {
-          "avif": "poster-day-800.fb0227d2.avif",
-          "webp": "poster-day-800.19185af7.webp"
+          "avif": "poster-day-800.d1e7ef72.avif",
+          "webp": "poster-day-800.ba5e2e8b.webp"
         }
       },
       "night": {
         "1600": {
-          "avif": "poster-night-1600.5eec069c.avif",
-          "webp": "poster-night-1600.4b27c691.webp"
+          "avif": "poster-night-1600.2ba4b904.avif",
+          "webp": "poster-night-1600.852e3ab6.webp"
         },
         "800": {
-          "avif": "poster-night-800.b90a9486.avif",
-          "webp": "poster-night-800.48d3d81c.webp"
+          "avif": "poster-night-800.414daa11.avif",
+          "webp": "poster-night-800.d8187d3b.webp"
         }
       }
     },
@@ -655,23 +655,23 @@
     }
   },
   "stats": {
-    "tris": 25936,
-    "verts": 28630,
+    "tris": 26244,
+    "verts": 29065,
     "bytes": {
-      "desk.8a8344a6.glb": 251828,
-      "atlas-day-2048.c98f3b7b.webp": 170006,
-      "atlas-day-1024.8bfe04cf.webp": 75774,
-      "atlas-night-2048.b95ce490.webp": 112844,
-      "atlas-night-1024.2110d868.webp": 43648,
-      "poster-day-1600.d23b3ed7.avif": 43272,
-      "poster-day-1600.67d1a2d9.webp": 64148,
-      "poster-day-800.fb0227d2.avif": 23663,
-      "poster-day-800.19185af7.webp": 34242,
-      "poster-night-1600.5eec069c.avif": 36825,
-      "poster-night-1600.4b27c691.webp": 55374,
-      "poster-night-800.b90a9486.avif": 17536,
-      "poster-night-800.48d3d81c.webp": 25374,
-      "../og.png": 530873
+      "desk.617a22d5.glb": 254716,
+      "atlas-day-2048.75583b29.webp": 176014,
+      "atlas-day-1024.12f05b64.webp": 78368,
+      "atlas-night-2048.2cb6f9b4.webp": 114622,
+      "atlas-night-1024.10e7ad2d.webp": 44284,
+      "poster-day-1600.7ecf3aa9.avif": 43696,
+      "poster-day-1600.7698fc3a.webp": 64494,
+      "poster-day-800.d1e7ef72.avif": 23679,
+      "poster-day-800.ba5e2e8b.webp": 34198,
+      "poster-night-1600.2ba4b904.avif": 36910,
+      "poster-night-1600.852e3ab6.webp": 55594,
+      "poster-night-800.414daa11.avif": 17594,
+      "poster-night-800.d8187d3b.webp": 25356,
+      "../og.png": 531038
     },
     "quality": {
       "atlas-day-2048": 82,

@@ -125,7 +125,7 @@ def build_materials():
     m["insole"] = C.mat("insole", "#e3e9e6", rough=0.9, bevel=0.002)
     m["teeth"] = C.mat("teeth", "#f1f1ea", rough=0.6, bevel=0.0)
     m["shark_eye"] = C.mat("shark_eye", "#17191e", rough=0.5, bevel=0.0)
-    m["shark_fin"] = C.mat("shark_fin", "#d9d67e", rough=0.7, bevel=0.001)
+    m["shark_fin"] = C.mat("shark_fin", "#d7e59f", rough=0.7, bevel=0.0)   # pale yellow-green, as the head top
     m["cat"] = C.mat("cat", "#14995a", rough=0.4, edge=0.25, edge_hex="#63d396", bevel=0.0)
     m["server"] = C.mat("server", C.G["850"], edge=0.4, edge_hex=C.G["500"], bevel=0.003)
     m["server_front"] = C.mat("server_front", C.G["800"], edge=0.35, edge_hex=C.G["500"], bevel=0.002)
@@ -1572,24 +1572,64 @@ def shark_material(name, ref):
     return mm
 
 
+def slide_half_width(W, L, y):
+    """Half-width of the sole outline at y (toe at -L/2): rounder, wider toe, narrower waist."""
+    t = (y + L / 2) / L                              # 0 toe .. 1 heel
+    w = W / 2 * (1.0 - 0.16 * math.exp(-((t - 0.62) / 0.16) ** 2) - 0.08 * t)
+    return w * math.sqrt(max(0.0, 1.0 - (2.0 * y / L) ** 2))
+
+
 def slide_outline(W, L, n=22):
-    """Top-view sole outline (x right, y back; toe at -L/2): rounder, wider toe, narrower waist."""
     pts = []
     for i in range(n):
         a = 2 * math.pi * i / n
         y = -0.5 * L * math.cos(a)
-        t = (y + L / 2) / L                              # 0 toe .. 1 heel
-        w = W / 2 * (1.0 - 0.16 * math.exp(-((t - 0.62) / 0.16) ** 2) - 0.08 * t)
-        x = w * math.sin(a) * (1.0 if math.sin(a) >= 0 else 1.0)
-        pts.append((x, y))
+        pts.append((math.copysign(slide_half_width(W, L, y), math.sin(a)) if abs(math.sin(a)) > 1e-9 else 0.0, y))
     return pts
 
 
+def bm_prism(outline, z0, z1):
+    """Closed prism over a 2D (x, y) outline, z0..z1 (consistent outward normals)."""
+    bm = bmesh.new()
+    lo = [bm.verts.new((x, y, z0)) for x, y in outline]
+    hi = [bm.verts.new((x, y, z1)) for x, y in outline]
+    bm.faces.new(lo)
+    bm.faces.new(hi)
+    n = len(outline)
+    for i in range(n):
+        bm.faces.new((lo[i], lo[(i + 1) % n], hi[(i + 1) % n], hi[i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
+
+
+SLIDE_SOLE_H = 0.024        # foam sole (top = insole)
+SLIDE_HEAD = dict(y0=-0.47, y1=0.02, top=0.048, toe=0.022, jaw=0.012, p=2.6, n=8, arc=12)
+
+
+def slide_head_shape(W, L, y):
+    """(half-width, height above the sole, lip z) of the head section at y."""
+    Hd = SLIDE_HEAD
+    y0, y1 = Hd["y0"] * L, Hd["y1"] * L
+    u = (y - y0) / (y1 - y0)                          # 0 toe .. 1 back edge of the head
+    hz = Hd["toe"] + (Hd["top"] - Hd["toe"]) * math.sin(0.5 * math.pi * min(1.0, u / 0.7))
+    lip = Hd["jaw"] * (1.0 - smooth01((u - 0.10) / 0.18))  # the mouth: head raised off the sole at the toe
+    return slide_half_width(W, L, y) * 0.985, hz, lip
+
+
+def smooth01(t):
+    t = min(max(t, 0.0), 1.0)
+    return t * t * (3 - 2 * t)
+
+
 def build_slides(m):
-    """sharkslides (photos sharks/1-4): thick foam sole, a closed shark-head dome over the toes
-    with the mouth (a row of white teeth) at the toe, eyes, an upright dorsal fin, side
-    pectoral fins, an open heel with a pale insole and a small forked tail at the heel."""
+    """sharkslides (photos sharks/1-4), real size (~28 x 11 cm, EU 42-43): a foam sole, a low
+    closed shark head lofted over the front half (flat-topped superellipse sections, lowest at
+    the toe) whose front lip stands off the sole - the mouth, with a row of white teeth above
+    and below - eyes on the flanks, a short thick rounded dorsal fin, side pectoral fins near
+    the front, an open heel with a pale insole and a small forked tail at the heel."""
     W, L = D.SLIDES["size"]
+    Hd = SLIDE_HEAD
+    h = SLIDE_SOLE_H
     helpers = C.coll("helpers")
     out = []
     for k, (x, y, yaw) in enumerate(D.SLIDES["pair"]):
@@ -1602,10 +1642,9 @@ def build_slides(m):
         # sole: extruded outline, bottom dropped; its top is the insole (white), sides gradient
         bm = bmesh.new()
         outline = slide_outline(W, L)
-        h = 0.030
         lo = [bm.verts.new((px, py, 0.0)) for px, py in outline]
         hi = [bm.verts.new((px * 0.97, py * 0.985, h)) for px, py in outline]
-        top = bm.faces.new(hi)
+        bm.faces.new(hi)
         n = len(outline)
         for i in range(n):
             bm.faces.new((lo[i], lo[(i + 1) % n], hi[(i + 1) % n], hi[i]))
@@ -1614,82 +1653,111 @@ def build_slides(m):
         sole.data.materials.append(m["insole"])
         faces_material(sole, lambda c, nn: 1 if nn.z > 0.7 else 0)
         parts.append(sole)
-        # shark head: the front of an ellipsoid dome over the toes, cut open towards the heel;
-        # it stops short of the toe, so the sole's pale front reads as the open mouth
-        dy, dry, drz, dz = -L * 0.10, L * 0.30, 0.042, h - 0.004
-        drx = W * 0.49
-        dome = hemi(drx, dry, drz, segs=18, rings=5)
-        bmesh.ops.bisect_plane(dome, geom=list(dome.verts) + list(dome.edges) + list(dome.faces),
-                               plane_co=(0, L * 0.06, 0), plane_no=(0, 1, 0), clear_outer=True)
-        edge = [e for e in dome.edges if e.is_boundary and all(v.co.y > L * 0.06 - 1e-5 for v in e.verts)]
-        # cap the opening: the foot entry (insole colour, faces the heel, away from the cameras)
-        bmesh.ops.contextual_create(dome, geom=edge)
-        bmesh.ops.translate(dome, vec=(0, dy, dz), verts=dome.verts)
-        bmesh.ops.recalc_face_normals(dome, faces=dome.faces)
-        hd = obj_from_bm(f"slide_head{k}", dome, body)
+        # head: lofted superellipse sections from the toe to the back edge of the strap
+        bm = bmesh.new()
+        ys = [L * (Hd["y0"] + (Hd["y1"] - Hd["y0"]) * i / (Hd["n"] - 1)) for i in range(Hd["n"])]
+        rings = []
+        for yy in ys:
+            w, hz, lip = slide_head_shape(W, L, yy)
+            ring = []
+            for j in range(Hd["arc"] + 1):
+                th = math.pi * j / Hd["arc"]
+                c, s_ = math.cos(th), math.sin(th)
+                ex = abs(c) ** (2.0 / Hd["p"]) * math.copysign(1.0, c)
+                ez = s_ ** (2.0 / Hd["p"])
+                ring.append(bm.verts.new((w * ex, yy, h - 0.002 + lip + (hz - lip) * ez)))
+            rings.append(ring)
+        for ra, rb in zip(rings, rings[1:]):
+            for j in range(Hd["arc"]):
+                bm.faces.new((ra[j], rb[j], rb[j + 1], ra[j + 1]))
+        bm.faces.new(rings[0])                          # the head's front (upper jaw)
+        back = bm.faces.new(list(reversed(rings[-1])))  # the foot opening (insole colour)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        for f in bm.faces:
+            f.material_index = 1 if f is back else 0
+        hd = obj_from_bm(f"slide_head{k}", bm, body)
         hd.data.materials.append(m["insole"])
-        faces_material(hd, lambda c, nn: 1 if nn.y > 0.95 else 0)
         parts.append(hd)
-
-        def on_dome(yy, zz):
-            q = 1.0 - ((yy - dy) / dry) ** 2 - ((zz - dz) / drz) ** 2
-            return drx * math.sqrt(max(q, 0.0))
-        # teeth: white wedges round the mouth - upper row down from the head's front lip, lower
-        # row up from the sole's front edge
-        for j in range(7):
-            a = R(-54 + 18 * j)
-            for (rx_, ry_, cy_, zc, flip) in ((drx * 0.97, dry * 0.97, dy, dz + 0.004, -1),
-                                             (W * 0.44, L * 0.46, 0.0, h + 0.003, 1)):
-                px, py = rx_ * math.sin(a), cy_ - ry_ * math.cos(a)
-                tb = C.bm_cyl(0.0048, 0.007, 3, r2=0.0004)
+        # teeth: white wedges along the mouth, where the head's lip stands off the sole - the
+        # upper row hangs from the lip, the lower row stands on the sole's edge
+        mouth = []
+        for i in range(60):
+            yy = L * (Hd["y0"] + 0.30 * i / 59)
+            w, hz, lip = slide_head_shape(W, L, yy)
+            if lip > 0.55 * Hd["jaw"]:
+                mouth.append((w, yy))
+        pts, acc, last = [], 0.0, None
+        ymax = mouth[-1][1]
+        for sx in (-1, 1):                                 # along one flank, round the front, the other
+            for w, yy in (reversed(mouth) if sx < 0 else mouth):
+                pts.append((sx * w, yy))
+        pts = [p_ for i, p_ in enumerate(pts) if i == 0 or p_ != pts[i - 1]]
+        L_arc = sum(math.dist(p0, p1) for p0, p1 in zip(pts, pts[1:]))
+        nt_ = 8
+        for j in range(nt_):
+            d = (j + 0.5) / nt_ * L_arc
+            for p0, p1 in zip(pts, pts[1:]):
+                seg = math.dist(p0, p1)
+                if d <= seg:
+                    q = (p0[0] + (p1[0] - p0[0]) * d / seg, p0[1] + (p1[1] - p0[1]) * d / seg)
+                    ang = math.atan2(p1[0] - p0[0], -(p1[1] - p0[1]))
+                    break
+                d -= seg
+            lip = slide_head_shape(W, L, q[1])[2]
+            for zc, flip in ((h - 0.002 + lip - 0.0035, -1), (h + 0.0025, 1)):
+                tb = C.bm_cyl(0.0050, 0.0075, 3, r2=0.0005)
                 if flip < 0:
                     bmesh.ops.rotate(tb, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi, 3, "X"), verts=tb.verts)
-                C._xf(tb, (px, py, zc), (0, 0, math.degrees(-a)))
+                C._xf(tb, (q[0] * 0.93, q[1] + 0.002, zc), (0, 0, math.degrees(ang)))
                 parts.append(obj_from_bm(f"slide_tooth{k}{j}{flip}", tb, m["teeth"]))
         # eyes: small dark studs on the head's flanks, facing out
+        ey = L * (Hd["y0"] + 0.12)
+        w, hz, lip = slide_head_shape(W, L, ey)
+        ez = 0.55
+        ex = w * (1.0 - ez ** Hd["p"]) ** (1.0 / Hd["p"])
         for sx in (-1, 1):
-            ey, ez = dy - dry * 0.45, dz + 0.020
-            ex = on_dome(ey, ez)
-            parts.append(C.cyl(f"slide_eye{k}{sx}", 0.0058, 0.004, (sx * (ex - 0.0005), ey, ez),
-                               rot=(0, 90, sx * -28), segs=8, mat_=m["shark_eye"]))
-        # dorsal fin: an upright rounded wedge on top of the head, leaning back
+            parts.append(C.cyl(f"slide_eye{k}{sx}", 0.0052, 0.004, (sx * (ex - 0.0008), ey, h + lip + (hz - lip) * ez),
+                               rot=(0, 90, sx * -35), segs=8, mat_=m["shark_eye"]))
+        # dorsal fin: a short, thick, rounded cone on the head, leaning back (closed mesh)
+        fy = L * (Hd["y0"] + 0.28)
+        w, hz, lip = slide_head_shape(W, L, fy)
         fin = bmesh.new()
-        base = [fin.verts.new(p) for p in ((0, -0.016, 0), (0.0055, 0.002, 0), (0, 0.014, 0), (-0.0055, 0.002, 0))]
-        tip = [fin.verts.new((0, 0.004, 0.017)), fin.verts.new((0, 0.012, 0.015))]
-        for i in range(4):
-            fin.faces.new((base[i], base[(i + 1) % 4], tip[0]))
-        fin.faces.new((base[1], base[2], tip[1], tip[0]))
-        fin.faces.new((base[2], base[3], tip[0], tip[1]))
-        bmesh.ops.delete(fin, geom=[f for f in fin.faces if len(f.verts) == 3 and base[2] in f.verts and tip[0] in f.verts], context="FACES_ONLY")
+        segs, fh = 8, 0.025
+        frings = []
+        for i, (t, rx, ry) in enumerate(((0.0, 0.0090, 0.017), (0.40, 0.0085, 0.0150), (0.72, 0.0072, 0.0115),
+                                        (0.93, 0.0048, 0.0075))):
+            zz = -0.006 + (fh + 0.006) * t
+            lean = 0.010 * t * t
+            frings.append([fin.verts.new((rx * math.cos(2 * math.pi * q / segs), lean + ry * math.sin(2 * math.pi * q / segs), zz))
+                           for q in range(segs)])
+        for ra, rb in zip(frings, frings[1:]):
+            for q in range(segs):
+                fin.faces.new((ra[q], ra[(q + 1) % segs], rb[(q + 1) % segs], rb[q]))
+        tipv = fin.verts.new((0, 0.0105, fh))
+        for q in range(segs):
+            fin.faces.new((frings[-1][q], frings[-1][(q + 1) % segs], tipv))
+        fin.faces.new(list(reversed(frings[0])))
         bmesh.ops.recalc_face_normals(fin, faces=fin.faces)
-        bmesh.ops.translate(fin, vec=(0, dy + 0.012, dz + drz - 0.004), verts=fin.verts)
-        parts.append(obj_from_bm(f"slide_fin{k}", fin, m["shark_fin"]))
-        # pectoral fins (flat, swept back) and the forked tail at the heel
+        bmesh.ops.translate(fin, vec=(0, fy, h - 0.002 + hz), verts=fin.verts)
+        fo = obj_from_bm(f"slide_fin{k}", fin, m["shark_fin"])
+        smooth(fo, 60.0)
+        parts.append(fo)
+        # pectoral fins: thick swept-back wedges sticking out of the head's sides near the front
+        py0 = L * (Hd["y0"] + 0.30)
         for sx in (-1, 1):
-            pf = bmesh.new()
-            vs = [pf.verts.new(p) for p in ((0, -0.014, 0.0), (0, 0.012, 0.0), (sx * 0.016, 0.022, 0.003),
-                                              (0, -0.014, 0.008), (0, 0.012, 0.008))]
-            pf.faces.new((vs[0], vs[1], vs[2]))
-            pf.faces.new((vs[3], vs[4], vs[2]))
-            pf.faces.new((vs[0], vs[3], vs[2]))
-            pf.faces.new((vs[1], vs[4], vs[2]))
-            bmesh.ops.recalc_face_normals(pf, faces=pf.faces)
-            bmesh.ops.translate(pf, vec=(sx * W * 0.44, L * 0.02, 0.010), verts=pf.verts)
+            wy = slide_half_width(W, L, py0)
+            pf = bm_prism([(0.0, -0.013), (sx * 0.020, 0.010), (sx * 0.017, 0.016), (0.0, 0.012)]
+                          if sx > 0 else [(0.0, 0.012), (sx * 0.017, 0.016), (sx * 0.020, 0.010), (0.0, -0.013)],
+                          0.0, 0.007)
+            bmesh.ops.translate(pf, vec=(sx * (wy - 0.004), py0, h + 0.003), verts=pf.verts)
             parts.append(obj_from_bm(f"slide_pfin{k}{sx}", pf, body))
-        tail = bmesh.new()
-        vs = [tail.verts.new(p) for p in ((-0.010, 0, 0.004), (0.010, 0, 0.004), (0.016, 0.022, 0.012),
-                                            (0.0, 0.012, 0.010), (-0.016, 0.022, 0.012),
-                                            (-0.010, 0, 0.020), (0.010, 0, 0.020))]
-        tail.faces.new((vs[0], vs[1], vs[2], vs[3], vs[4]))
-        tail.faces.new((vs[5], vs[4], vs[3], vs[2], vs[6]))
-        tail.faces.new((vs[0], vs[4], vs[5]))
-        tail.faces.new((vs[1], vs[6], vs[2]))
-        bmesh.ops.recalc_face_normals(tail, faces=tail.faces)
+        # forked tail at the heel
+        tail = bm_prism([(-0.009, 0.0), (0.009, 0.0), (0.015, 0.020), (0.0, 0.011), (-0.015, 0.020)], 0.004, 0.019)
         bmesh.ops.translate(tail, vec=(0, L * 0.47, 0.0), verts=tail.verts)
         parts.append(obj_from_bm(f"slide_tail{k}", tail, body))
         for p in parts:
             xform(p, M)
-            S(p, 0.9, room=True)
+            S(p, 2.0 if "fin" in p.name or "tail" in p.name or "eye" in p.name else 0.9, room=True)
         out += parts
     return out
 

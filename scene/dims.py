@@ -80,8 +80,9 @@ HEADPHONES = dict(x=-0.240, y=-0.170, yaw=-22.0, roll=-58.0, tilt=24.0,
                   band_r=0.080, band_w=0.036, band_t=0.011,
                   cup=(0.041, 0.050), shell=(0.036, 0.062), cushion=(0.012, 0.036))
 # sharkslides foam slides on the floor under the desk's right end, left of the right foot,
-# toes towards the viewer (sharks/4jpg), casually splayed. x/y centre, yaw (deg)
-SLIDES = dict(size=(0.105, 0.275), pair=((0.200, -0.070, 9.0), (0.402, -0.030, -5.0)))
+# toes towards the viewer (sharks/4jpg), casually splayed. Real size (EU 42-43): 28 x 11 cm,
+# 7-8 cm tall at the head. x/y centre, yaw (deg)
+SLIDES = dict(size=(0.110, 0.280), pair=((0.200, -0.070, 9.0), (0.402, -0.030, -5.0)))
 
 # --- misc -----------------------------------------------------------------------
 SERVER = dict(x=0.84, y=0.17, size=(0.45, 0.30, 0.18))
