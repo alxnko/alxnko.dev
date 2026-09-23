@@ -231,6 +231,14 @@
   color: var(--ansi-green);
 }
 
+/* the monitor stays a dark screen in both themes: hover is a soft gray row, not the page's
+   (light-theme) surface colour */
+@media (hover: hover) {
+  [data-mode="scene"] .contacts a:hover {
+    background: color-mix(in srgb, var(--ansi-fg) 12%, var(--ansi-bg));
+  }
+}
+
 /* back to the desk view: appears whenever you have flown or looked away */
 .back {
   display: none;
