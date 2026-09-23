@@ -535,11 +535,9 @@
 }
 
 /* portrait phones at a screen: the screen is the content; the identity keeps just the mark */
-@media (max-aspect-ratio: 1/1) {
-  [data-mode="scene"][data-view="laptop"] .identity :is(.name, .facts),
-  [data-mode="scene"][data-view="monitor"] .identity :is(.name, .facts) {
-    display: none;
-  }
+[data-mode="scene"][data-view="laptop"] .identity :is(.name, .facts),
+[data-mode="scene"][data-view="monitor"] .identity :is(.name, .facts) {
+  display: none;
 }
 
 /* phone typing mode: nothing floats over the terminal while the keyboard is up */

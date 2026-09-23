@@ -352,10 +352,13 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     // portrait phones: the laptop screen sits in the top ~55 %, leaving room for the keyboard
     // typing on a phone (keyboard up, chrome hidden): the screen fills what's left of the view
     const typing = document.body.dataset.typing !== undefined;
-    const laptop = fitScreen('laptop', screenCorners(laptopScreen), 0.94, 34, camera.aspect < 1 ? (typing ? [0.02, 0.98] : PHONE_BAND) : [0, 1]);
+    // screen views sit between the top row and the bottom nav (px → fractions of the view)
+    const vh = o.stage.clientHeight || innerHeight;
+    const clear: [number, number] = [Math.min(0.2, 64 / vh), Math.max(0.8, 1 - 108 / vh)];
+    const laptop = fitScreen('laptop', screenCorners(laptopScreen), 0.96, 34, camera.aspect < 1 ? (typing ? [0.02, 0.98] : PHONE_BAND) : clear);
     // the whole ultrawide on landscape screens; on portrait phones the live contacts panel fills
     // the width (readable), and the side panes are a drag away
-    const mon = camera.aspect < 1 ? fitScreen('contacts', contactsCorners(), 0.96, 34) : fitScreen('monitor', screenCorners(monitorScreen), 0.94, 34);
+    const mon = camera.aspect < 1 ? fitScreen('contacts', contactsCorners(), 0.96, 34, clear) : fitScreen('monitor', screenCorners(monitorScreen), 0.96, 34, clear);
     rail.setPoses({ wide, desk, laptop, monitor: mon });
   }
 
