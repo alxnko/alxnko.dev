@@ -218,16 +218,21 @@ def build_manifest(version, files, info, bake, crop, stats, sizes, quality):
             "hit_paddle_down": "invisible tap target over the paddle's down arrow (see hit_paddle)",
             "geometry": "each named mesh node keeps its authored TRS; its geometry is in a child '<name>__geo' (quantisation transform lives there). Traverse for meshes.",
             "shadow_floor": {**info["shadowFloor"], "role": "shadow",
-                             "note": "multiply decal (dst * src; white = no change), 1.5 mm above the floor under the desk, "
-                                     "unparented. UV0 into the same atlas (day/night like the baked meshes); texels = the "
-                                     "desk's floor shadow at preset 1 (sRGB-encoded linear ratio lit-with / lit-without the "
-                                     "desk), soft, exactly white at the border. The room (`static`) carries no desk shadow. "
-                                     "Runtime: scale x/z by ~1 + 0.35*dh about its centre and fade it with dh "
-                                     "(dh = deskHeight - 0.74; review renders used mix(1, src, 1 - 0.6*min(1, dh/0.46)))"},
+                             "note": "multiply decal, 1.5 mm above the floor under the desk, unparented. UV0 into the "
+                                     "same atlas (day/night like the baked meshes); texels = the desk's floor shadow + "
+                                     "contact occlusion at preset 1, stored for a DISPLAY-space multiply: runtime "
+                                     "dst(display-encoded) * src(sampled linear) is correct as is; white = no change, "
+                                     "exactly white at the border. The room (`static`) carries no desk shadow.",
+                             "runtime": {"sunShiftPerMetre": [1.56, 0.0, -0.76],
+                                         "day": "position = pos0 + sunShiftPerMetre * dh (glTF x/z; the sun shadow of "
+                                                "a raised top slides along the sun's horizontal direction), scale 1, no fade",
+                                         "night": "scale x/z = 1 + 0.35*dh about the node origin, uFade = min(0.6, 1.4*dh)",
+                                         "mix": "blend the two by the theme mix (0 = day, 1 = night)",
+                                         "dh": "deskHeight - 0.74 (>= 0)"}},
             "shadow_wall": {**info["shadowWall"], "role": "shadow",
-                            "note": "multiply decal (dst * src; white = no change), 1.5 mm in front of the back wall, "
-                                    "PARENTED to desk_rig so it rides up with the desk. UV0 into the atlas; texels = the shadow "
-                                    "the desk top / monitor / laptop cast on the wall at preset 1, soft, white at the border"},
+                            "note": "multiply decal (display-space dst * src; white = no change), 1.5 mm in front of the "
+                                    "back wall, PARENTED to desk_rig so it rides up with the desk (a sun shadow on a vertical "
+                                    "wall moves up by exactly dh). UV0 into the atlas; soft, white at the border"},
             "materials": "one unlit placeholder per role: baked, screen, ring, glow, led, sky, hit, shadow (multiply decal)",
         },
         "cameras": info["cameras"],

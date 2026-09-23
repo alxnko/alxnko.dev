@@ -39,6 +39,7 @@ POS_OFF, POS_SCALE = 4.0, 8.0
 
 # per-rig exposure applied to linear radiance before tone mapping (tuned by eye)
 EXPOSURE = {"day": 1.1, "night": 3.0}
+AO_SAMPLES, AO_DIST, AO_K = 128, 0.10, 0.6     # contact-occlusion pass: samples, reach (m), strength
 BG = {"day": C.TOKENS["semantic"]["light"]["bg"], "night": C.TOKENS["semantic"]["dark"]["bg"]}
 # edge fade: ellipsoidal distance from the desk (metres), smoothstep(F0, F1)
 FADE = dict(center=(-0.25, -0.15, 0.95), axes=(2.0, 1.6, 1.3),
@@ -529,7 +530,9 @@ def decal_values(rig, lw, lwo, pos, grp, rects):
         dark = (1.0 - rr) * DECAL_STRENGTH * ramp * (1.0 - fade_mask(pos, np.ones_like(r), rig))
         out = np.where(sel, 1.0 - dark, out)
         sel_all |= sel
-    return sel_all, srgb(out)
+    # runtime: display-encoded frame * linear(texel) -> store ratio^(1/2.2), so the display-space
+    # multiply equals the physically right linear one (and the posters, which emulate it)
+    return sel_all, srgb(np.power(np.clip(out, 0.0, 1.0), 1.0 / 2.2))
 
 
 def save_png(path, rgb):
@@ -568,6 +571,8 @@ def main():
     if A.get("device", "GPU").upper() == "CPU":
         sc.cycles.device = dev = "CPU"   # bit-exact reruns; GPU may flip ~1e-5 of bytes by 1 LSB
     sc.cycles.seed = 7
+    for w in bpy.data.worlds:
+        w.light_settings.distance = AO_DIST
     sc.cycles.use_animated_seed = False
     sc.cycles.max_bounces = 6
     sc.cycles.diffuse_bounces = 4
@@ -580,7 +585,7 @@ def main():
     room_objs = [o for o in objs if group_of(o) == GRP["static"]]
     decals = [o for o in objs if o.get("shadow_decal")]
     passes = {"with": rig_objs + decals, "room": room_objs + decals}
-    names = ["color", "pos", "flag", "nrm"] + [f"light-{r}-{p}" for r in ("day", "night") for p in passes]
+    names = ["color", "pos", "flag", "nrm", "ao-with", "ao-room"] + [f"light-{r}-{p}" for r in ("day", "night") for p in passes]
     if "reuse" not in A or not all((CACHE / f"{n}.npy").exists() for n in names):
         img = target_image("bake_target")
         point_nodes(objs, img)
@@ -607,6 +612,12 @@ def main():
             for pname, targets in passes.items():
                 saved = hide_rig_from_rays() if pname == "room" else {}
                 mv = moving_no_cast()
+                if rig == "day":
+                    # contact occlusion (crisp near contact, 12 cm reach), same visibility as the light
+                    sc.cycles.samples = AO_SAMPLES
+                    run_bake(targets, "AO", set())
+                    np.save(CACHE / f"ao-{pname}.npy", pixels(img)[..., :1].astype(np.float16))
+                    sc.cycles.samples = SAMPLES
                 run_bake(targets, "DIFFUSE", {"DIRECT", "INDIRECT"})
                 restore_moving(mv)
                 restore_rays(saved)
@@ -630,6 +641,12 @@ def main():
     for rig in ("day", "night"):
         lw = np.load(CACHE / f"light-{rig}-with.npy").astype(np.float32)
         lwo = np.load(CACHE / f"light-{rig}-room.npy").astype(np.float32)
+        # contact occlusion on top of the path-traced light: crisp dark contact where things
+        # meet (feet on the floor, keyboard / pad / mouse on the desk, the plate under the stand)
+        aw = np.load(CACHE / "ao-with.npy").astype(np.float32)
+        ar = np.load(CACHE / "ao-room.npy").astype(np.float32)
+        lw = lw * (1.0 - AO_K * (1.0 - np.clip(aw, 0, 1)))
+        lwo = lwo * (1.0 - AO_K * (1.0 - np.clip(ar, 0, 1)))
         light = np.where(is_room[..., None], lwo, lw)
         for b in blades:
             M = b.matrix_world

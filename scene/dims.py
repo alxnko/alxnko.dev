@@ -19,7 +19,7 @@ LOWER_COL = (0.060, 0.045)    # static inner column, floor .. LOWER_TOP
 LOWER_TOP = 0.68
 UPPER_COL = (0.072, 0.056)    # outer sleeve rides with the rig
 UPPER_BOTTOM = 0.18           # at preset 1 (world z)
-RAIL = (0.05, 0.50, 0.03)     # side rails under the top
+RAIL = (0.05, 0.30, 0.03)     # side brackets under the top (pass 8: short, centred on the column)
 TRAY = (0.80, 0.12, 0.075)    # cable tray under the rear edge
 PADDLE = dict(x=0.42, size=(0.13, 0.045, 0.022), below=0.03)
 
@@ -80,7 +80,7 @@ LEFT_X = -1.40                # left wall plane
 FLOOR = (4.0, 4.0)
 ROOM_H = 2.7
 WINDOW = dict(y=-0.40, w=0.90, h=1.20, sill=0.85, depth=0.22)
-SOCKET = dict(x=-0.42, z=0.60)
+SOCKET = dict(x=-0.67, z=0.30)   # pass 8: below the rail line (at 0.60 its top edge peeked out under the desk top)
 CONDUIT_X = 0.66
 
 # --- cameras ------------------------------------------------------------------------

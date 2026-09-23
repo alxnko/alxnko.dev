@@ -1,5 +1,5 @@
 {
-  "version": "303a2ded",
+  "version": "af9e0a90",
   "deskBase": 0.74,
   "presets": [
     0.74,
@@ -138,36 +138,36 @@
     }
   },
   "files": {
-    "glb": "desk.303a2ded.glb",
+    "glb": "desk.af9e0a90.glb",
     "atlas": {
       "day": {
-        "2048": "atlas-day-2048.1a348c81.webp",
-        "1024": "atlas-day-1024.58f974eb.webp"
+        "2048": "atlas-day-2048.13ec70fa.webp",
+        "1024": "atlas-day-1024.2c1847ef.webp"
       },
       "night": {
-        "2048": "atlas-night-2048.6895da89.webp",
-        "1024": "atlas-night-1024.37942884.webp"
+        "2048": "atlas-night-2048.730f12fa.webp",
+        "1024": "atlas-night-1024.6efb2a69.webp"
       }
     },
     "poster": {
       "day": {
         "1600": {
-          "avif": "poster-day-1600.926dd45c.avif",
-          "webp": "poster-day-1600.ce777f06.webp"
+          "avif": "poster-day-1600.f00e1565.avif",
+          "webp": "poster-day-1600.8b5c2eb7.webp"
         },
         "800": {
-          "avif": "poster-day-800.dd67148f.avif",
-          "webp": "poster-day-800.f80215b7.webp"
+          "avif": "poster-day-800.5bea4103.avif",
+          "webp": "poster-day-800.6320eca8.webp"
         }
       },
       "night": {
         "1600": {
-          "avif": "poster-night-1600.898ebcb4.avif",
-          "webp": "poster-night-1600.4ef9555f.webp"
+          "avif": "poster-night-1600.1fd65508.avif",
+          "webp": "poster-night-1600.3b3d1104.webp"
         },
         "800": {
-          "avif": "poster-night-800.7c7e2c4c.avif",
-          "webp": "poster-night-800.05357bd3.webp"
+          "avif": "poster-night-800.21178914.avif",
+          "webp": "poster-night-800.466fc92f.webp"
         }
       }
     },
@@ -532,7 +532,18 @@
         0.0
       ],
       "role": "shadow",
-      "note": "multiply decal (dst * src; white = no change), 1.5 mm above the floor under the desk, unparented. UV0 into the same atlas (day/night like the baked meshes); texels = the desk's floor shadow at preset 1 (sRGB-encoded linear ratio lit-with / lit-without the desk), soft, exactly white at the border. The room (`static`) carries no desk shadow. Runtime: scale x/z by ~1 + 0.35*dh about its centre and fade it with dh (dh = deskHeight - 0.74; review renders used mix(1, src, 1 - 0.6*min(1, dh/0.46)))"
+      "note": "multiply decal, 1.5 mm above the floor under the desk, unparented. UV0 into the same atlas (day/night like the baked meshes); texels = the desk's floor shadow + contact occlusion at preset 1, stored for a DISPLAY-space multiply: runtime dst(display-encoded) * src(sampled linear) is correct as is; white = no change, exactly white at the border. The room (`static`) carries no desk shadow.",
+      "runtime": {
+        "sunShiftPerMetre": [
+          1.56,
+          0.0,
+          -0.76
+        ],
+        "day": "position = pos0 + sunShiftPerMetre * dh (glTF x/z; the sun shadow of a raised top slides along the sun's horizontal direction), scale 1, no fade",
+        "night": "scale x/z = 1 + 0.35*dh about the node origin, uFade = min(0.6, 1.4*dh)",
+        "mix": "blend the two by the theme mix (0 = day, 1 = night)",
+        "dh": "deskHeight - 0.74 (>= 0)"
+      }
     },
     "shadow_wall": {
       "center": [
@@ -551,7 +562,7 @@
         1.0
       ],
       "role": "shadow",
-      "note": "multiply decal (dst * src; white = no change), 1.5 mm in front of the back wall, PARENTED to desk_rig so it rides up with the desk. UV0 into the atlas; texels = the shadow the desk top / monitor / laptop cast on the wall at preset 1, soft, white at the border"
+      "note": "multiply decal (display-space dst * src; white = no change), 1.5 mm in front of the back wall, PARENTED to desk_rig so it rides up with the desk (a sun shadow on a vertical wall moves up by exactly dh). UV0 into the atlas; soft, white at the border"
     },
     "materials": "one unlit placeholder per role: baked, screen, ring, glow, led, sky, hit, shadow (multiply decal)"
   },
@@ -644,23 +655,23 @@
     }
   },
   "stats": {
-    "tris": 24420,
-    "verts": 26833,
+    "tris": 24844,
+    "verts": 27426,
     "bytes": {
-      "desk.303a2ded.glb": 238368,
-      "atlas-day-2048.1a348c81.webp": 157358,
-      "atlas-day-1024.58f974eb.webp": 68102,
-      "atlas-night-2048.6895da89.webp": 114248,
-      "atlas-night-1024.37942884.webp": 44234,
-      "poster-day-1600.926dd45c.avif": 42537,
-      "poster-day-1600.ce777f06.webp": 64058,
-      "poster-day-800.dd67148f.avif": 21290,
-      "poster-day-800.f80215b7.webp": 32336,
-      "poster-night-1600.898ebcb4.avif": 37105,
-      "poster-night-1600.4ef9555f.webp": 57822,
-      "poster-night-800.7c7e2c4c.avif": 16970,
-      "poster-night-800.05357bd3.webp": 25588,
-      "../og.png": 525013
+      "desk.af9e0a90.glb": 242648,
+      "atlas-day-2048.13ec70fa.webp": 150158,
+      "atlas-day-1024.2c1847ef.webp": 65960,
+      "atlas-night-2048.730f12fa.webp": 106810,
+      "atlas-night-1024.6efb2a69.webp": 41636,
+      "poster-day-1600.f00e1565.avif": 42519,
+      "poster-day-1600.8b5c2eb7.webp": 63172,
+      "poster-day-800.5bea4103.avif": 21521,
+      "poster-day-800.6320eca8.webp": 32112,
+      "poster-night-1600.1fd65508.avif": 36217,
+      "poster-night-1600.3b3d1104.webp": 56198,
+      "poster-night-800.21178914.avif": 16548,
+      "poster-night-800.466fc92f.webp": 24566,
+      "../og.png": 521613
     },
     "quality": {
       "atlas-day-2048": 82,

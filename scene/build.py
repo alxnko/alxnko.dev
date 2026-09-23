@@ -44,7 +44,8 @@ PARTS_RIG: list = []
 def tag(ob, weight=1.0, room=False):
     """Per-face atlas weight (texel density) and room flag (edge fade)."""
     me = ob.data
-    for nm, val in (("uvw", float(weight)), ("room", 1.0 if room else 0.0)):
+    rv = float(room) if not isinstance(room, bool) else (1.0 if room else 0.0)   # edge-fade weight
+    for nm, val in (("uvw", float(weight)), ("room", rv)):
         a = me.attributes.get(nm) or me.attributes.new(nm, "FLOAT", "FACE")
         a.data.foreach_set("value", [val] * len(me.polygons))
     return ob
@@ -1567,10 +1568,11 @@ def build_room(m):
     Hh = D.ROOM_H
     # big surfaces are split so the texels go where the camera looks (the far
     # parts fade into the page background anyway)
-    grid_plane("floor", (W0, -1.0, 1.55, W1), (Y0, -1.35, Y1), lambda u, v: (u, v, 0.0), m["floor"],
-               du=(0.07, 0.30, 0.07), dv=(0.07, 0.30))
-    grid_plane("wall_back", (W0, -0.95, 1.35, W1), (0.0, 1.9, Hh), lambda u, v: (u, Y1, v), m["wall"],
-               du=(0.08, 0.32, 0.08), dv=(0.32, 0.08))
+    # densest under / behind the desk (contact shadows of the feet, the desk's wall shadow)
+    grid_plane("floor", (W0, -1.0, -0.75, 0.75, 1.55, W1), (Y0, -1.35, -0.55, Y1), lambda u, v: (u, v, 0.0),
+               m["floor"], du=(0.07, 0.30, 0.45, 0.30, 0.07), dv=(0.07, 0.30, 0.45))
+    grid_plane("wall_back", (W0, -0.95, -0.75, 0.75, 1.35, W1), (0.0, 1.1, 1.9, Hh), lambda u, v: (u, Y1, v),
+               m["wall"], du=(0.08, 0.32, 0.42, 0.32, 0.08), dv=(0.42, 0.32, 0.08))
     Wn = D.WINDOW
     wy0, wy1 = Wn["y"] - Wn["w"] / 2, Wn["y"] + Wn["w"] / 2
     wz0, wz1 = Wn["sill"], Wn["sill"] + Wn["h"]
@@ -1585,18 +1587,44 @@ def build_room(m):
                     ("rev_r", [(x, wy1, wz0), (x - dep, wy1, wz0), (x - dep, wy1, wz1), (x, wy1, wz1)]),
                     ("rev_t", [(x, wy0, wz1), (x, wy1, wz1), (x - dep, wy1, wz1), (x - dep, wy0, wz1)])):
         S(plane(nm, list(reversed(pts)), m["wall"]), 0.12, room=True)
-    # window frame (white PVC), mullion, sill
+    # window (pass 8): a closed low-poly PVC window in the reveal - a continuous outer frame
+    # on all four sides, two sashes with their own frames meeting at a full-height mullion
+    # (head to sill frame), a transom bar spanning the left sash from its frame to the
+    # mullion, and a sill board under the frame with a small overhang into the room. Every
+    # member overlaps its neighbours (closed joints). room=0.5: the edge fade is halved on
+    # the window so the frame keeps reading against the wall when seen up close.
     fx = x - dep * 0.6
-    ft = 0.06
-    for nm, size, loc in (("wf_b", (0.06, Wn["w"], ft), (fx, Wn["y"], wz0 + ft / 2)),
-                          ("wf_t", (0.06, Wn["w"], ft), (fx, Wn["y"], wz1 - ft / 2)),
-                          ("wf_l", (0.06, ft, Wn["h"]), (fx, wy0 + ft / 2, (wz0 + wz1) / 2)),
-                          ("wf_r", (0.06, ft, Wn["h"]), (fx, wy1 - ft / 2, (wz0 + wz1) / 2)),
-                          ("wf_m", (0.07, 0.05, Wn["h"] - 2 * ft), (fx, Wn["y"] + 0.05, (wz0 + wz1) / 2)),
-                          ("wf_h", (0.05, Wn["w"] / 2 - ft, 0.04), (fx, Wn["y"] - Wn["w"] / 4, wz0 + 0.42))):
-        S(C.box(nm, size, loc, bevel=0.004, mat_=m["pvc"]), 0.4, room=True)
-    S(C.box("sill", (dep + 0.06, Wn["w"] + 0.12, 0.022), (x - dep / 2 + 0.03, Wn["y"], wz0 - 0.011),
-            bevel=0.003, mat_=m["pvc"]), 0.4, room=True)
+    ft, fd = 0.06, 0.07                                  # outer frame: face width, depth (along x)
+    st, sd, sx_ = 0.045, 0.06, 0.008                     # sash frame: width, depth, offset into the room
+    ym = Wn["y"] + 0.05                                  # mullion centre
+    mw = 0.07
+    parts = []
+
+    def bx(nm, xr, yr, zr, bevel=0.003):
+        (x0, x1), (y0, y1), (z0, z1) = xr, yr, zr
+        parts.append(C.box(nm, (x1 - x0, y1 - y0, z1 - z0), ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2),
+                           bevel=bevel, mat_=m["pvc"]))
+
+    fxr = (fx - fd / 2, fx + fd / 2)
+    bx("wf_b", fxr, (wy0, wy1), (wz0, wz0 + ft))
+    bx("wf_t", fxr, (wy0, wy1), (wz1 - ft, wz1))
+    bx("wf_l", fxr, (wy0, wy0 + ft), (wz0, wz1))
+    bx("wf_r", fxr, (wy1 - ft, wy1), (wz0, wz1))
+    bx("wf_m", (fx - fd / 2, fx + fd / 2 + 0.004), (ym - mw / 2, ym + mw / 2), (wz0, wz1))
+    sxr = (fx - sd / 2 + sx_, fx + sd / 2 + sx_)
+    za, zb = wz0 + ft - 0.004, wz1 - ft + 0.004
+    for side, (ya, yb) in (("l", (wy0 + ft - 0.004, ym - mw / 2 + 0.004)), ("r", (ym + mw / 2 - 0.004, wy1 - ft + 0.004))):
+        bx(f"ws{side}_b", sxr, (ya, yb), (za, za + st))
+        bx(f"ws{side}_t", sxr, (ya, yb), (zb - st, zb))
+        bx(f"ws{side}_l", sxr, (ya, ya + st), (za, zb))
+        bx(f"ws{side}_r", sxr, (yb - st, yb), (za, zb))
+    bx("ws_bar", (sxr[0] + 0.006, sxr[1] - 0.006), (wy0 + ft - 0.004, ym - mw / 2 + 0.004),
+       (wz0 + 0.42 - 0.02, wz0 + 0.42 + 0.02))
+    # sill board: under the frame (top flush with the frame bottom), 4 cm overhang into the room
+    parts.append(C.box("sill", (x + 0.04 - (fx - fd / 2), Wn["w"] + 0.10, 0.028),
+                       ((x + 0.04 + fx - fd / 2) / 2, Wn["y"], wz0 - 0.014), bevel=0.003, mat_=m["pvc"]))
+    for p in parts:
+        S(p, 0.4, room=0.5)
     sky = plane("window_sky", [(fx - 0.04, wy0, wz0), (fx - 0.04, wy1, wz0), (fx - 0.04, wy1, wz1),
                                (fx - 0.04, wy0, wz1)], m["sky"], uvs=[(0, 1), (1, 1), (1, 0), (0, 0)])
     C.set_origin(sky, (fx - 0.04, Wn["y"], (wz0 + wz1) / 2))

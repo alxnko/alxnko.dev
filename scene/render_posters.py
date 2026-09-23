@@ -73,7 +73,8 @@ def image_emission(name, path, flip_v=False, strength=1.0, uv="UVMap"):
 
 
 def multiply_material(name, path, uv="UVMap"):
-    """Unlit multiply decal: a Transparent BSDF tinted by the atlas texel (dst * src)."""
+    """Unlit multiply decal: a Transparent BSDF tinted by the atlas texel (dst * src, as the
+    runtime does it: in display space)."""
     m = bpy.data.materials.new(name)
     nt = m.node_tree
     for n in list(nt.nodes):
@@ -86,7 +87,12 @@ def multiply_material(name, path, uv="UVMap"):
     uvn = nt.nodes.new("ShaderNodeUVMap")
     uvn.uv_map = uv
     nt.links.new(uvn.outputs["UV"], tex.inputs["Vector"])
-    nt.links.new(tex.outputs["Color"], tr.inputs["Color"])
+    # the runtime multiplies the display-encoded frame by the sampled (linear) texel; in linear
+    # scene space that is a multiply by texel^2.2 - match it, so posters == runtime
+    gm = nt.nodes.new("ShaderNodeGamma")
+    gm.inputs["Gamma"].default_value = 2.2
+    nt.links.new(tex.outputs["Color"], gm.inputs["Color"])
+    nt.links.new(gm.outputs["Color"], tr.inputs["Color"])
     nt.links.new(tr.outputs["BSDF"], out.inputs["Surface"])
     return m
 
