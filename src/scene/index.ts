@@ -771,6 +771,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const onLost = (e: Event) => e.preventDefault();
   const onRestored = () => { monitor.invalidate(); fanReadout?.texture && (fanReadout.texture.needsUpdate = true); invalidate(); };
   addEventListener('resize', onResize);
+  addEventListener('scene:refit', onResize);
   document.addEventListener('visibilitychange', onVis);
   canvas.addEventListener('webglcontextlost', onLost);
   canvas.addEventListener('webglcontextrestored', onRestored);
@@ -801,6 +802,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       detachInput();
       dock.destroy();
       removeEventListener('resize', onResize);
+      removeEventListener('scene:refit', onResize);
       document.removeEventListener('visibilitychange', onVis);
       canvas.removeEventListener('webglcontextlost', onLost);
       canvas.removeEventListener('webglcontextrestored', onRestored);

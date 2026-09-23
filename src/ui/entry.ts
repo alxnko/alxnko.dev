@@ -248,17 +248,29 @@ addEventListener('keydown', (e) => {
 for (const b of document.querySelectorAll<HTMLButtonElement>('#nav [data-landmark]'))
   b.addEventListener('click', () => world.fly(b.dataset.landmark as Landmark));
 $('term')?.addEventListener('focusin', () => { if (world.scene) world.fly('laptop'); });
-// phones: typing mode while the terminal input has focus (chrome steps aside, the screen
-// fills the space above the keyboard); a resize makes the scene refit either way
+// Phones: "typing mode" follows the on-screen keyboard itself, not just focus (Android keeps
+// focus when the keyboard is dismissed with back/arrow). The keyboard shrinks the viewport
+// (interactive-widget=resizes-content): while it is up and the terminal has focus, the chrome
+// steps aside and the laptop screen fills what's left; when it goes down, focus is released
+// and everything returns.
 const coarse = matchMedia('(pointer: coarse)');
-const input = document.getElementById('term-input');
-const setTyping = (on: boolean) => {
-  if (!coarse.matches || !world.scene) return;
+const input = document.getElementById('term-input') as HTMLInputElement | null;
+let fullH = innerHeight;
+let keyboardWasUp = false;
+const syncTyping = () => {
+  const kbUp = innerHeight < fullH * 0.8;
+  if (!kbUp) fullH = Math.max(fullH, innerHeight);
+  if (keyboardWasUp && !kbUp && document.activeElement === input) input?.blur();
+  keyboardWasUp = kbUp;
+  const on = coarse.matches && !!world.scene && kbUp && document.activeElement === input;
+  if (on === (document.body.dataset.typing !== undefined)) return;
   if (on) document.body.dataset.typing = ''; else delete document.body.dataset.typing;
-  dispatchEvent(new Event('resize'));
+  dispatchEvent(new Event('scene:refit'));
 };
-input?.addEventListener('focus', () => setTyping(true));
-input?.addEventListener('blur', () => setTyping(false));
+addEventListener('resize', syncTyping);
+addEventListener('orientationchange', () => { fullH = 0; setTimeout(() => { fullH = innerHeight; syncTyping(); }, 400); });
+input?.addEventListener('focus', () => setTimeout(syncTyping, 350));
+input?.addEventListener('blur', syncTyping);
 $('contacts')?.addEventListener('focusin', () => { if (world.scene) world.fly('monitor'); });
 document.addEventListener(THEME_EVENT, () => world.scene?.setTheme(currentTheme()));
 
