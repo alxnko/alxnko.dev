@@ -1,0 +1,47 @@
+// WorldPort (see types.ts) and NullWorld: an in-memory world for tests and the no-3D fallback.
+import type { FanSpeed, Landmark, Ring, SoundLevel, Theme, WorldPort, WorldState } from './types';
+
+export type { WorldPort, WorldState } from './types';
+
+export const DEFAULT_WORLD: Readonly<WorldState> = {
+  theme: 'dark',
+  desk: 0.74,
+  ring: 'green',
+  fan: 1,
+  sound: 'off',
+  landmark: 'desk',
+};
+
+export class NullWorld implements WorldPort {
+  private s: WorldState;
+
+  constructor(initial: Partial<WorldState> = {}) {
+    this.s = { ...DEFAULT_WORLD, ...initial };
+  }
+
+  get(): WorldState {
+    return { ...this.s };
+  }
+  fly(to: Landmark): void {
+    this.s.landmark = to;
+  }
+  setDesk(h: number): Promise<void> {
+    this.s.desk = h;
+    return Promise.resolve();
+  }
+  setTheme(t: Theme): void {
+    this.s.theme = t;
+  }
+  setRing(r: Ring): void {
+    this.s.ring = r;
+  }
+  setFan(f: FanSpeed): void {
+    this.s.fan = f;
+  }
+  setSound(l: SoundLevel): void {
+    this.s.sound = l;
+  }
+  meow(): void {}
+  stare(): void {}
+  sfx(_kind: 'key' | 'enter' | 'tick'): void {}
+}
