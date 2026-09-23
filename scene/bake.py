@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import bpy  # noqa: E402
 import numpy as np  # noqa: E402
+from mathutils import Vector  # noqa: E402
 
 import common as C  # noqa: E402
 
@@ -62,7 +63,13 @@ def under_rig(o):
 GRP = {"static": 0.0, "floor": 0.5, "wall": 0.75, "rig": 1.0}
 
 
+MOVING = ("fan_blades", "cat_head", "cat_tail")   # animated at runtime: must not cast baked shadows
+GRP_BLADES = 0.9
+
+
 def group_of(o):
+    if o.name == "fan_blades":
+        return GRP_BLADES
     if o.get("shadow_decal"):
         return float(o["shadow_decal"])
     return GRP["rig"] if under_rig(o) else GRP["static"]
@@ -76,6 +83,55 @@ def set_group_attr(objs):
 
 
 RAYS = ("visible_diffuse", "visible_glossy", "visible_transmission", "visible_volume_scatter", "visible_shadow")
+
+
+def moving_no_cast():
+    """The fan blades spin, the cat's head / tail turn: bake them lit, but invisible to shadow
+    and bounce rays, so nothing static carries a shadow that belongs to a moving part."""
+    saved = {}
+    for n in MOVING:
+        o = bpy.data.objects.get(n)
+        if o is None:
+            continue
+        saved[n] = [getattr(o, a) for a in RAYS]
+        for a in RAYS:
+            setattr(o, a, False)
+    return saved
+
+
+def restore_moving(saved):
+    for n, vals in saved.items():
+        for a, v in zip(RAYS, vals):
+            setattr(bpy.data.objects[n], a, v)
+
+
+def nrm_socket(nt):
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    mul = nt.nodes.new("ShaderNodeVectorMath")
+    mul.operation = "MULTIPLY_ADD"
+    mul.inputs[1].default_value = (0.5, 0.5, 0.5)
+    mul.inputs[2].default_value = (0.5, 0.5, 0.5)
+    nt.links.new(geo.outputs["Normal"], mul.inputs[0])
+    return mul.outputs[0]
+
+
+def radial_average(light, pos, nrm, sel, hub, axis, step=0.0015):
+    """Rotation-invariant blade lighting: every blade texel gets the mean light of all blade
+    texels at the same radius from the hub and the same facing (front / back / rim)."""
+    idx = np.nonzero(sel)
+    p = pos[idx] - hub
+    along = p @ axis
+    rad = np.linalg.norm(p - np.outer(along, axis), axis=1)
+    f = nrm[idx] @ axis
+    face = np.where(f > 0.5, 2, np.where(f < -0.5, 0, 1))
+    key = np.floor(rad / step).astype(np.int64) * 3 + face
+    out = light.copy()
+    for c in range(light.shape[-1]):
+        v = light[idx][:, c]
+        sums = np.bincount(key, weights=v)
+        cnts = np.bincount(key)
+        out[idx[0], idx[1], c] = sums[key] / np.maximum(cnts[key], 1)
+    return out
 
 
 def hide_rig_from_rays():
@@ -128,7 +184,49 @@ def restore_rays(saved):
 
 # ------------------------------------------------------------------ UVs
 
+def read_fixed_uvs(o):
+    """(face mask, per-loop uv) of faces laid out by build.py (`fixuv` / `uvfix`), or None."""
+    me = o.data
+    if "fixuv" not in me.attributes or "uvfix" not in me.attributes:
+        return None
+    fx = np.zeros(len(me.polygons), dtype=np.float32)
+    me.attributes["fixuv"].data.foreach_get("value", fx)
+    uv = np.zeros(len(me.loops) * 2, dtype=np.float32)
+    me.attributes["uvfix"].data.foreach_get("vector", uv)
+    return fx > 0.5, uv.reshape(-1, 2)
+
+
+def apply_fixed_uvs(o, fixed):
+    """Replace the smart-project UVs of the fixed faces by their continuous layout, scaled
+    to the same texel density the per-face weights give everything else."""
+    mask, fuv = fixed
+    me = o.data
+    uv = np.empty(len(me.loops) * 2, dtype=np.float32)
+    me.uv_layers[0].data.foreach_get("uv", uv)
+    uv = uv.reshape(-1, 2)
+    w = np.ones(len(me.polygons), dtype=np.float32)
+    if "uvw" in me.attributes:
+        me.attributes["uvw"].data.foreach_get("value", w)
+    ratios = []
+    for p in me.polygons:
+        if mask[p.index] or p.area < 1e-6:
+            continue
+        li = list(p.loop_indices)
+        q = uv[li]
+        a = 0.5 * abs(sum(q[k][0] * q[(k + 1) % len(q)][1] - q[(k + 1) % len(q)][0] * q[k][1] for k in range(len(q))))
+        if a > 0:
+            ratios.append(math.sqrt(a / p.area) / max(w[p.index], 1e-3))
+    r = float(np.median(ratios)) if ratios else 1.0
+    for p in me.polygons:
+        if mask[p.index]:
+            for li in p.loop_indices:
+                uv[li] = fuv[li] * r
+    me.uv_layers[0].data.foreach_set("uv", uv.ravel())
+    return r
+
+
 def unwrap(objs):
+    fixed = {o.name: read_fixed_uvs(o) for o in objs}
     for o in objs:
         me = o.data
         while me.uv_layers:
@@ -160,6 +258,10 @@ def unwrap(objs):
         me.uv_layers[0].data.foreach_get("uv", uv)
         uv = uv.reshape(-1, 2) * w[loop_face][:, None]
         me.uv_layers[0].data.foreach_set("uv", uv.ravel())
+    for o in objs:
+        if fixed[o.name] is not None:
+            r = apply_fixed_uvs(o, fixed[o.name])
+            print(f"[bake] {o.name}: {int(fixed[o.name][0].sum())} faces on continuous islands (scale {r:.4f})")
     pack()
     # sub-texel islands (3 mm lips, thin plates) would get no texels and inherit a
     # neighbour's colour: stretch every island to >= MIN_TEXELS (at 1024) across
@@ -436,7 +538,11 @@ def save_png(path, rgb):
     img = bpy.data.images.new(Path(path).stem, w, h, alpha=False, float_buffer=False)
     img.colorspace_settings.name = "Non-Color"
     rgba = np.ones((h, w, 4), dtype=np.float32)
-    rgba[..., :3] = rgb
+    # triangular dither (+-1 LSB, fixed seed) before the 8-bit quantisation: no banding in
+    # the dark, slow night gradients on walls and floor
+    rng = np.random.default_rng(7)
+    tri = (rng.random((h, w, 1), dtype=np.float32) - rng.random((h, w, 1), dtype=np.float32)) / 255.0
+    rgba[..., :3] = np.clip(rgb + tri, 0.0, 1.0)
     img.pixels.foreach_set(rgba.ravel())
     img.filepath_raw = str(path)
     img.file_format = "PNG"
@@ -470,11 +576,11 @@ def main():
     print("[bake] device", dev, "size", SIZE, "samples", SAMPLES)
 
     set_group_attr(objs)
-    rig_objs = [o for o in objs if group_of(o) == GRP["rig"]]
+    rig_objs = [o for o in objs if group_of(o) in (GRP["rig"], GRP_BLADES)]
     room_objs = [o for o in objs if group_of(o) == GRP["static"]]
     decals = [o for o in objs if o.get("shadow_decal")]
     passes = {"with": rig_objs + decals, "room": room_objs + decals}
-    names = ["color", "pos", "flag"] + [f"light-{r}-{p}" for r in ("day", "night") for p in passes]
+    names = ["color", "pos", "flag", "nrm"] + [f"light-{r}-{p}" for r in ("day", "night") for p in passes]
     if "reuse" not in A or not all((CACHE / f"{n}.npy").exists() for n in names):
         img = target_image("bake_target")
         point_nodes(objs, img)
@@ -483,8 +589,9 @@ def main():
         np.save(CACHE / "color.npy", pixels(img).astype(np.float16))
         pm = emit_mat("__pos", pos_socket)
         fm = emit_mat("__flag", flag_socket)
-        for nm, mt, margin in (("pos", pm, 8), ("flag", fm, 0)):
-            for m in (pm, fm):
+        nm_ = emit_mat("__nrm", nrm_socket)
+        for nm, mt, margin in (("pos", pm, 8), ("flag", fm, 0), ("nrm", nm_, 8)):
+            for m in (pm, fm, nm_):
                 n = m.node_tree.nodes.get("__bake") or m.node_tree.nodes.new("ShaderNodeTexImage")
                 n.name = "__bake"
                 n.image = img
@@ -493,13 +600,15 @@ def main():
             sc.cycles.samples = 4
             run_bake(objs, "EMIT", set(), margin=margin)
             restore_materials(objs, saved)
-            np.save(CACHE / f"{nm}.npy", pixels(img).astype(np.float32 if nm == "pos" else np.float16))
+            np.save(CACHE / f"{nm}.npy", pixels(img).astype(np.float32 if nm in ("pos", "nrm") else np.float16))
         for rig in ("day", "night"):
             C.apply_rig(rig)
             sc.cycles.samples = SAMPLES
             for pname, targets in passes.items():
                 saved = hide_rig_from_rays() if pname == "room" else {}
+                mv = moving_no_cast()
                 run_bake(targets, "DIFFUSE", {"DIRECT", "INDIRECT"})
+                restore_moving(mv)
                 restore_rays(saved)
                 raw = pixels(img)
                 stem = f"light-{rig}-{pname}"
@@ -514,12 +623,19 @@ def main():
     pos = np.load(CACHE / "pos.npy").astype(np.float32) * POS_SCALE - POS_OFF
     flag = np.load(CACHE / "flag.npy").astype(np.float32)
     cov, room, grp = flag[..., 0], flag[..., 1], flag[..., 2]
+    nrm = np.load(CACHE / "nrm.npy").astype(np.float32) * 2.0 - 1.0
     rects = {float(o["shadow_decal"]): (o["decal_axes"], tuple(o["decal_rect"])) for o in decals}
     is_room = (cov > 0.5) & (grp < 0.25)
+    blades = [o for o in objs if o.name == "fan_blades"]
     for rig in ("day", "night"):
         lw = np.load(CACHE / f"light-{rig}-with.npy").astype(np.float32)
         lwo = np.load(CACHE / f"light-{rig}-room.npy").astype(np.float32)
         light = np.where(is_room[..., None], lwo, lw)
+        for b in blades:
+            M = b.matrix_world
+            sel_b = (cov > 0.5) & (np.abs(grp - GRP_BLADES) < 0.03)
+            light = radial_average(light, pos, nrm, sel_b, np.array(M.translation),
+                                   np.array((M.to_3x3() @ Vector((0, 1, 0))).normalized()))
         light = dilate(light, cov > 0.5, 6)
         dsel, dval = decal_values(rig, lw, lwo, pos, grp, rects)
         dsel &= cov > 0.5

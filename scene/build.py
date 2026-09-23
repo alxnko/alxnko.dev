@@ -1488,15 +1488,45 @@ def build_server(m):
     return leds
 
 
-def grid_plane(name, us, vs, to3, mat_, near, w_near, w_far, flip=False):
-    """Axis-aligned plane split at the given cuts; near cells get more texels."""
+def grid_plane(name, us, vs, to3, mat_, du, dv, holes=()):
+    """Axis-aligned plane split at the given cuts, as ONE connected mesh with a continuous
+    UV layout (pass 8). Per-cell texel weights used to give every cell its own atlas island
+    at its own density: the bake / denoise then differed per island and showed as lines
+    and brightness steps along the cuts. Now u -> U(u), v -> V(v) are piecewise-linear
+    (density du[i] per u-interval, dv[j] per v-interval: more texels near the desk), stored
+    in the `uvfix` corner attribute; bake.py lays the island out from it instead of
+    smart-projecting, so the whole wall / floor is one seamless island."""
+    def cum(cuts, dens):
+        out = [0.0]
+        for i in range(len(cuts) - 1):
+            out.append(out[-1] + (cuts[i + 1] - cuts[i]) * dens[i])
+        return out
+    U, V = cum(us, du), cum(vs, dv)
+    bm = bmesh.new()
+    grid = [[bm.verts.new(to3(u, v)) for v in vs] for u in us]
+    faces = []
     for i in range(len(us) - 1):
         for j in range(len(vs) - 1):
-            u0, u1, v0, v1 = us[i], us[i + 1], vs[j], vs[j + 1]
-            pts = [to3(u0, v0), to3(u1, v0), to3(u1, v1), to3(u0, v1)]
-            if flip:
-                pts = list(reversed(pts))
-            S(plane(f"{name}_{i}{j}", pts, mat_), w_near if near(i, j) else w_far, room=True)
+            if (i, j) in holes:
+                continue
+            bm.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]))
+            nv = len(vs)
+            faces.append({i * nv + j: (U[i], V[j]), (i + 1) * nv + j: (U[i + 1], V[j]),
+                          (i + 1) * nv + j + 1: (U[i + 1], V[j + 1]), i * nv + j + 1: (U[i], V[j + 1])})
+    ob = obj_from_bm(name, bm, mat_)
+    me = ob.data
+    a = me.attributes.new("uvfix", "FLOAT2", "CORNER")
+    lv = {}
+    for fi, uvs in enumerate(faces):
+        for vi, uv in uvs.items():
+            lv[(fi, vi)] = uv
+    for poly in me.polygons:
+        for li in poly.loop_indices:
+            a.data[li].vector = lv[(poly.index, me.loops[li].vertex_index)]
+    fx = me.attributes.new("fixuv", "FLOAT", "FACE")
+    fx.data.foreach_set("value", [1.0] * len(me.polygons))
+    S(ob, 1.0, room=True)
+    return ob
 
 
 # desk shadow decals (runtime multiply, white = no change). The room (`static`) is baked
@@ -1535,17 +1565,16 @@ def build_room(m):
     # big surfaces are split so the texels go where the camera looks (the far
     # parts fade into the page background anyway)
     grid_plane("floor", (W0, -1.0, 1.55, W1), (Y0, -1.35, Y1), lambda u, v: (u, v, 0.0), m["floor"],
-               near=lambda i, j: i == 1 and j == 1, w_near=0.34, w_far=0.05)
+               du=(0.07, 0.30, 0.07), dv=(0.07, 0.30))
     grid_plane("wall_back", (W0, -0.95, 1.35, W1), (0.0, 1.9, Hh), lambda u, v: (u, Y1, v), m["wall"],
-               near=lambda i, j: i == 1 and j == 0, w_near=0.36, w_far=0.05)
+               du=(0.08, 0.32, 0.08), dv=(0.32, 0.08))
     Wn = D.WINDOW
     wy0, wy1 = Wn["y"] - Wn["w"] / 2, Wn["y"] + Wn["w"] / 2
     wz0, wz1 = Wn["sill"], Wn["sill"] + Wn["h"]
     x = W0
-    for nm, (a, b, c, e), wgt in (("wl_a", (Y0, wy0 - 0.6, 0, Hh), 0.05), ("wl_a2", (wy0 - 0.6, wy0, 0, Hh), 0.14),
-                                  ("wl_b", (wy1, Y1, 0, Hh), 0.14),
-                                  ("wl_c", (wy0, wy1, 0, wz0), 0.14), ("wl_d", (wy0, wy1, wz1, Hh), 0.1)):
-        S(plane(nm, [(x, a, c), (x, b, c), (x, b, e), (x, a, e)], m["wall"]), wgt, room=True)
+    # left wall: one mesh around the window opening (the hole is cell (2, 1))
+    grid_plane("wall_left", (Y0, wy0 - 0.6, wy0, wy1, Y1), (0.0, wz0, wz1, Hh), lambda u, v: (x, u, v),
+               m["wall"], du=(0.05, 0.14, 0.14, 0.14), dv=(0.14, 0.14, 0.11), holes={(2, 1)})
     dep = Wn["depth"]
     # reveals of the opening
     # reveals face into the opening (point order sets the normal)
