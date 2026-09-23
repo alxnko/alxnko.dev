@@ -1307,11 +1307,14 @@ def build_cat(m):
     def W(p):
         return base + Rot @ Vector(p)
 
+    dy = Ct["y_shift"]
+
     def A(phi, y, h):
-        """Point `h` above the housing surface at arc angle phi (deg), depth y."""
-        a = math.radians(phi)
+        """Point `h` above the housing surface at arc angle phi (deg), depth y (pass-2 frame:
+        its drum was 7 cm deep; dy slides the cat forward onto the 10 cm drum's front edge)."""
+        a = math.radians(phi + Ct["phi_shift"])
         rr = rt + h - 0.0025
-        return Vector((rr * math.sin(a), y, rr * math.cos(a) - rt))
+        return Vector((rr * math.sin(a), y + dy, rr * math.cos(a) - rt))
 
     def tube(bm, pts, radii, n=6, cap0=True, tip=None):
         """Faceted tube through fan-local points; radii = [(r_side, r_up)] per point."""
@@ -1347,7 +1350,6 @@ def build_cat(m):
     rings = []
     for phi, w, t in ((-56, 0.022, 0.030), (-47, 0.035, 0.046), (-35, 0.043, 0.056), (-20, 0.045, 0.058),
                       (-4, 0.043, 0.055), (11, 0.040, 0.054), (23, 0.035, 0.053), (32, 0.027, 0.044)):
-        w *= 1.15                                     # the drum is 10 cm deep: fuller loaf
         sec = [(-0.84 * w, 0.0), (-w, 0.42 * t), (-0.74 * w, 0.84 * t), (-0.16 * w, t), (0.0, t - 0.0045),
                (0.16 * w, t), (0.74 * w, 0.84 * t), (w, 0.42 * t), (0.84 * w, 0.0)]
         rings.append([bm.verts.new(W(A(phi, yo + y, h))) for y, h in sec])
@@ -1362,13 +1364,13 @@ def build_cat(m):
         bm.faces.new((rings[-1][j], rings[-1][(j + 1) % n], chest))
     # front legs: from the chest over the front edge, draping down the bezel, paws at the end
     for phi in (27.0, 14.0):
-        top = A(phi, -0.036, 0.016)
-        pts = [top, A(phi + 1, -0.057, 0.010), A(phi + 2, -0.064, -0.004), A(phi + 2, -0.066, -0.013)]
+        top = A(phi, -0.026, 0.016)
+        pts = [top, A(phi + 1, -0.042, 0.010), A(phi + 2, -0.049, -0.004), A(phi + 2, -0.051, -0.013)]
         tube(bm, [Vector(p) for p in pts], [(0.011, 0.012), (0.0105, 0.010), (0.010, 0.0095), (0.0115, 0.010)],
-             n=6, tip=A(phi + 2.5, -0.072, -0.019))
+             n=6, tip=A(phi + 2.5, -0.057, -0.019))
     # hind leg: faceted haunch on the front flank at the hips, foot tucked in above the tail
-    tube(bm, [A(-37, -0.036, 0.027), A(-31, -0.050, 0.021)], [(0.016, 0.014), (0.011, 0.009)], n=6,
-         tip=A(-25, -0.057, 0.018))
+    tube(bm, [A(-37, -0.028, 0.027), A(-31, -0.039, 0.021)], [(0.016, 0.014), (0.011, 0.009)], n=6,
+         tip=A(-25, -0.044, 0.018))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     body = obj_from_bm("cat_body", bm, m["cat"])
     C.set_origin(body, W((0.0, 0.0, 0.0)))
@@ -1376,12 +1378,11 @@ def build_cat(m):
 
     # head: faceted diamond (the mark's head seen along the gaze) + ear prisms, raised at the
     # laptop end of the loaf and turned towards the laptop / viewer
-    nphi = Ct["neck_phi"]
-    neck = A(nphi, yo - 0.002, Ct["neck_h"])        # pivot: on the back, clear of the body
+    neck = A(21, yo - 0.002, 0.036)
     Hm = (Matrix.Translation(neck) @ C.euler((0, 0, -90.0 + Ct["head_yaw"]))
           @ C.euler((0, -Ct["head_tilt"], 0)))
     s = Ct["head_w"] / 122.0                       # the mark's head is 122 px wide
-    hc = Vector((0.016, 0.0, 0.024 + Ct["head_lift"]))
+    hc = Vector((0.016, 0.0, 0.024))
     hw, ht, hb = 61 * s, 52 * s, 45 * s
 
     def WH(p):  # head frame: x = gaze, y = left, z = up
@@ -1412,24 +1413,23 @@ def build_cat(m):
         bm.faces.new(list(reversed(back_)))
         for i in range(3):
             bm.faces.new((front[i], back_[i], back_[(i + 1) % 3], front[(i + 1) % 3]))
-    # neck: short faceted tube from the shoulders up into the back of the head
-    tube(bm, [A(nphi - 5, yo - 0.002, 0.028), neck, Hm @ (hc + Vector((-0.010, 0, -0.010)))],
-         [(0.019, 0.017), (0.016, 0.015), (0.014, 0.013)], n=6, cap0=True)
+    # pass 6: no neck tube - the head's lower half already sits inside the loaf's front (the
+    # pass-2 look). The pivot moves from the old neck point into the head's lower back, so the
+    # runtime gaze turns the head in place instead of swinging it through the body.
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     head = obj_from_bm("cat_head", bm, m["cat"])
-    C.set_origin(head, W(neck))
+    pivot = W(Hm @ (hc + Vector(Ct["pivot"])))
+    C.set_origin(head, pivot)
     tag(head, 2.4)
 
     # tail: from the rump round the hip and forward along the front edge of the housing top,
     # under the hind leg towards the front paws (the loaf's wrapped tail; faces the camera)
-    tl = Ct["tail_lift"]                          # pass 5: lifted clear of the housing + hind leg
-    tpath = [A(-57, yo + 0.004, 0.020 + tl), A(-64, -0.016, 0.015 + tl), A(-63, -0.036, 0.011 + tl),
-             A(-54, -0.049, 0.008 + tl), A(-42, -0.056, 0.006 + tl), A(-30, -0.058, 0.005 + tl),
-             A(-19, -0.057, 0.006 + tl)]
+    tpath = [A(-57, yo + 0.004, 0.020), A(-64, -0.012, 0.015), A(-63, -0.032, 0.011), A(-54, -0.046, 0.008),
+             A(-42, -0.052, 0.006), A(-30, -0.054, 0.005), A(-19, -0.054, 0.006)]
     radii = [(0.0105, 0.0095), (0.0098, 0.0088), (0.0092, 0.0082), (0.0086, 0.0077), (0.008, 0.0072),
              (0.0072, 0.0065), (0.0062, 0.0056)]
     bm = bmesh.new()
-    tube(bm, tpath, radii, n=6, tip=A(-11, -0.055, 0.008 + tl))
+    tube(bm, tpath, radii, n=6, tip=A(-11, -0.052, 0.008))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     tail = obj_from_bm("cat_tail", bm, m["cat"])
     C.set_origin(tail, W(tpath[0]))
@@ -1438,6 +1438,7 @@ def build_cat(m):
     return body, head, tail, head_fwd
 
 
+# ------------------------------------------------------------------ server + room
 # ------------------------------------------------------------------ server + room
 # ------------------------------------------------------------------ server + room
 

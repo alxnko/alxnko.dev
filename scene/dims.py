@@ -58,11 +58,12 @@ GAMEPAD = dict(x=0.05, y=0.085, yaw=-9.0, width=0.161)
 
 # --- fan + cat ------------------------------------------------------------------
 FAN = dict(x=-0.487, y=-0.25, yaw=6.0, r=0.09, depth=0.10, center_h=0.106)
-# pass-3 loaf (lying over the drum top, head at the laptop end) - the owner's pick. neck_h:
-# pivot height above the housing (pass 3: 0.036, inside the back, so the head sank into the
-# body when it turned); head_lift raises the head above the pivot
-CAT = dict(head_w=0.064, head_yaw=40.0, head_tilt=6.0, neck_phi=-2.0,     # yaw: turned towards the laptop; tilt > 0: chin up
-           neck_h=0.048, head_lift=0.010, tail_lift=0.004)
+# pass-2 loaf (beb42a2, the owner's pick): lying over the drum top, head low at the laptop end,
+# merged into the chest (no neck). y_shift: the pass-2 drum was 7 cm deep, this one 10 cm -
+# slide the cat forward so the paws drape over the front edge as before. pivot: head-frame
+# offset of the gaze pivot from the head centre (x = gaze, z = up): inside the lower back
+CAT = dict(head_w=0.064, head_yaw=40.0, head_tilt=6.0,     # yaw: turned towards the laptop; tilt > 0: chin up
+           y_shift=-0.015, phi_shift=-8.0, pivot=(0.0, 0.0, -0.008))
 
 # --- misc -----------------------------------------------------------------------
 SERVER = dict(x=0.84, y=0.17, size=(0.45, 0.30, 0.18))
@@ -77,5 +78,5 @@ SOCKET = dict(x=-0.42, z=0.60)
 CONDUIT_X = 0.66
 
 # --- cameras ------------------------------------------------------------------------
-CAM_DESK = dict(loc=(0.03, -1.55, 1.42), target=(-0.06, 0.02, 0.88), hfov=50.0, aspect=1.6)
+CAM_DESK = dict(loc=(0.16, -1.55, 1.42), target=(-0.06, 0.02, 0.88), hfov=50.0, aspect=1.6)
 CAM_WIDE = dict(loc=(0.95, -2.55, 1.85), target=(-0.15, 0.0, 0.85), hfov=55.0, aspect=1.6)
