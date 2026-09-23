@@ -51,6 +51,31 @@ test.describe('3D desk', () => {
     }
   });
 
+  test('pinned screens stay below the 3D canvas (real occlusion)', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    // the canvas must paint above every pinned panel: walk the stacking contexts
+    const above = await page.evaluate(() => {
+      const canvas = document.querySelector('canvas.stage-canvas')!;
+      const ctxZ = (el: Element) => {
+        const chain: number[] = [];
+        for (let n: Element | null = el; n && n !== document.documentElement; n = n.parentElement) {
+          const cs = getComputedStyle(n);
+          const parentDisplay = n.parentElement ? getComputedStyle(n.parentElement).display : '';
+          const flexItem = /flex|grid/.test(parentDisplay);
+          if (cs.zIndex !== 'auto' && (cs.position !== 'static' || flexItem)) chain.unshift(Number(cs.zIndex));
+        }
+        return chain;
+      };
+      const c = ctxZ(canvas);
+      return ['#term', '#contacts', '#mon-info'].map((id) => {
+        const p = ctxZ(document.querySelector(id)!);
+        return { id, canvasFirst: c[0], panelFirst: p[0] };
+      });
+    });
+    for (const a of above) expect(a.panelFirst, a.id).toBeLessThan(a.canvasFirst);
+  });
+
   test('cd monitor flies there, docks contacts, updates the nav', async ({ page }) => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });

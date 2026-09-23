@@ -103,6 +103,10 @@
 [data-mode="scene"] .sheet {
   pointer-events: none; /* click-through: only real controls and the pinned screens take input */
   position: static;
+  /* body is a flex container, where z-index applies even to static items: without this the
+     sheet would form a stacking context (z 10) and lift the pinned screens above the canvas,
+     so 3D objects in front of a screen could not hide it */
+  z-index: auto;
   display: block;
   padding: 0;
 }
