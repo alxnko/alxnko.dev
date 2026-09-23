@@ -67,7 +67,9 @@ export class MonitorScreen {
     ctx.textAlign = 'center';
     ctx.fillText('~/monitor', W / 2, by);
     ctx.textAlign = 'right';
-    const hh = String(d.getHours()).padStart(2, '0'), mm = String(d.getMinutes()).padStart(2, '0');
+    // Kyrgyzstan time (UTC+6, no DST), like the page clock and `date`
+    const kg = new Date(d.getTime() + 6 * 3600_000);
+    const hh = String(kg.getUTCHours()).padStart(2, '0'), mm = String(kg.getUTCMinutes()).padStart(2, '0');
     ctx.fillText(`kg  ${hh}:${mm}`, W - 44, by);
     ctx.textAlign = 'left';
 

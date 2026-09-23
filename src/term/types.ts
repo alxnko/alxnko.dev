@@ -10,6 +10,8 @@ export interface Span {
   bold?: boolean;
   /** Only ever set from LINK_ALLOWLIST (see format.link). */
   href?: string;
+  /** Decorative (ASCII/block art): shown, but skipped by screen readers. */
+  art?: boolean;
 }
 export type Line = Span[];
 

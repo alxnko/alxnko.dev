@@ -42,6 +42,7 @@ function spans(line: Line, into: HTMLElement): HTMLElement {
     }
     if (s.fg && COLORS.has(s.fg)) el.classList.add(`c-${s.fg}`);
     if (s.bold) el.classList.add('b');
+    if (s.art) el.setAttribute('aria-hidden', 'true');
     el.textContent = s.text;
     into.append(el);
   }

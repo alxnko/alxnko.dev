@@ -15,6 +15,15 @@ test.describe('terminal', () => {
     await expect(lines(page)).toContainText('[alxnko@nitro ~]$ whoami');
   });
 
+  test('decorative art and the matrix overlay stay out of the screen reader log', async ({ page }) => {
+    await run(page, 'fastfetch');
+    await expect(lines(page)).toContainText('tech lead');
+    // the cat mark's block art is aria-hidden; the facts beside it are not
+    expect(await page.locator('#term-lines [aria-hidden="true"]').count()).toBeGreaterThan(5);
+    await expect(page.locator('#term-lines').getByText('tech lead').last()).not.toHaveAttribute('aria-hidden', 'true');
+    await expect(page.locator('#term-overlay')).toHaveAttribute('aria-hidden', 'true');
+  });
+
   test('filesystem, pipes and did-you-mean', async ({ page }) => {
     await run(page, 'ls ~/monitor | grep git');
     await expect(lines(page)).toContainText('github.lnk');

@@ -116,7 +116,9 @@ function hasWebGL2(): boolean {
   }
 }
 
-const MOUNT_TIMEOUT_MS = 20000;
+// the same deadline as the head watchdog (Base.astro): once the page has been revealed the
+// desk never takes it over mid-read
+const MOUNT_TIMEOUT_MS = 15000;
 
 const $ = (id: string) => document.getElementById(id);
 
@@ -126,11 +128,12 @@ function enter3d() {
   if (!stage || !termEl || !contactsEl) return;
   if (btn) { btn.disabled = true; btn.textContent = 'loading 3d'; }
   document.body.dataset.scene = 'loading';
+  const initial = world.get();
   const mounting = import('../scene/index').then((m) =>
       m.mount({
         stage,
         store,
-        initial: world.get(),
+        initial,
         reducedMotion: reducedMotion(),
         mobile: matchMedia('(pointer: coarse)').matches || innerWidth < 720,
         termEl,
@@ -179,6 +182,13 @@ function enter3d() {
     .then((handle) => {
       handle3d = handle;
       world.scene = handle.world;
+      // anything changed while the desk was loading (theme, desk height, ring, fan) was only
+      // applied to the page: bring the scene up to date now that it is listening
+      const now = world.get(), was = initial;
+      if (now.theme !== was.theme) handle.world.setTheme(now.theme);
+      if (now.ring !== was.ring) handle.world.setRing(now.ring);
+      if (now.fan !== was.fan) handle.world.setFan(now.fan);
+      if (now.desk !== was.desk) void handle.world.setDesk(now.desk);
       document.body.dataset.mode = 'scene';
       document.body.dataset.scene = 'ready';
       if (btn) btn.hidden = true;
@@ -268,6 +278,9 @@ exitBtn?.addEventListener('click', () => setViewMode(false));
 // "away from the desk" → the desk, then it leaves the page as usual. Each layer is one history
 // entry; leaving a layer another way (button, Esc) removes its entry so history stays clean.
 let skipPop = false;
+// a reload starts at the desk with the interface shown: an entry left over from before it
+// would make the first Back do nothing visible
+if (history.state?.away || history.state?.noui) history.replaceState(null, '');
 function popQuietly() { skipPop = true; history.back(); }
 function syncAwayHistory(away: boolean) {
   if (away && !history.state?.away && !history.state?.noui) history.pushState({ away: true }, '');
@@ -309,15 +322,19 @@ const syncTyping = () => {
   const h = viewH();
   const kbUp = h < fullH * 0.8;
   if (!kbUp) fullH = Math.max(fullH, h);
-  if (keyboardWasUp && !kbUp && document.activeElement === input) input?.blur();
+  // phones: the keyboard going down ends typing (desktop windows resize for other reasons)
+  if (coarse.matches && keyboardWasUp && !kbUp && document.activeElement === input) input?.blur();
   keyboardWasUp = kbUp;
   const on = coarse.matches && !!world.scene && kbUp && document.activeElement === input;
+  // already typing: the visible slice can still move (iOS pans the visual viewport)
+  if (on && document.body.dataset.typing !== undefined) { dispatchEvent(new Event('scene:refit')); return; }
   if (on === (document.body.dataset.typing !== undefined)) return;
   if (on) document.body.dataset.typing = ''; else delete document.body.dataset.typing;
   dispatchEvent(new Event('scene:refit'));
 };
 addEventListener('resize', syncTyping);
 visualViewport?.addEventListener('resize', syncTyping);
+visualViewport?.addEventListener('scroll', syncTyping);
 addEventListener('orientationchange', () => { fullH = 0; setTimeout(() => { fullH = viewH(); syncTyping(); }, 400); });
 input?.addEventListener('focus', () => setTimeout(syncTyping, 350));
 input?.addEventListener('blur', syncTyping);

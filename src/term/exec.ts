@@ -25,7 +25,9 @@ export interface ShellOptions {
 }
 
 const defaultOpener = (url: string): void => {
-  globalThis.open?.(url, '_blank', 'noopener,noreferrer');
+  // mailto: hands off to the mail app; a new tab for it would be left empty
+  if (url.startsWith('mailto:')) globalThis.location?.assign(url);
+  else globalThis.open?.(url, '_blank', 'noopener,noreferrer');
 };
 
 const defaultSleep = (ms: number, signal: AbortSignal): Promise<void> =>

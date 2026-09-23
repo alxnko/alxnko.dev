@@ -69,18 +69,46 @@ const FAN_SPEED = [0, 28, 42, 56]; // rad/s (shown as rotation up to FAN_MAX_STE
 // shown rotation is capped so it looks the same at any frame rate (30 fps idle, 60+ while
 // moving) and never strobes (5 blades 72° apart: a step near 36° reads as spinning backwards);
 // speed beyond it shows as motion blur
-const FAN_SHOWN = 16; // rad/s
-const FAN_MAX_STEP = 0.6; // rad per frame, for hitches
+const FAN_SHOWN = 12; // rad/s
+const FAN_MAX_STEP = 0.45; // rad per frame (~26°, well under the 36° strobe point)
 const FAN_PCT = ['0', '40', '70', '100'];
 /** Portrait phones: the laptop screen sits between the name block and the on-screen keyboard. */
 const PHONE_BAND: [number, number] = [0.2, 0.62];
+/**
+ * Typing on a phone: the part of the stage the on-screen keyboard leaves visible. Android
+ * shrinks the layout viewport (the stage itself gets shorter, so this is the whole view);
+ * iOS keeps the layout and only shrinks/pans the visual viewport, so the band is the slice
+ * of the stage that is actually on screen.
+ */
+function typingBand(): [number, number] {
+  const vv = window.visualViewport;
+  if (!vv || innerHeight <= 0) return [0.02, 0.98];
+  const top = Math.min(0.8, Math.max(0, vv.offsetTop / innerHeight));
+  const bottom = Math.min(1, Math.max(top + 0.2, (vv.offsetTop + vv.height) / innerHeight));
+  return [top + 0.02, bottom - 0.02];
+}
 // UV rects (u0, u1, v0, v1; v down) of the monitor that the live DOM panels cover
 const MON_CONTACTS_UV = [0.24, 0.76, 0.12, 0.92] as const;
 const MON_INFO_UV = [0.765, 0.995, 0.12, 0.92] as const;
 const DEG = Math.PI / 180;
 const GAZE = { yaw: 50 * DEG, up: 12 * DEG, down: 20 * DEG };
 
+/**
+ * Load and start the desk. If anything fails partway, whatever was already created (GL
+ * context, canvas, subscriptions, listeners, pinned-screen transforms) is torn down before
+ * the error propagates, so the page falls back to its no-3D form cleanly.
+ */
 export async function mount(o: SceneOptions): Promise<SceneHandle> {
+  const undo: (() => void)[] = [];
+  try {
+    return await build(o, undo);
+  } catch (e) {
+    for (const f of undo.reverse()) { try { f(); } catch { /* keep tearing down */ } }
+    throw e;
+  }
+}
+
+async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle> {
   const base = '/scene/';
   const step = (s: LoadStep, st: 'run' | 'ok') => o.onStep?.(s, st);
   step('manifest', 'run');
@@ -101,6 +129,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     alpha: true, // screen regions are transparent windows onto the pinned DOM beneath
     powerPreference: o.mobile ? 'default' : 'high-performance',
   });
+  undo.push(() => { renderer.dispose(); renderer.forceContextLoss(); canvas.remove(); });
   renderer.outputColorSpace = SRGBColorSpace;
   let dprScale = 1;
   const applySize = () => {
@@ -166,6 +195,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   // the terminal typed into is the DOM one pinned on this screen; any output re-renders the frame
   const unsubStore = o.store.subscribe(() => invalidate());
   const monitor = new MonitorScreen(o.mobile);
+  undo.push(unsubStore, () => monitor.dispose());
   monitor.texture.flipY = false;
   const laptopScreen = node('screen_laptop'), monitorScreen = node('screen_monitor');
   const laptopMat = windowMaterial(null, [[0, 1, 0, 1]], TERM_BG);
@@ -219,6 +249,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   }
   const fanDisplay = opt('fan_display');
   const fanReadout = fanDisplay ? new FanDisplay() : null;
+  undo.push(() => fanReadout?.dispose());
   if (fanDisplay && fanReadout) {
     fanReadout.texture.flipY = false;
     meshesOf(fanDisplay).forEach((m) => (m.material = screenMaterial(fanReadout.texture)));
@@ -392,7 +423,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     // screen views sit between the top row and the bottom nav (px → fractions of the view)
     const vh = o.stage.clientHeight || innerHeight;
     const clear: [number, number] = [Math.min(0.2, 64 / vh), Math.max(0.8, 1 - 108 / vh)];
-    const laptop = fitScreen('laptop', screenCorners(laptopScreen), 0.96, 34, camera.aspect < 1 ? (typing ? [0.02, 0.98] : PHONE_BAND) : clear);
+    const laptop = fitScreen('laptop', screenCorners(laptopScreen), 0.96, 34, camera.aspect < 1 ? (typing ? typingBand() : PHONE_BAND) : clear);
     // the whole ultrawide on landscape screens; on portrait phones the live contacts panel fills
     // the width (readable), and the side panes are a drag away
     const mon = camera.aspect < 1 ? fitScreen('contacts', contactsCorners(), 0.96, 34, clear) : fitScreen('monitor', screenCorners(monitorScreen), 0.96, 34, clear);
@@ -437,7 +468,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   let lim: { yaw: number; up: number; down: number; dolly: readonly [number, number]; pan: number } = LIM.normal;
   const YAW = () => lim.yaw * DEG, PITCH_UP = () => lim.up * DEG, PITCH_DOWN = () => lim.down * DEG;
   let deskTween: Tween | null = null, deskDone: (() => void) | null = null;
-  let mixTween: Tween | null = null;
+  let mixTween: Tween | null = null, themeReq = 0;
   let ringTween: { from: Color; to: Color; start: number } | null = null;
   let ringKind: Ring = o.initial.ring;
   let fanSpeed = FAN_SPEED[o.initial.fan], fanTarget = fanSpeed, fanAngle = 0;
@@ -467,7 +498,9 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
 
   // ---------- render loop ----------
   let raf = 0, timer = 0, last = performance.now();
+  undo.push(() => { disposed = true; cancelAnimationFrame(raf); clearTimeout(timer); });
   const frameTimes: number[] = [];
+  let chained = false; // this frame follows the last one directly (no idle sleep in its dt)
   const hidden = () => document.visibilityState === 'hidden';
   function invalidate() {
     if (disposed || raf) return;
@@ -477,6 +510,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   }
 
   const dock = new Dock([o.termEl, o.contactsEl, ...(o.infoEl ? [o.infoEl] : [])]);
+  undo.push(() => dock.destroy());
   // logical overlay sizes: the laptop terminal is a 16:10 grid (fewer columns on phones so
   // text stays readable when the screen fills the view); contacts match their arc's aspect
   const sizeOverlays = () => {
@@ -571,7 +605,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     backlight.uniforms.uIntensity.value = ringKind === 'off' && !ringTween ? 0 : (0.3 + 0.45 * mix) * (1 + pulse * 0.5);
 
     // fan
-    fanSpeed += (fanTarget - fanSpeed) * Math.min(1, dt * 1.5);
+    fanSpeed = o.reducedMotion ? fanTarget : fanSpeed + (fanTarget - fanSpeed) * Math.min(1, dt * 1.5);
     if (Math.abs(fanTarget - fanSpeed) > 0.05) animating = true;
     if (!o.reducedMotion || fanTarget !== fanSpeed) {
       const drift = o.reducedMotion ? 1 : 1 + 0.04 * Math.sin(now / 3100);
@@ -581,7 +615,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       fanAngle = (fanAngle + step) % (Math.PI * 2);
       fan.quaternion.copy(fanQ0).multiply(q.setFromAxisAngle(fanAxis, fanAngle));
       // blur carries the speed the rotation can't show, so the levels read apart
-      const blur = clamp((fanSpeed - FAN_SHOWN * 0.8) / (FAN_SHOWN * 2.2), 0, 1);
+      const blur = clamp((fanSpeed - FAN_SHOWN * 0.8) / (FAN_SPEED[3] - FAN_SHOWN * 0.8), 0, 1); // levels 1/2/3 ≈ 0.4/0.7/1
       fanTrails.forEach(({ g, mat }, i) => {
         g.visible = blur > 0.02;
         if (!g.visible) return;
@@ -607,8 +641,9 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
         look = raycaster.ray.at(1.2, v2.set(0, 0, 0)).clone();
       } else look = screenCorners(laptopScreen)[0].clone().lerp(screenCorners(laptopScreen)[2], 0.5);
     }
+    if (o.reducedMotion) look = null; // reduced motion: the cat keeps its pose
     const restQ = headQ0.clone();
-    if (tiltStart > 0 && now - tiltStart < 900) {
+    if (!o.reducedMotion && tiltStart > 0 && now - tiltStart < 900) {
       const k = Math.sin(((now - tiltStart) / 900) * Math.PI);
       restQ.multiply(q2.setFromAxisAngle(new Vector3(1, 0, 0), 14 * DEG * k));
       animating = true;
@@ -689,22 +724,23 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     };
     dock.update([quad(screenCorners(laptopScreen)), quad(contactsCorners()), ...(o.infoEl ? [quad(infoCorners())] : [])]);
 
-    const t0 = performance.now();
     renderer.render(scene, camera);
-    // adaptive resolution while continuously animating
-    if (animating) {
+    // adaptive resolution while continuously animating: only back-to-back frames count (a
+    // frame after an idle sleep would read as slow). rAF is capped at vsync, so "fast" means
+    // keeping up with a 60 Hz display (~16.7 ms); anything well past it steps down
+    if (animating && chained) {
       frameTimes.push(dt * 1000);
       if (frameTimes.length >= 30) {
         const avg = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
         frameTimes.length = 0;
-        if (avg > 22 && dprScale > 0.55) { dprScale -= 0.15; applySize(); }
-        else if (avg < 12 && dprScale < 1) { dprScale = Math.min(1, dprScale + 0.1); applySize(); }
+        if (avg > 24 && dprScale > 0.55) { dprScale -= 0.15; applySize(); }
+        else if (avg < 18 && dprScale < 1) { dprScale = Math.min(1, dprScale + 0.1); applySize(); }
       }
     }
-    void t0;
 
     const spinning = fanSpeed > 0.05 && !o.reducedMotion && fanInView();
     const interval = frameInterval({ animating, hidden: hidden(), reducedMotion: o.reducedMotion, idleMs: now - lastInput, spinning });
+    chained = interval === 0;
     if (interval === 0) raf = requestAnimationFrame(frame);
     else if (interval !== null) timer = window.setTimeout(() => { timer = 0; raf = requestAnimationFrame(frame); }, interval);
   }
@@ -731,7 +767,9 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       invalidate();
     },
     setDesk(h) {
-      hold = null; // a typed/clicked preset takes over from a held arrow
+      // a typed/clicked preset takes over from a held arrow (and stops its motor hum)
+      if (hold?.active) { ledPaddle.set(LED_OFF); o.onHold?.('end', rigDy + manifest.deskBase); }
+      hold = null;
       const target = clamp(h, manifest.range[0], manifest.range[1]);
       deskDone?.();
       const from = rigDy + manifest.deskBase;
@@ -741,10 +779,12 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
     },
     setTheme(t) {
       const want = t === 'light' ? 0 : 1;
+      const req = ++themeReq;
       atlas(themeKey(t)).then((tx) => {
         if (disposed) return;
         if (t === 'light') baked.uniforms.uDay.value = shadowMat.uniforms.uDay.value = tx;
         else baked.uniforms.uNight.value = shadowMat.uniforms.uNight.value = tx;
+        if (req !== themeReq) return; // a newer toggle owns the crossfade
         mixTween = new Tween(mix, want, performance.now(), o.reducedMotion ? 0 : 600);
         invalidate();
       }).catch((e) => {
@@ -858,6 +898,7 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
       else if (t?.kind === 'paddle') o.onPaddle?.(t.key);
     },
   });
+  undo.push(detachInput);
 
   const onResize = () => {
     const before = currentPose();
@@ -882,6 +923,11 @@ export async function mount(o: SceneOptions): Promise<SceneHandle> {
   document.addEventListener('visibilitychange', onVis);
   canvas.addEventListener('webglcontextlost', onLost);
   canvas.addEventListener('webglcontextrestored', onRestored);
+  undo.push(() => {
+    removeEventListener('resize', onResize);
+    removeEventListener('scene:refit', onResize);
+    document.removeEventListener('visibilitychange', onVis);
+  });
 
   o.stage.after(canvas); // above the pinned screens (they show through its windows)
   if (new URLSearchParams(location.search).has('test')) (window as any).__scene = { scene, camera, renderer, rail, flight, dest: () => dest, orbit, invalidate, world: () => world, hold: () => hold, pan };

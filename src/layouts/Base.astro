@@ -50,7 +50,11 @@ const ld = JSON.stringify(person).replace(/</g, '\\u003c');
     <meta name="theme-color" content={light} media="(prefers-color-scheme: light)" />
     <script is:inline define:vars={{ dark, light }}>
       var d = document.documentElement, t = null;
-      try { t = localStorage.getItem('alxnko:theme') || localStorage.getItem('alxnko-theme'); } catch (e) {}
+      try {
+        t = localStorage.getItem('alxnko:theme');
+        // one-time move from the old site's key, so the saved choice keeps winning
+        if (!t && (t = localStorage.getItem('alxnko-theme'))) { localStorage.setItem('alxnko:theme', t); localStorage.removeItem('alxnko-theme'); }
+      } catch (e) {}
       if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
       d.dataset.theme = t;
       d.classList.add('js');

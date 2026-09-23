@@ -166,7 +166,7 @@ export function infoCommands(env: ShellEnv): Command[] {
       const width = CAT[0].length;
       const n = Math.max(CAT.length, rows.length);
       for (let i = 0; i < n; i++) {
-        const art: Line = i < CAT.length ? [fg('green', CAT[i])] : [{ text: ' '.repeat(width) }];
+        const art: Line = i < CAT.length ? [{ ...fg('green', CAT[i]), art: true }] : [{ text: ' '.repeat(width), art: true }];
         ctx.out([...art, { text: '   ' }, ...(rows[i] ?? [])]);
       }
     },

@@ -116,7 +116,8 @@ export function toyCommands(env: ShellEnv): Command[] {
     group: 'fun',
     run(ctx) {
       const msg = ctx.args.length ? ctx.args.join(' ') : ctx.stdin?.trim() || 'meow';
-      for (const l of [...bubble(msg), ...CAT_BODY]) ctx.out(l);
+      for (const l of bubble(msg)) ctx.out(l);
+      for (const l of CAT_BODY) ctx.out([{ text: l, art: true }]);
     },
   };
 
@@ -127,8 +128,10 @@ export function toyCommands(env: ShellEnv): Command[] {
     group: 'fun',
     async run(ctx) {
       const m = matrix(env.random);
-      const frameMs = Math.round(1000 / MATRIX_FPS);
-      const frames = Math.floor(MATRIX_MAX_MS / frameMs);
+      // reduced motion: one still frame of the rain instead of the animation
+      const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const frameMs = still ? 1500 : Math.round(1000 / MATRIX_FPS);
+      const frames = still ? 1 : Math.floor(MATRIX_MAX_MS / frameMs);
       try {
         for (let f = 0; f < frames && !ctx.signal.aborted; f++) {
           m.step();
