@@ -62,6 +62,7 @@ export function attachInput(h: InputHandlers): () => void {
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now(), surface });
     axis = null;
     if (pts.size === 2) {
+      h.release?.(); // a pinch is not a press on the paddle
       const [a, b] = [...pts.values()];
       pinch0 = Math.hypot(a.x - b.x, a.y - b.y);
     }
@@ -88,23 +89,29 @@ export function attachInput(h: InputHandlers): () => void {
     const p = pts.get(e.pointerId);
     pts.delete(e.pointerId);
     if (!p) return;
-    const held = pts.size === 0 && !p.surface && (h.release?.() ?? false);
+    // the last finger up always ends a paddle hold, wherever it was
+    const held = pts.size === 0 && (h.release?.() ?? false);
     if (p.surface) { if (axis) draggedAt = performance.now(); }
     else if (!held && !axis && performance.now() - p.t0 < TAP_MS && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < TAP_PX) h.tap(e.clientX, e.clientY);
     if (pts.size === 0) axis = null;
   };
 
   const onCanvasDown = (e: PointerEvent) => onDown(e);
-  const onSurfaceDown = (e: PointerEvent) => { if (e.pointerType !== 'mouse') onDown(e, true); };
-  const onSurfaceClick = (e: MouseEvent) => {
-    if (performance.now() - draggedAt < 400) { e.preventDefault(); e.stopPropagation(); }
-  };
+  // touch only: mouse and pen keep selecting text and hovering on the panes
+  const onSurfaceDown = (e: PointerEvent) => { if (e.pointerType === 'touch') onDown(e, true); };
   const surfaces = h.surfaces ?? [];
+  // on the window, capture phase: runs before any handler on the panes themselves
+  const onSurfaceClick = (e: MouseEvent) => {
+    if (performance.now() - draggedAt < 400 && surfaces.some((el) => el.contains(e.target as Node))) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  };
   for (const el of surfaces) {
     el.style.touchAction = 'none';
     el.addEventListener('pointerdown', onSurfaceDown);
-    el.addEventListener('click', onSurfaceClick, { capture: true });
   }
+  addEventListener('click', onSurfaceClick, { capture: true });
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('pointerdown', onCanvasDown);
   addEventListener('pointermove', onMove, { passive: true });
@@ -116,8 +123,8 @@ export function attachInput(h: InputHandlers): () => void {
     for (const el of surfaces) {
       el.style.removeProperty('touch-action');
       el.removeEventListener('pointerdown', onSurfaceDown);
-      el.removeEventListener('click', onSurfaceClick, { capture: true });
     }
+    removeEventListener('click', onSurfaceClick, { capture: true });
     removeEventListener('pointermove', onMove);
     removeEventListener('pointerup', onUp);
     removeEventListener('pointercancel', onUp);
