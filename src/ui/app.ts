@@ -132,8 +132,13 @@ export function start(app: AppDeps): App {
   // Type anywhere: a printable key with nothing editable focused lands in the terminal.
   const onKey = (e: KeyboardEvent) => {
     document.body.dataset.interacted = '';
-    if (!term || !deps || e.defaultPrevented || !isTypingKey(e)) return;
+    if (!term || !deps || e.defaultPrevented) return;
     const active = document.activeElement;
+    // a running full-screen toy owns the keyboard (q, ctrl+c), like typing anywhere goes to
+    // the prompt; a focused control keeps its own Enter/Space
+    const activates = (e.key === 'Enter' || e.key === ' ') && active?.closest(ACTIVATES_ON_SPACE);
+    if (!active?.closest(EDITABLE) && !activates && term.toyKey(e)) return;
+    if (!isTypingKey(e)) return;
     if (active?.closest(EDITABLE)) return;
     if (e.key === ' ' && active?.closest(ACTIVATES_ON_SPACE)) return;
     e.preventDefault();

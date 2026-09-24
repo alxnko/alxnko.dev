@@ -15,9 +15,14 @@ export function setup(opts: ShellOptions = {}) {
   const world = new NullWorld();
   const opened: string[] = [];
   let clock = T0;
-  const shell = new Shell(store, world, undefined, {
+  let sleeps = 0;
+  const shell: Shell = new Shell(store, world, undefined, {
     opener: (u) => opened.push(u),
-    sleep: instant,
+    // instant sleeps; a toy that runs until quit (cmatrix) gets a `q` every 100 frames
+    sleep: (ms, signal) => {
+      if (++sleeps % 100 === 0) shell.key('q');
+      return instant(ms, signal);
+    },
     now: () => clock,
     random: () => 0.42,
     ...opts,

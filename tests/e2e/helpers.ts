@@ -44,13 +44,13 @@ export const rainView = (page: Page) =>
     };
   });
 
-/** cmatrix over a scrolled scrollback: visible, changing rain for a while, then any key stops it. */
-export async function expectRain(page: Page) {
+/** cmatrix over a scrolled scrollback: visible, changing rain; other keys don't stop it, ctrl+c does. */
+export async function expectRain(page: Page, cmd = 'cmatrix') {
   // fill the scrollback past one screen so the log is scrolled (the live-site case)
   await run(page, 'fastfetch');
   await run(page, 'help');
   await expect.poll(() => page.evaluate(() => document.getElementById('term-screen')!.scrollTop)).toBeGreaterThan(0);
-  await run(page, 'cmatrix');
+  await run(page, cmd);
   const seen = new Set<string>();
   for (let i = 0; i < 6; i++) {
     await page.waitForTimeout(250);
@@ -62,8 +62,13 @@ export async function expectRain(page: Page) {
   expect(seen.size).toBeGreaterThanOrEqual(5); // it animates
   expect([...seen].at(-1)!.replace(/\s/g, '').length).toBeGreaterThan(100); // and it rains
   await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');
-  await page.keyboard.press('x');
+  // the toy owns the tty: typing is swallowed and does not stop it
+  await page.keyboard.type('xyz');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(300);
+  await expect(page.locator('#term-overlay')).toBeVisible();
+  await page.keyboard.press('Control+c');
   await expect(page.locator('#term-overlay')).toBeHidden();
   await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
-  await expect(page.locator('#term-input')).toHaveValue(''); // the stopping key is swallowed
+  await expect(page.locator('#term-input')).toHaveValue(''); // nothing typed during the rain landed
 }

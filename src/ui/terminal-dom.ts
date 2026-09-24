@@ -1,6 +1,6 @@
 // DOM renderer + keyboard controller for the single terminal (spec §5.1, §5.2).
 // It only ever creates text nodes, <span> and allowlisted <a>: never HTML strings.
-import type { Color, Line, TermState } from '../term/types';
+import type { Color, Line, Span, TermState } from '../term/types';
 import { LINK_ALLOWLIST } from '../content/site';
 
 export interface TermDeps {
@@ -12,7 +12,13 @@ export interface TermDeps {
   };
   run(line: string): Promise<void>;
   interrupt(): void;
-  complete(line: string, cursor: number): { replace: [number, number]; candidates: string[]; insert: string | null };
+  complete(line: string, cursor: number): { replace: [number, number]; candidates: string[]; full?: string[]; insert: string | null };
+  /** A key for the running command that owns the keyboard (cmatrix: q). False when none does. */
+  key?(k: string): boolean;
+  /** Suggestion chips for an empty prompt (what to try next). */
+  chips?(): string[];
+  /** A tap on a running full-screen toy (phones: point at the ^C key). */
+  onToyTap?(): void;
   historySearch?(query: string): string | null;
   /** Ctrl+L. Falls back to running `clear`. */
   clear?(): void;
@@ -22,6 +28,12 @@ export interface TermDeps {
 
 export interface TermHandle {
   focus(): void;
+  /**
+   * While a full-screen toy owns the tty, a key pressed anywhere on the page is its: ctrl+c
+   * interrupts, a plain key goes to the toy, and the rest is swallowed. Esc, Tab and browser
+   * shortcuts are never taken. Returns true when the key was taken.
+   */
+  toyKey(e: KeyboardEvent): boolean;
   destroy(): void;
 }
 
@@ -32,6 +44,10 @@ const COLORS: ReadonlySet<Color> = new Set<Color>([
 function spans(line: Line, into: HTMLElement): HTMLElement {
   const doc = into.ownerDocument;
   for (const s of line) {
+    if (s.run && !s.href) {
+      into.append(runButton(s, doc));
+      continue;
+    }
     const link = s.href !== undefined && LINK_ALLOWLIST.has(s.href);
     const el = doc.createElement(link ? 'a' : 'span');
     if (link) {
@@ -47,6 +63,66 @@ function spans(line: Line, into: HTMLElement): HTMLElement {
     into.append(el);
   }
   return into;
+}
+
+/** A command a click runs (or, ending in a space, starts in the prompt): a button in the log. */
+function runButton(s: Span, doc: Document): HTMLElement {
+  const el = doc.createElement('button');
+  el.type = 'button';
+  el.className = 'run';
+  if (s.fg && COLORS.has(s.fg)) el.classList.add(`c-${s.fg}`);
+  if (s.bold) el.classList.add('b');
+  el.tabIndex = -1; // typing is the keyboard way; the log must not become a wall of tab stops
+  el.dataset.cmd = s.run!.trimEnd();
+  if (s.run!.endsWith(' ')) el.dataset.fill = '';
+  el.textContent = s.text;
+  return el;
+}
+
+/**
+ * A full-screen toy frame (cmatrix): one row element per line, each a reused set of spans, so
+ * a frame only touches the text and classes that changed (no per-frame node churn).
+ */
+export class FrameView {
+  private rows: HTMLElement[] = [];
+  constructor(private readonly el: HTMLElement) {}
+
+  show(frame: Line[] | null): void {
+    const { el } = this;
+    if (!frame) {
+      if (!el.hidden) {
+        el.hidden = true;
+        el.replaceChildren();
+        this.rows = [];
+      }
+      return;
+    }
+    el.hidden = false;
+    const doc = el.ownerDocument;
+    while (this.rows.length < frame.length) {
+      const r = doc.createElement('div');
+      r.className = 'ln';
+      el.append(r);
+      this.rows.push(r);
+    }
+    while (this.rows.length > frame.length) this.rows.pop()!.remove();
+    frame.forEach((line, i) => {
+      const row = this.rows[i];
+      line.forEach((s, j) => {
+        let sp = row.children[j] as HTMLElement | undefined;
+        if (!sp) {
+          sp = doc.createElement('span');
+          sp.append(doc.createTextNode(''));
+          row.append(sp);
+        }
+        const cls = (s.fg && COLORS.has(s.fg) ? `c-${s.fg}` : '') + (s.bold ? ' b' : '');
+        if (sp.className !== cls) sp.className = cls;
+        const t = sp.firstChild as Text;
+        if (t.data !== s.text) t.data = s.text;
+      });
+      while (row.childElementCount > line.length) row.lastElementChild!.remove();
+    });
+  }
 }
 
 /** One scrollback row. */
@@ -72,6 +148,8 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
   const promptEl = need<HTMLElement>('#term-prompt');
   const mirror = need<HTMLElement>('#term-mirror');
   const input = need<HTMLInputElement>('#term-input');
+  const chipsEl = root.querySelector<HTMLElement>('#term-chips');
+  const frames = new FrameView(overlay);
   const doc = root.ownerDocument;
   const { store } = deps;
 
@@ -150,15 +228,40 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
   }
 
   function syncOverlay(s: TermState) {
-    if (s.overlay) {
-      overlay.hidden = false;
-      overlay.replaceChildren(...s.overlay.map((l) => renderLine(l, doc)));
-      screen.dataset.overlay = 'true';
-    } else if (!overlay.hidden) {
-      overlay.hidden = true;
-      overlay.replaceChildren();
-      delete screen.dataset.overlay;
-    }
+    frames.show(s.overlay);
+    if (s.overlay) screen.dataset.overlay = 'true';
+    else delete screen.dataset.overlay;
+  }
+
+  // ---- chips: completions while typing (tap = Tab), else what to try next ---------------
+  let chipsKey = '';
+  function syncChips(s: TermState) {
+    if (!chipsEl || !deps.chips) return;
+    chipsEl.dataset.busy = s.busy ? 'true' : 'false';
+    if (s.busy || searching) return; // keep the row as it is (no jumps) until the prompt is back
+    let items: { label: string; cmd: string; fill: boolean }[] = [];
+    if (s.input.trim()) {
+      const r = deps.complete(s.input, s.cursor);
+      const [a, b] = r.replace;
+      const full = r.full ?? [];
+      items = full.slice(0, 6).map((f, i) => {
+        const text = s.input.slice(0, a) + f + (f.endsWith('/') ? '' : ' ') + s.input.slice(b);
+        return { label: r.candidates[i] ?? f, cmd: text, fill: true };
+      }).filter((it) => it.cmd.trimEnd() !== s.input.trimEnd()); // no chip that changes nothing
+    } else items = deps.chips().map((c) => ({ label: c, cmd: c, fill: false }));
+    const key = items.map((i) => `${i.fill ? '+' : ''}${i.label}\u0001${i.cmd}`).join('\u0002');
+    if (key === chipsKey) return;
+    chipsKey = key;
+    chipsEl.dataset.kind = s.input.trim() ? 'complete' : 'next';
+    chipsEl.replaceChildren(...items.map((it) => {
+      const b = doc.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.dataset.cmd = it.cmd;
+      if (it.fill) b.dataset.fill = '';
+      b.textContent = it.label;
+      return b;
+    }));
   }
 
   function render(s: TermState) {
@@ -168,6 +271,7 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
     syncOverlay(s);
     form.dataset.busy = s.busy ? 'true' : 'false';
     syncInput(s);
+    syncChips(s);
     if (stick) screen.scrollTop = screen.scrollHeight;
   }
 
@@ -300,16 +404,29 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
     (input.selectionStart ?? 0) !== (input.selectionEnd ?? 0) ||
     (doc.getSelection?.()?.toString() ?? '') !== '';
 
+  const toyMode = () => store.state.busy && store.state.overlay !== null;
+  function toyKey(e: KeyboardEvent): boolean {
+    if (!toyMode() || e.isComposing) return false;
+    // Esc is the page's (back to the desk, out of view mode); Tab never traps focus
+    if (['Escape', 'Tab', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return false;
+    const ctrl = e.ctrlKey && !e.altKey && !e.metaKey;
+    if (ctrl && e.key.toLowerCase() === 'c') {
+      if (hasSelection()) return false; // copy wins
+      e.preventDefault();
+      deps.interrupt();
+      return true;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return false; // browser shortcuts stay the browser's
+    e.preventDefault(); // the toy owns the tty: nothing reaches the prompt
+    deps.key?.(e.key);
+    return true;
+  }
+
   function onKeyDown(e: KeyboardEvent) {
     deps.onActivity?.();
     if (e.isComposing) return;
     const s = store.state;
-    const modifierOnly = ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key);
-    if (s.busy && s.overlay && !modifierOnly) {
-      e.preventDefault();
-      deps.interrupt();
-      return;
-    }
+    if (toyMode()) return void toyKey(e); // whatever it doesn't take is the page's or the browser's
     if (searching) return searchKey(e);
     const ctrl = e.ctrlKey && !e.altKey && !e.metaKey;
     const { input: text, cursor } = s;
@@ -341,13 +458,26 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
       case 'ArrowUp': e.preventDefault(); histWalk(-1); return;
       case 'ArrowDown': e.preventDefault(); histWalk(1); return;
       case 'Escape':
-        if (s.overlay || s.busy) { e.preventDefault(); deps.interrupt(); return; }
+        // Esc never interrupts (ctrl+c does, as in a real terminal): unclaimed, it is the
+        // page's, which flies back to the desk
         if (!comp.hidden) { e.preventDefault(); hideComp(); }
         return;
     }
   }
 
   function onInput() {
+    if (toyMode()) {
+      // phone keyboards send no key events: take the typed text as keys, keep the prompt
+      const typed = input.value, was = store.state.input;
+      let p = 0;
+      while (p < typed.length && p < was.length && typed[p] === was[p]) p++;
+      let q = 0;
+      while (q < typed.length - p && q < was.length - p && typed[typed.length - 1 - q] === was[was.length - 1 - q]) q++;
+      const ins = typed.slice(p, typed.length - q);
+      input.value = was;
+      for (const ch of ins) deps.key?.(ch);
+      return;
+    }
     if (searching) { searchFor(input.value); return; }
     histIdx = -1;
     hideComp();
@@ -370,11 +500,22 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
     const b = (e.target as Element | null)?.closest?.<HTMLElement>('[data-cmd]');
     if (!b || !root.contains(b) || store.state.busy) return;
     if (searching) endSearch(null);
-    submit(b.dataset.cmd ?? '');
+    const cmd = b.dataset.cmd ?? '';
+    if (b.dataset.fill !== undefined) {
+      // a completion, or a command that needs an argument: into the prompt, not run
+      const text = b.classList.contains('run') ? cmd + ' ' : cmd;
+      histIdx = -1;
+      hideComp();
+      edit(text, text.length);
+      input.focus({ preventScroll: true });
+      return;
+    }
+    submit(cmd);
   }
   function onPointerUp(e: Event) {
     const t = e.target as Element | null;
     if (!t || t.closest('a,button,input')) return;
+    if (toyMode()) { deps.onToyTap?.(); return; } // the toy owns the screen: no keyboard pop-up
     if ((doc.getSelection?.()?.toString() ?? '') !== '') return; // user is selecting text
     input.focus({ preventScroll: true });
   }
@@ -401,6 +542,7 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
     focus() {
       input.focus({ preventScroll: true });
     },
+    toyKey,
     destroy() {
       for (const [t, ev, fn] of on) t.removeEventListener(ev, fn);
       unsub();

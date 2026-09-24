@@ -9,12 +9,12 @@ const c = (line: string, cursor = line.length, cwd = HOME) => complete(line, cur
 
 describe('complete', () => {
   it('completes a unique command with a trailing space', () => {
-    expect(c('hel')).toEqual({ replace: [0, 3], candidates: ['help'], insert: 'help ' });
-    expect(c('he')).toEqual({ replace: [0, 2], candidates: ['head', 'help'], insert: null });
+    expect(c('hel')).toEqual({ replace: [0, 3], candidates: ['help'], full: ['help'], insert: 'help ' });
+    expect(c('he')).toEqual({ replace: [0, 2], candidates: ['head', 'help'], full: ['head', 'help'], insert: null });
   });
 
   it('lists multiple commands and inserts the common prefix', () => {
-    expect(c('ca')).toEqual({ replace: [0, 2], candidates: ['cat', 'catsay'], insert: 'cat' });
+    expect(c('ca')).toEqual({ replace: [0, 2], candidates: ['cat', 'catsay'], full: ['cat', 'catsay'], insert: 'cat' });
     expect(c('cat').insert).toBeNull();
   });
 
@@ -31,7 +31,7 @@ describe('complete', () => {
   });
 
   it('completes dirs with a trailing slash', () => {
-    expect(c('cd mo')).toEqual({ replace: [3, 5], candidates: ['monitor/'], insert: 'monitor/' });
+    expect(c('cd mo')).toEqual({ replace: [3, 5], candidates: ['monitor/'], full: ['monitor/'], insert: 'monitor/' });
   });
 
   it('cd completes directories only', () => {
@@ -78,11 +78,11 @@ describe('complete', () => {
   });
 
   it('completes only the word under the cursor', () => {
-    expect(c('cd mo && ls', 5)).toEqual({ replace: [3, 5], candidates: ['monitor/'], insert: 'monitor/' });
+    expect(c('cd mo && ls', 5)).toEqual({ replace: [3, 5], candidates: ['monitor/'], full: ['monitor/'], insert: 'monitor/' });
   });
 
   it('returns nothing for no match', () => {
-    expect(c('zz')).toEqual({ replace: [0, 2], candidates: [], insert: null });
+    expect(c('zz')).toEqual({ replace: [0, 2], candidates: [], full: [], insert: null });
     expect(c('cat nope/x').candidates).toEqual([]);
   });
 });

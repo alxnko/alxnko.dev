@@ -15,8 +15,11 @@ describe('info commands', () => {
   it('help lists groups and visible commands, never hidden ones or projects', async () => {
     const { out } = setup();
     const h = await out('help');
-    expect(h).toContain('GNU bash, version 5.3');
-    for (const g of ['info', 'files', 'world', 'fun', 'text']) expect(h).toMatch(new RegExp(`^${g}$`, 'm'));
+    expect(h).toContain('meowOS, bash 5.3');
+    // the most fun or useful first, then the groups
+    expect(h.indexOf('start here')).toBeLessThan(h.indexOf('\ninfo\n'));
+    expect(h.split('\n').filter((l) => l.startsWith('  ')).slice(0, 3).map((l) => l.trim().split(' ')[0])).toEqual(['fastfetch', 'contacts', 'tour']);
+    for (const g of ['start here', 'info', 'files', 'world', 'fun', 'text']) expect(h).toMatch(new RegExp(`^${g}$`, 'm'));
     for (const cmd of ['help', 'man', 'fastfetch', 'ls', 'cd', 'open', 'desk', 'theme', 'ring', 'fan', 'sound', 'meow', 'catsay', 'cmatrix', 'pacman', 'grep'])
       expect(h).toMatch(new RegExp(`^  ${cmd} `, 'm'));
     expect(h).not.toMatch(/^ {2}sudo/m);
@@ -358,7 +361,7 @@ describe('toys', () => {
     expect(long).toMatch(/^\\ word/m);
   });
 
-  it('cmatrix draws overlay frames, never scrollback, and cleans up', async () => {
+  it('cmatrix draws overlay frames, never scrollback (one note for screen readers), and cleans up', async () => {
     const { run, store } = setup();
     const frames: number[] = [];
     let busyDuring = false;
@@ -367,15 +370,28 @@ describe('toys', () => {
         frames.push(s.overlay.length);
         busyDuring ||= s.busy;
         expect(s.overlay.every((row) => row.map((sp) => sp.text).join('').length === 80)).toBe(true);
+        expect(s.monitor).toBeNull(); // only with --both
       }
     });
     const lines = await run('cmatrix');
-    expect(lines).toEqual([]);
-    expect(frames.length).toBeGreaterThan(10);
-    expect(frames.length).toBeLessThanOrEqual(96);
+    expect(lines.map(text)).toEqual(['cmatrix running, press ctrl+c to stop']);
+    expect(frames.length).toBe(100); // the harness quits it with q after 100 frames
     expect(frames.every((n) => n === 24)).toBe(true);
     expect(busyDuring).toBe(true);
     expect(store.state.overlay).toBeNull();
+  });
+
+  it('cmatrix flags: -h, -C colors, bad options, and never in a pipe', async () => {
+    const { out } = setup();
+    expect(await out('cmatrix -h')).toContain('usage: cmatrix [-s] [-C color] [--both]');
+    expect(await out('cmatrix --help')).toContain('--both');
+    expect(await out('cmatrix -C pink; echo $?')).toBe("cmatrix: invalid color 'pink' (green, red, blue, white, yellow, cyan, magenta)\n1");
+    expect(await out('cmatrix -C')).toBe("cmatrix: option requires an argument -- 'C'");
+    expect(await out('cmatrix -x')).toBe("cmatrix: invalid option -- 'x'\ntry 'cmatrix -h' for the options");
+    expect(await out('cmatrix --nope')).toContain("unexpected argument '--nope'");
+    expect(await out('cmatrix | wc -l; echo $?')).toBe('cmatrix: stdout is not a terminal\n0\n0');
+    for (const c of ['-Cred', '-C YELLOW', '-sC cyan']) expect(await out(`cmatrix ${c}`)).toContain('cmatrix running');
+    expect(await out('cmatrix -s')).toBe('cmatrix running, press any key to stop');
   });
 
   it('cmatrix under reduced motion shows one still frame of rain already falling', async () => {

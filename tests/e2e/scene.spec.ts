@@ -1,5 +1,5 @@
 import { chromium, expect, test } from '@playwright/test';
-import { expectRain, guard, run } from './helpers';
+import { expectRain, guard, rainView, run } from './helpers';
 
 test.describe('3D desk', () => {
   test.setTimeout(60_000);
@@ -27,12 +27,84 @@ test.describe('3D desk', () => {
     }
   });
 
-  test('cmatrix rains on the laptop screen and any key stops it', async ({ page }) => {
+  test('cmatrix rains on the laptop screen; ctrl+c stops it', async ({ page }) => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
     await page.locator('#nav [data-landmark="laptop"]').click();
     await page.waitForTimeout(1500);
     await expectRain(page);
+  });
+
+  test('cmatrix: esc flies back to the desk and the rain keeps falling; ctrl+c then stops it', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await page.locator('#nav [data-landmark="laptop"]').click();
+    await page.waitForTimeout(1200);
+    await run(page, 'cmatrix');
+    await expect(page.locator('#term-overlay')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#nav [data-landmark="desk"]')).toHaveAttribute('aria-current', 'true', { timeout: 5000 });
+    await page.waitForTimeout(600);
+    const a = (await rainView(page)).text;
+    await page.waitForTimeout(400);
+    expect((await rainView(page)).text).not.toBe(a); // still raining at the desk
+    await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');
+    // the input lost focus with Esc: keys still reach the toy (type-anywhere)
+    await page.keyboard.press('w');
+    await expect(page.locator('#nav [data-landmark="desk"]')).toHaveAttribute('aria-current', 'true');
+    await page.keyboard.press('Control+c');
+    await expect(page.locator('#term-overlay')).toBeHidden();
+    await expect(page.locator('#term-input')).toHaveValue('');
+  });
+
+  test('cmatrix --both covers the whole monitor; ctrl+c gives the contacts back', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    const holes = () => page.evaluate(() => {
+      let v: number[] = [];
+      (window as any).__scene.scene.getObjectByName('screen_monitor').traverse((o: any) => {
+        if (o.material?.uniforms?.uRects) v = o.material.uniforms.uRects.value.map((q: any) => q.x);
+      });
+      return v;
+    });
+    const open = await holes();
+    expect(open[0]).toBeLessThan(1); // the contacts window is open
+    await run(page, 'cmatrix --both');
+    await expect(page.locator('body')).toHaveAttribute('data-rain', '');
+    await expect.poll(holes).toEqual([2, 2, 2, 2]); // every window closed: the rain is the screen
+    await expect(page.locator('#contacts')).toBeHidden();
+    await expect(page.locator('#mon-info')).toBeHidden();
+    await expect(page.locator('#contacts-rain')).toBeHidden(); // the page's copy stays off in 3D
+    await page.locator('#nav [data-landmark="monitor"]').click();
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: test.info().outputPath('monitor-rain.png') });
+    await page.keyboard.press('Control+c');
+    await expect(page.locator('body')).not.toHaveAttribute('data-rain', '');
+    await expect.poll(holes).toEqual(open);
+    await expect(page.locator('#contacts')).toBeVisible();
+  });
+
+  test('on a phone, the ^C key stops the rain (no ctrl key there)', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'touch');
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await page.locator('#nav [data-landmark="laptop"]').tap();
+    await page.waitForTimeout(1200);
+    await run(page, 'cmatrix --both');
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // keyboard down
+    const intr = page.locator('#intr');
+    await expect(intr).toBeVisible();
+    // clear of the nav, and a full 44 px target
+    const [b, n] = [(await intr.boundingBox())!, (await page.locator('#nav').boundingBox())!];
+    expect(b.height).toBeGreaterThanOrEqual(44);
+    expect(b.y + b.height).toBeLessThanOrEqual(n.y);
+    const t = (await page.locator('#term').boundingBox())!;
+    await page.touchscreen.tap(t.x + t.width / 2, t.y + t.height / 2); // a tap on the rain
+    await expect(intr).toHaveClass(/nudge/);
+    await expect(page.locator('#term-input')).not.toBeFocused();
+    await intr.tap();
+    await expect(page.locator('#term-overlay')).toBeHidden();
+    await expect(page.locator('body')).not.toHaveAttribute('data-rain', '');
   });
 
   test('esc and the back button return to the desk view', async ({ page }) => {

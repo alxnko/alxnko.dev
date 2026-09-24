@@ -41,35 +41,40 @@ export function bubble(msg: string, width = 40): string[] {
 // cmatrix
 export const MATRIX_COLS = 80;
 export const MATRIX_ROWS = 24;
+/** The ultrawide's rain (cmatrix --both): 21:9, the same rows. */
+export const WALL_COLS = 128;
 const MATRIX_FPS = 12;
-const MATRIX_MAX_MS = 8000;
 const GLYPHS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!"#$%&()*+-./:;<=>?@[]^_{|}~';
+/** Real cmatrix's -C names, on the site's ANSI palette (yellow is the palette's amber). */
+export const MATRIX_COLORS: Readonly<Record<string, Color>> = {
+  green: 'green', red: 'red', blue: 'blue', white: 'white', yellow: 'amber', cyan: 'cyan', magenta: 'magenta',
+};
 
-function matrix(random: () => number) {
+export function matrix(random: () => number, cols = MATRIX_COLS, rows = MATRIX_ROWS, color: Color = 'green') {
   const glyph = () => GLYPHS[Math.floor(random() * GLYPHS.length) % GLYPHS.length];
-  const grid: string[][] = Array.from({ length: MATRIX_ROWS }, () => Array.from({ length: MATRIX_COLS }, glyph));
+  const grid: string[][] = Array.from({ length: rows }, () => Array.from({ length: cols }, glyph));
   // Per column: head row (can be negative = not yet on screen), trail length, active flag.
-  const head = Array.from({ length: MATRIX_COLS }, () => -Math.floor(random() * MATRIX_ROWS * 1.5));
-  const len = Array.from({ length: MATRIX_COLS }, () => 4 + Math.floor(random() * 14));
-  const on = Array.from({ length: MATRIX_COLS }, (_, c) => c % 2 === 0 || random() < 0.3);
+  const head = Array.from({ length: cols }, () => -Math.floor(random() * rows * 1.5));
+  const len = Array.from({ length: cols }, () => 4 + Math.floor(random() * 14));
+  const on = Array.from({ length: cols }, (_, c) => c % 2 === 0 || random() < 0.3);
 
   const step = () => {
-    for (let c = 0; c < MATRIX_COLS; c++) {
+    for (let c = 0; c < cols; c++) {
       if (!on[c]) continue;
       head[c]++;
-      if (head[c] - len[c] > MATRIX_ROWS) {
+      if (head[c] - len[c] > rows) {
         head[c] = -Math.floor(random() * 10);
         len[c] = 4 + Math.floor(random() * 14);
       }
-      if (head[c] >= 0 && head[c] < MATRIX_ROWS) grid[head[c]][c] = glyph();
+      if (head[c] >= 0 && head[c] < rows) grid[head[c]][c] = glyph();
     }
     // A little shimmer in the trails.
-    for (let k = 0; k < 20; k++) grid[Math.floor(random() * MATRIX_ROWS) % MATRIX_ROWS][Math.floor(random() * MATRIX_COLS) % MATRIX_COLS] = glyph();
+    for (let k = 0; k < 20; k++) grid[Math.floor(random() * rows) % rows][Math.floor(random() * cols) % cols] = glyph();
   };
 
   const render = (): Line[] => {
     const frame: Line[] = [];
-    for (let r = 0; r < MATRIX_ROWS; r++) {
+    for (let r = 0; r < rows; r++) {
       const row: Line = [];
       let run = '';
       let runColor: Color | 'blank' | 'head' = 'blank';
@@ -78,9 +83,9 @@ function matrix(random: () => number) {
         row.push(runColor === 'blank' ? { text: run } : runColor === 'head' ? { text: run, fg: 'white', bold: true } : fg(runColor, run));
         run = '';
       };
-      for (let c = 0; c < MATRIX_COLS; c++) {
+      for (let c = 0; c < cols; c++) {
         const d = head[c] - r;
-        const kind: Color | 'blank' | 'head' = !on[c] || d < 0 || d > len[c] ? 'blank' : d === 0 ? 'head' : d > len[c] - 3 ? 'dim' : 'green';
+        const kind: Color | 'blank' | 'head' = !on[c] || d < 0 || d > len[c] ? 'blank' : d === 0 ? 'head' : d > len[c] - 3 ? 'dim' : color;
         if (kind !== runColor) {
           flush();
           runColor = kind;
@@ -94,6 +99,15 @@ function matrix(random: () => number) {
   };
   return { step, render };
 }
+
+const CMATRIX_HELP = [
+  'usage: cmatrix [-s] [-C color] [--both]',
+  ' -s          screensaver mode: any key quits',
+  ` -C color    rain color: ${Object.keys(MATRIX_COLORS).join(', ')}`,
+  ' --both      rain on the monitor too',
+  ' -h          print this help',
+  'quit with q or ctrl+c. esc steps back to the desk and the rain keeps falling.',
+];
 
 // pacman
 const REPOS: [string, string, string][] = [
@@ -115,6 +129,7 @@ export function toyCommands(env: ShellEnv): Command[] {
     usage: 'catsay [message]',
     group: 'fun',
     run(ctx) {
+      if (ctx.args[0] === '-h') return ctx.out(`usage: ${this.usage}  (or: echo hi | catsay)`);
       const msg = ctx.args.length ? ctx.args.join(' ') : ctx.stdin?.trim() || 'meow';
       for (const l of bubble(msg)) ctx.out(l);
       for (const l of CAT_BODY) ctx.out([{ text: l, art: true }]);
@@ -123,25 +138,74 @@ export function toyCommands(env: ShellEnv): Command[] {
 
   const cmatrix: Command = {
     name: 'cmatrix',
-    summary: 'the rain. any key stops it',
-    usage: 'cmatrix',
+    summary: 'the rain. q or ctrl+c stops it',
+    usage: 'cmatrix [-s] [-C color] [--both]',
     group: 'fun',
+    help: CMATRIX_HELP,
+    complete: (args) => (args[args.length - 2] === '-C' ? Object.keys(MATRIX_COLORS) : ['--both', '-C', '-s']),
     async run(ctx) {
-      const m = matrix(env.random);
-      // reduced motion: one still frame of the rain instead of the animation
+      let color: Color = 'green';
+      let saver = false;
+      let both = false;
+      const a = ctx.args;
+      for (let i = 0; i < a.length; i++) {
+        const w = a[i];
+        if (w === '--both') both = true;
+        else if (w === '--help') return CMATRIX_HELP.forEach((l) => ctx.out(l));
+        else if (/^-[a-zA-Z]+$/.test(w)) {
+          for (let j = 1; j < w.length; j++) {
+            const ch = w[j];
+            if (ch === 'h') return CMATRIX_HELP.forEach((l) => ctx.out(l));
+            if (ch === 's') saver = true;
+            else if (ch === 'C') {
+              const v = w.slice(j + 1) || a[++i];
+              if (!v) fail(ctx, "cmatrix: option requires an argument -- 'C'");
+              const c = MATRIX_COLORS[v.toLowerCase()];
+              if (!c) fail(ctx, `cmatrix: invalid color '${v}' (${Object.keys(MATRIX_COLORS).join(', ')})`);
+              color = c;
+              break;
+            } else {
+              ctx.err(`cmatrix: invalid option -- '${ch}'`);
+              fail(ctx, "try 'cmatrix -h' for the options");
+            }
+          }
+        } else {
+          ctx.err(`cmatrix: unexpected argument '${w}'`);
+          fail(ctx, "try 'cmatrix -h' for the options");
+        }
+      }
+      if (!env.tty) fail(ctx, 'cmatrix: stdout is not a terminal');
+
+      // the toy owns the tty: q quits like the real one, a screensaver quits on any key, and
+      // everything else is swallowed (ctrl+c and esc never reach here: they stay the shell's)
+      let quit = false;
+      ctx.onKey((k) => {
+        if (saver || k === 'q' || k === 'Q') quit = true;
+      });
+      // said once, through the log (the rain itself is aria-hidden)
+      ctx.out([fg('muted', `cmatrix running, press ${saver ? 'any key' : 'ctrl+c'} to stop`)]);
+
+      const m = matrix(env.random, MATRIX_COLS, MATRIX_ROWS, color);
+      const wall = both ? matrix(env.random, WALL_COLS, MATRIX_ROWS, color) : null;
+      // reduced motion: one still frame of the rain (pre-rolled one screen, so it is already
+      // falling) until it is stopped, instead of the animation
       const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const frameMs = still ? 1500 : Math.round(1000 / MATRIX_FPS);
-      const frames = still ? 1 : Math.floor(MATRIX_MAX_MS / frameMs);
-      // the rain starts above the screen; the still frame shows it already falling
-      if (still) for (let i = 0; i < MATRIX_ROWS; i++) m.step();
+      if (still) for (let i = 0; i < MATRIX_ROWS; i++) m.step(), wall?.step();
+      const frameMs = Math.round(1000 / MATRIX_FPS);
+      let drawn = false;
       try {
-        for (let f = 0; f < frames && !ctx.signal.aborted; f++) {
-          m.step();
-          env.store.setOverlay(m.render());
-          await ctx.sleep(frameMs);
+        // no time limit: it rains until q or ctrl+c, like the real one
+        while (!ctx.signal.aborted && !quit) {
+          if (!still || !drawn) {
+            m.step();
+            wall?.step();
+            env.store.setFrames(m.render(), wall?.render() ?? null);
+            drawn = true;
+          }
+          await ctx.sleep(still ? 100 : frameMs);
         }
       } finally {
-        env.store.setOverlay(null);
+        env.store.setFrames(null, null);
       }
     },
   };
@@ -161,15 +225,32 @@ export function toyCommands(env: ShellEnv): Command[] {
     ctx.out(' there is nothing to do');
   }
 
+  const PACMAN_HELP = [
+    'usage:  pacman <operation> [...]',
+    'operations:',
+    '    pacman {-h --help}',
+    '    pacman {-V --version}',
+    '    pacman {-S --sync}    [options] [package(s)]',
+    '',
+    "try 'pacman -Syu': it synchronizes and upgrades the system.",
+  ];
   const pacman: Command = {
     name: 'pacman',
     summary: 'package manager',
     usage: 'pacman -Syu',
     group: 'fun',
-    complete: () => ['-Syu'],
+    help: PACMAN_HELP,
+    complete: () => ['-Syu', '-h', '-V'],
     async run(ctx) {
       const op = ctx.args[0];
       if (!op || !op.startsWith('-')) fail(ctx, 'error: no operation specified (use -h for help)');
+      if (op === '-h' || op === '--help') return PACMAN_HELP.forEach((l) => ctx.out(l));
+      if (op === '-V' || op === '--version') {
+        ctx.out(' .--.                  Pacman v7.0.0 - libalpm v15.0.0');
+        ctx.out("/ _.-' .-.  .-.  .-.   meow meow meow meow");
+        ctx.out("\\  '-. '-'  '-'  '-'");
+        return ctx.out(" '--'");
+      }
       if (/^-S(?=.*u)[yu]+$/.test(op)) return sync(ctx, false);
       fail(ctx, 'error: you cannot perform this operation unless you are root.');
     },

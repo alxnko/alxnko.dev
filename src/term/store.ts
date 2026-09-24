@@ -29,6 +29,7 @@ export class TermStore {
       busy: false,
       history: loadHistory(this.historyKey),
       overlay: null,
+      monitor: null,
       version: 0,
     };
   }
@@ -76,6 +77,17 @@ export class TermStore {
 
   setOverlay(frame: Line[] | null): void {
     this.commit({ overlay: frame });
+  }
+
+  /** Both screens in one commit (one render) per frame. */
+  setFrames(overlay: Line[] | null, monitor: Line[] | null): void {
+    this.commit({ overlay, monitor });
+  }
+
+  /** Forgets the history (`history -c`). */
+  clearHistory(): void {
+    prefs.set(this.historyKey, '[]');
+    this.commit({ history: [] });
   }
 
   /** Dedupes consecutive entries, caps at 100, persists. Blank commands are ignored. */

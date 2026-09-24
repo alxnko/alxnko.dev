@@ -4,6 +4,7 @@ import type { FanSpeed, Landmark, Ring, SoundLevel, Theme, WorldPort, WorldState
 import { TermStore } from '../term/store';
 import { Shell } from '../term/exec';
 import { complete } from '../term/complete';
+import { suggest } from '../term/suggest';
 import { createFs } from '../term/vfs';
 import { bootLines } from '../term/boot';
 import { DEFAULT_WORLD } from '../term/world';
@@ -13,6 +14,7 @@ import type { SceneWorld } from '../scene/index';
 import * as prefs from '../lib/prefs';
 import { SOUND_EVENT, soundLevel, start } from './app';
 import { currentTheme, setTheme, THEME_EVENT } from './theme';
+import { FrameView } from './terminal-dom';
 
 const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const narrow = () => innerWidth < 640;
@@ -368,6 +370,31 @@ if (soundLevel() !== 'off') {
   addEventListener('keydown', resume, { once: true, capture: true });
 }
 
+// ^C: the interrupt key for fingers (phones have no ctrl). Shown while a foreground job runs
+// (CSS holds it back for a moment, so a quick command doesn't flash it); a tap on a running
+// toy's screen makes it stand out.
+const intr = $('intr') as HTMLButtonElement | null;
+intr?.addEventListener('click', () => (booting ? booting.abort() : shell.interrupt()));
+const nudge = () => {
+  if (!intr || intr.hidden) return;
+  intr.classList.remove('nudge');
+  void intr.offsetWidth; // restart the animation
+  intr.classList.add('nudge');
+};
+// cmatrix --both on the page (no 3D): the rain covers the contacts; in 3D the scene draws it
+// on the monitor itself and the pinned panels step aside (scene.css, [data-rain])
+const wallEl = $('contacts-rain');
+const wall = wallEl ? new FrameView(wallEl) : null;
+store.subscribe((s) => {
+  if (intr && intr.hidden === s.busy) intr.hidden = !s.busy;
+  const raining = s.monitor !== null;
+  if (raining !== (document.body.dataset.rain !== undefined)) {
+    if (raining) document.body.dataset.rain = '';
+    else delete document.body.dataset.rain;
+  }
+  wall?.show(document.body.dataset.mode === 'scene' ? null : s.monitor);
+});
+
 start({
   createTerm: () => ({
     store,
@@ -377,6 +404,9 @@ start({
     },
     interrupt: () => (booting ? booting.abort() : shell.interrupt()),
     complete: (line, cursor) => complete(line, cursor, store.state.cwd, shell.registry, fs),
+    key: (k) => shell.key(k),
+    chips: () => suggest(shell.last, world.get()),
+    onToyTap: nudge,
     clear: () => store.clear(),
     onActivity: () => {
       world.sfx('key');

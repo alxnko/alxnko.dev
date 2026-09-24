@@ -2,7 +2,7 @@
 // Renders on demand; every surface is unlit (baked), so it stays cheap on phones.
 import {
   Box3, Color, Frustum, LinearFilter, Matrix4, Mesh, type Object3D, PerspectiveCamera, Quaternion, Raycaster,
-  Scene, Sphere, SRGBColorSpace, type Texture, TextureLoader, Vector2, Vector3, WebGLRenderer,
+  Scene, Sphere, SRGBColorSpace, type Texture, TextureLoader, Vector2, Vector3, type Vector4, WebGLRenderer,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
@@ -219,16 +219,26 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const baked = bakedMaterial(firstAtlas, firstAtlas, mix);
   for (const n of ['static', 'desk_baked', 'cat_body', 'cat_head', 'cat_tail', 'fan_blades']) meshesOf(node(n)).forEach((m) => (m.material = baked));
 
-  // the terminal typed into is the DOM one pinned on this screen; any output re-renders the frame
-  const unsubStore = o.store.subscribe(() => invalidate());
   const monitor = new MonitorScreen(o.mobile);
-  undo.push(unsubStore, () => monitor.dispose());
+  undo.push(() => monitor.dispose());
   monitor.texture.flipY = false;
   const laptopScreen = node('screen_laptop'), monitorScreen = node('screen_monitor');
   const laptopMat = windowMaterial(null, [[0, 1, 0, 1]], TERM_BG);
   const monitorMat = windowMaterial(monitor.texture, o.infoEl ? [[...MON_CONTACTS_UV], [...MON_INFO_UV]] : [[...MON_CONTACTS_UV]]);
   meshesOf(laptopScreen).forEach((m) => (m.material = laptopMat));
   meshesOf(monitorScreen).forEach((m) => (m.material = monitorMat));
+  // the terminal typed into is the DOM one pinned on this screen; any output re-renders the
+  // frame. cmatrix --both rains on the whole monitor: drawn into its canvas, windows closed
+  const holes: Vector4[] = monitorMat.uniforms.uRects.value, open = holes.map((h) => h.clone());
+  let rain: TermState['monitor'] = null;
+  const unsubStore = o.store.subscribe((s) => {
+    if (s.monitor !== rain) {
+      if (!rain !== !s.monitor) holes.forEach((h, i) => (s.monitor ? h.setScalar(2) : h.copy(open[i])));
+      monitor.rain((rain = s.monitor));
+    }
+    invalidate();
+  });
+  undo.push(unsubStore);
 
   const ringMat = emissiveMaterial(RING[o.initial.ring]);
   meshesOf(node('ring')).forEach((m) => (m.material = ringMat));

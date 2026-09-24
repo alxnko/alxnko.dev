@@ -5,6 +5,7 @@ import { CanvasTexture, LinearFilter, SRGBColorSpace } from 'three';
 import { SITE } from '../content/site';
 import { CAT_MARK } from '../content/mark';
 import { ansi, TERM_BG, TOKENS } from '../lib/tokens';
+import type { Line } from '../term/types';
 
 const W = 2048, H = 858; // 21:9
 /** Must match CONTACTS_UV in index.ts: the middle stays empty for the DOM panel. */
@@ -14,6 +15,7 @@ export class MonitorScreen {
   readonly texture: CanvasTexture;
   private ctx: CanvasRenderingContext2D;
   private minute = -1;
+  private raining = false;
 
   constructor(mobile: boolean) {
     const c = document.createElement('canvas');
@@ -34,8 +36,35 @@ export class MonitorScreen {
     this.minute = -1;
   }
 
+  /** cmatrix --both: the frame fills the whole panel; null gives the screen back (next update). */
+  rain(frame: Line[] | null) {
+    this.raining = !!frame;
+    if (!frame) return this.invalidate();
+    const { ctx } = this, cw = W / frame[0].reduce((n, sp) => n + sp.text.length, 0), ch = H / frame.length;
+    ctx.fillStyle = TERM_BG;
+    ctx.fillRect(0, 0, W, H);
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    let last = '';
+    frame.forEach((line, r) => {
+      let x = 0;
+      for (const sp of line) {
+        if (sp.fg) {
+          // a mono cell is 0.6 em: this size puts every glyph on its column
+          const font = `${sp.bold ? 700 : 400} ${cw / 0.6}px "JetBrains Mono", monospace`;
+          if (font !== last) ctx.font = last = font;
+          ctx.fillStyle = ansi(sp.fg);
+          ctx.fillText(sp.text, x, r * ch + (ch - cw / 0.6) / 2);
+        }
+        x += sp.text.length * cw;
+      }
+    });
+    this.texture.needsUpdate = true;
+  }
+
   /** Returns true when redrawn. */
   update(now = Date.now()): boolean {
+    if (this.raining) return false;
     const m = Math.floor(now / 60000);
     if (m === this.minute) return false;
     this.minute = m;

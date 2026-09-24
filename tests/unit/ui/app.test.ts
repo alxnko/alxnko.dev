@@ -26,7 +26,7 @@ function page() {
 }
 
 function fakeTerm() {
-  let state: TermState = { lines: [], input: '', cursor: 0, cwd: '/', busy: false, history: [], overlay: null, version: 0 };
+  let state: TermState = { lines: [], input: '', cursor: 0, cwd: '/', busy: false, history: [], overlay: null, monitor: null, version: 0 };
   const subs = new Set<(s: TermState) => void>();
   return {
     store: {

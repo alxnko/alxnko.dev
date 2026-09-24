@@ -79,6 +79,8 @@ export interface ShellEnv {
   /** True when the running stage writes to the terminal, false inside a pipe. */
   tty: boolean;
   oldpwd: string | null;
+  /** Session aliases: name → the words it expands to. */
+  aliases: Map<string, string[]>;
 }
 
 /** Prints to stderr and exits with `code`. */

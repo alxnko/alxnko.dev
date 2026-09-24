@@ -763,3 +763,19 @@
   [data-mode="scene"] :is(.toggle, .back:not([hidden]), .nav button) { font-size: 0.9375rem; }
   [data-mode="scene"] .hint, [data-boot="3d"] body:not([data-scene="ready"]) > #hint { font-size: var(--fs-2); }
 }
+
+/* ^C sits where the hint is (clear of the nav); the hint steps aside while it shows */
+[data-mode="scene"] .intr:not([hidden]) {
+  bottom: calc(env(safe-area-inset-bottom) + var(--sp-5) + 52px);
+}
+
+[data-mode="scene"] .intr:not([hidden]) ~ .hint {
+  visibility: hidden;
+}
+
+/* cmatrix --both: the scene draws the rain over the whole monitor; its pinned panels step
+   aside (hidden, and no clicks land on links nobody can see) */
+[data-mode="scene"][data-rain] :is(.contacts, .mon-info) {
+  visibility: hidden;
+  pointer-events: none;
+}

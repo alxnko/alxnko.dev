@@ -24,11 +24,27 @@ test.describe('terminal', () => {
     await expect(page.locator('#term-overlay')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  test('cmatrix rains on the visible screen and any key stops it', async ({ page }) => {
+  test('cmatrix rains on the visible screen; typing is swallowed, ctrl+c stops it', async ({ page }) => {
     await expectRain(page);
   });
 
-  test('cmatrix under reduced motion: one visible still frame of rain', async ({ page }) => {
+  test('cmatrix has no time limit (still raining after 9 s) and q quits it', async ({ page }) => {
+    test.setTimeout(60_000);
+    await run(page, 'cmatrix');
+    await expect(page.locator('#term-lines')).toContainText('cmatrix running, press ctrl+c to stop'); // for screen readers
+    await page.waitForTimeout(9000);
+    const a = (await rainView(page)).text;
+    await page.waitForTimeout(400);
+    const v = await rainView(page);
+    expect(v.shown).toBe(true);
+    expect(v.text).not.toBe(a); // still animating
+    await page.keyboard.press('q');
+    await expect(page.locator('#term-overlay')).toBeHidden();
+    await run(page, 'echo $?');
+    await expect(page.locator('#term-lines .ln').last()).toHaveText('0');
+  });
+
+  test('cmatrix under reduced motion: one still frame until ctrl+c', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await run(page, 'fastfetch');
     await run(page, 'cmatrix');
@@ -36,7 +52,59 @@ test.describe('terminal', () => {
     const v = await rainView(page);
     expect(v.covers).toBe(true);
     expect(v.text.replace(/\s/g, '').length).toBeGreaterThan(200);
-    await expect(page.locator('#term-overlay')).toBeHidden({ timeout: 4000 });
+    await page.waitForTimeout(3000);
+    expect((await rainView(page)).text).toBe(v.text); // still, and still there
+    await page.keyboard.press('Control+c');
+    await expect(page.locator('#term-overlay')).toBeHidden();
+  });
+
+  test('cmatrix --both on the page covers the contacts; ctrl+c clears both', async ({ page }) => {
+    await run(page, 'cmatrix --both -C cyan');
+    const rain = page.locator('#contacts-rain');
+    await expect(rain).toBeVisible();
+    await expect(rain).toHaveAttribute('aria-hidden', 'true');
+    const [c, r] = await Promise.all([page.locator('#contacts').boundingBox(), rain.boundingBox()]);
+    expect(Math.abs(c!.width - r!.width)).toBeLessThan(2);
+    expect(Math.abs(c!.height - r!.height)).toBeLessThan(2);
+    await expect.poll(async () => ((await rain.textContent()) ?? '').replace(/\s/g, '').length).toBeGreaterThan(50);
+    expect(await rain.locator('.c-cyan').count()).toBeGreaterThan(0);
+    await page.keyboard.press('Control+c');
+    await expect(rain).toBeHidden();
+    await expect(page.locator('#term-overlay')).toBeHidden();
+  });
+
+  test('the ^C key stops a running command with a tap or click', async ({ page }) => {
+    await run(page, 'cmatrix');
+    const intr = page.locator('#intr');
+    await expect(intr).toBeVisible(); // after its short delay
+    const box = (await intr.boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    // a tap on the rain points at it instead of popping up a keyboard
+    await page.locator('#term-overlay').click();
+    await expect(intr).toHaveClass(/nudge/);
+    await expect(page.locator('#term-input')).not.toBeFocused();
+    await intr.click();
+    await expect(page.locator('#term-overlay')).toBeHidden();
+    await expect(intr).toBeHidden();
+  });
+
+  test('friendly but real: phrases, clickable help, fixed errors', async ({ page }) => {
+    await run(page, 'who are you?');
+    await expect(lines(page)).toContainText('# whoami -v');
+    await expect(lines(page)).toContainText('tech lead · Kyrgyzstan');
+    await run(page, 'help');
+    await page.locator('#term-lines button.run', { hasText: 'contacts' }).last().click();
+    await expect(lines(page)).toContainText('short links: alxnko.dev/gh');
+    await run(page, 'grep x nope');
+    await expect(lines(page)).toContainText('grep: nope: No such file or directory');
+    await expect(lines(page).locator('.ln').last()).not.toContainText('usage');
+    await run(page, 'pacman -h');
+    await expect(lines(page)).toContainText('usage:  pacman <operation>');
+    // chips follow: completions while typing
+    await page.locator('#term-input').fill('fastf');
+    await page.locator('#term-chips .chip', { hasText: 'fastfetch' }).click();
+    await expect(page.locator('#term-input')).toHaveValue('fastfetch ');
   });
 
   test('block-art lines stay on the monospace grid (our font draws the blocks)', async ({ page }) => {

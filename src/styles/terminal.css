@@ -107,6 +107,55 @@
   white-space: pre;
 }
 
+/* a command in the output (help's names, hints): a click runs it */
+.term .run {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-color: var(--ansi-dim);
+  text-underline-offset: 3px;
+}
+
+.term .run:hover {
+  color: var(--ansi-white);
+  text-decoration-color: currentColor;
+}
+
+/* cmatrix --both on the page: the rain covers the contacts (the "monitor") */
+.contacts {
+  position: relative;
+}
+
+.rain {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  padding: var(--sp-3);
+  border-radius: var(--r-m);
+  background: var(--ansi-bg);
+  color: var(--ansi-fg);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.rain[hidden],
+[data-mode="scene"] .rain {
+  display: none;
+}
+
+.rain .ln {
+  white-space: pre;
+}
+
+.rain .b {
+  font-weight: 700;
+}
+
 /* ansi palette ----------------------------------------------------------------------- */
 .c-fg { color: var(--ansi-fg); }
 .c-muted { color: var(--ansi-muted); }
@@ -137,8 +186,18 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2);
+  min-height: calc(30px + 2 * var(--sp-2) + 1px); /* never collapses while typing */
   padding: var(--sp-2) var(--sp-3);
   border-top: 1px solid var(--term-rule);
+}
+
+.term-chips[data-busy="true"] .chip {
+  opacity: 0.5;
+}
+
+/* completions while typing read as the words they complete */
+.term-chips[data-kind="complete"] .chip {
+  color: var(--ansi-fg);
 }
 
 .chip {

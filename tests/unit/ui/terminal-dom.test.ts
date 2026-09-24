@@ -41,7 +41,7 @@ function fakeDeps(init: Partial<TermState> = {}) {
   const subs = new Set<(s: TermState) => void>();
   let state: TermState = {
     lines: [], input: '', cursor: 0, cwd: '/home/alxnko', busy: false,
-    history: [], overlay: null, version: 1, ...init,
+    history: [], overlay: null, monitor: null, version: 1, ...init,
   };
   const emit = () => subs.forEach((f) => f(state));
   const update = (p: Partial<TermState>) => {
@@ -188,14 +188,32 @@ describe('terminal-dom rendering', () => {
     expect(ov.hidden).toBe(true);
   });
 
-  it('a tap on the rain focuses the prompt (so a phone keyboard can stop it)', () => {
+  it('a tap on the rain points at ^C instead of popping up a keyboard', () => {
     const f = fakeDeps({ busy: true, overlay: [[{ text: 'rain' }]] });
-    handle = mountTerminal(root, f.deps);
+    const onToyTap = vi.fn();
+    handle = mountTerminal(root, { ...f.deps, onToyTap });
     const ov = root.querySelector('#term-overlay') as HTMLElement;
     expect(ov.closest('#term-screen')).toBeNull(); // never inside the scrolling log
     (document.activeElement as HTMLElement | null)?.blur();
     ov.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-    expect(document.activeElement).toBe(root.querySelector('#term-input'));
+    expect(document.activeElement).not.toBe(root.querySelector('#term-input'));
+    expect(onToyTap).toHaveBeenCalled();
+  });
+
+  it('renders frames into reused rows (only changed text moves)', () => {
+    const f = fakeDeps({ busy: true, overlay: [[{ text: 'ab', fg: 'green' }, { text: ' ' }], [{ text: 'c', fg: 'white', bold: true }]] });
+    handle = mountTerminal(root, f.deps);
+    const ov = root.querySelector('#term-overlay') as HTMLElement;
+    const firstSpan = ov.querySelector('span')!;
+    expect(ov.textContent).toBe('ab c');
+    expect(firstSpan.className).toBe('c-green');
+    f.update({ overlay: [[{ text: 'xy', fg: 'dim' }, { text: ' ' }], [{ text: 'z' }]] });
+    expect(ov.querySelector('span')).toBe(firstSpan); // the same node, new text and colour
+    expect(ov.textContent).toBe('xy z');
+    expect(firstSpan.className).toBe('c-dim');
+    f.update({ overlay: null, busy: false });
+    expect(ov.hidden).toBe(true);
+    expect(ov.childElementCount).toBe(0);
   });
 
   it('marks the form busy while a command runs', () => {
@@ -384,11 +402,57 @@ describe('terminal-dom keyboard', () => {
     expect(root.querySelector('#term-mirror')!.textContent).toContain('from-store');
   });
 
-  it('any key interrupts a running full-screen toy', () => {
+  it('a running full-screen toy owns the keys: ctrl+c interrupts, keys go to it, Esc and Tab pass', () => {
     const f = fakeDeps({ busy: true, overlay: [[{ text: 'x' }]] });
+    const keyFn = vi.fn(() => true);
+    handle = mountTerminal(root, { ...f.deps, key: keyFn });
+    const q = key(input, 'q');
+    expect(q.defaultPrevented).toBe(true);
+    expect(keyFn).toHaveBeenCalledWith('q');
+    expect(f.deps.interrupt).not.toHaveBeenCalled(); // q is the toy's (it quits itself)
+    key(input, 'x');
+    key(input, 'Enter');
+    expect(f.deps.run).not.toHaveBeenCalled(); // nothing reaches the prompt
+    expect(keyFn).toHaveBeenCalledTimes(3);
+    const esc = key(input, 'Escape');
+    expect(esc.defaultPrevented).toBe(false); // the page's: back to the desk, the rain keeps falling
+    expect(f.deps.interrupt).not.toHaveBeenCalled();
+    expect(key(input, 'Tab').defaultPrevented).toBe(false); // never a keyboard trap
+    expect(key(input, 'r', { ctrlKey: true }).defaultPrevented).toBe(false); // browser shortcuts stay
+    key(input, 'c', { ctrlKey: true });
+    expect(f.deps.interrupt).toHaveBeenCalledTimes(1);
+    expect(keyFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('a phone keyboard\'s typed text goes to the toy, not the prompt', () => {
+    const f = fakeDeps({ busy: true, overlay: [[{ text: 'x' }]], input: 'ab', cursor: 2 });
+    const keyFn = vi.fn(() => true);
+    handle = mountTerminal(root, { ...f.deps, key: keyFn });
+    type(input, 'abq');
+    expect(keyFn).toHaveBeenCalledWith('q');
+    expect(input.value).toBe('ab');
+    expect(f.state.input).toBe('ab');
+  });
+
+  it('toyKey takes page-level keys only while a toy runs', () => {
+    const f = fakeDeps();
+    handle = mountTerminal(root, { ...f.deps, key: vi.fn(() => true) });
+    const idle = new KeyboardEvent('keydown', { key: 'q', cancelable: true });
+    expect(handle.toyKey(idle)).toBe(false);
+    f.update({ busy: true, overlay: [[{ text: 'x' }]] });
+    const q = new KeyboardEvent('keydown', { key: 'q', cancelable: true });
+    expect(handle.toyKey(q)).toBe(true);
+    expect(q.defaultPrevented).toBe(true);
+    expect(handle.toyKey(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))).toBe(false);
+    expect(handle.toyKey(new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, cancelable: true }))).toBe(true);
+    expect(f.deps.interrupt).toHaveBeenCalledTimes(1);
+  });
+
+  it('Esc never interrupts a running command (ctrl+c does)', () => {
+    const f = fakeDeps({ busy: true });
     handle = mountTerminal(root, f.deps);
-    key(input, 'q');
-    expect(f.deps.interrupt).toHaveBeenCalled();
+    expect(key(input, 'Escape').defaultPrevented).toBe(false);
+    expect(f.deps.interrupt).not.toHaveBeenCalled();
   });
 
   it('reports activity and focus', () => {
@@ -421,5 +485,38 @@ describe('terminal-dom chips', () => {
     f.push([{ text: 'late' }]);
     expect(f.deps.run).not.toHaveBeenCalled();
     expect(root.querySelector('#term-lines')!.textContent).not.toContain('late');
+  });
+
+  it('offers what to try next, and completions while typing (a tap = Tab)', () => {
+    const f = fakeDeps();
+    const complete = vi.fn((line: string, cursor: number) =>
+      line.startsWith('de')
+        ? { replace: [0, cursor] as [number, number], candidates: ['desk'], full: ['desk'], insert: 'desk ' }
+        : { replace: [0, cursor] as [number, number], candidates: [], full: [], insert: null });
+    handle = mountTerminal(root, { ...f.deps, complete, chips: () => ['help', 'tour'] });
+    const chips = () => [...root.querySelectorAll('#term-chips .chip')].map((b) => b.textContent);
+    expect(chips()).toEqual(['help', 'tour']);
+    type(input, 'de');
+    expect(chips()).toEqual(['desk']);
+    (root.querySelector('#term-chips .chip') as HTMLButtonElement).click();
+    expect(f.state.input).toBe('desk '); // filled in, not run
+    expect(f.deps.run).not.toHaveBeenCalled();
+    type(input, '');
+    expect(chips()).toEqual(['help', 'tour']);
+    f.update({ busy: true });
+    expect(root.querySelector('#term-chips')!.getAttribute('data-busy')).toBe('true');
+  });
+
+  it('commands in the output are buttons: run, or start the line when they need an argument', () => {
+    const f = fakeDeps();
+    handle = mountTerminal(root, f.deps);
+    f.push([{ text: 'fastfetch', run: 'fastfetch' }, { text: ' ' }, { text: 'man', run: 'man ' }]);
+    const [ff, man] = [...root.querySelectorAll<HTMLButtonElement>('#term-lines button.run')];
+    expect(ff.tabIndex).toBe(-1);
+    ff.click();
+    expect(f.deps.run).toHaveBeenCalledWith('fastfetch');
+    man.click();
+    expect(f.state.input).toBe('man ');
+    expect(f.deps.run).toHaveBeenCalledTimes(1);
   });
 });
