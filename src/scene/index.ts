@@ -147,6 +147,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   // CPU WebGL: something changed since the last drawn frame (a settled, sharp view is not
   // redrawn until it does), and when things last moved
   let dirty = true, lastMove = 0;
+  let roomK = 1; // how far the room walls pulled this frame's view in (1: not at all)
   const pixelRatio = () => {
     const w = o.stage.clientWidth || innerWidth, h = o.stage.clientHeight || innerHeight;
     const full = Math.min(devicePixelRatio, dprCap);
@@ -487,7 +488,9 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   };
 
   // normal limits; view mode widens them (still bounded to the front of the models)
-  const LIM = { normal: { yaw: 40, up: 22, down: 10, dolly: [0.35, 1.9], pan: 0.9 }, free: { yaw: 75, up: 38, down: 12, dolly: [0.25, 2.6], pan: 1.3 } } as const;
+  // (the room bounds and the desk-top floor keep every view presentable, so these can be
+  // generous; "up" tilts the eye lower, "down" raises it to look down at the desk)
+  const LIM = { normal: { yaw: 55, up: 30, down: 35, dolly: [0.35, 1.9], pan: 0.9 }, free: { yaw: 80, up: 38, down: 50, dolly: [0.25, 2.6], pan: 1.3 } } as const;
   let lim: { yaw: number; up: number; down: number; dolly: readonly [number, number]; pan: number } = LIM.normal;
   const YAW = () => lim.yaw * DEG, PITCH_UP = () => lim.up * DEG, PITCH_DOWN = () => lim.down * DEG;
   let deskTween: Tween | null = null, deskDone: (() => void) | null = null;
@@ -726,23 +729,25 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       // stay inside the room: past a wall, the window or the ceiling, the camera slides in
       // toward what it looks at (the desk side stays free), and the dolly follows so zooming
       // back in answers at once instead of unwinding the overshoot first
-      const capDolly = (k: number) => {
-        const d = orbit.dolly.value * k;
-        if (orbit.dolly.target > d) orbit.dolly.target = d;
-        if (orbit.dolly.value > d) orbit.dolly.snap(d);
-      };
-      const t = roomFit(tgt.clamp(ROOM_MIN, ROOM_MAX), off);
-      if (t < 1) { off.multiplyScalar(t); capDolly(t); }
-      // looking around never takes the eye under (or skimming) the desk top, whose underside
-      // is not meant to be seen. Only the eye is held (the look point stays put), and never
-      // above where the preset view itself puts it, so the landmark views are unchanged
-      const floorY = Math.min(rigDy + manifest.deskBase + 0.15, p.pos[1]);
+      // (only this frame's view comes in: the zoom setting stays, so turning away from the wall
+      // brings the view back out; a pinch/wheel continues from what is seen, see zoom())
+      roomK = roomFit(tgt.clamp(ROOM_MIN, ROOM_MAX), off);
+      if (roomK < 1) off.multiplyScalar(roomK);
+      // looking around never takes the eye under the desk top, whose underside is not meant to
+      // be seen. The orbit tilts back up to that height (same distance, same direction around),
+      // so the zoom never changes, and the pitch spring stops there so a drag back answers at
+      // once. Never above where the preset view itself puts the eye: landmarks are unchanged
+      const floorY = Math.min(rigDy + manifest.deskBase + 0.04, p.pos[1]);
       if (tgt.y + off.y < floorY) {
-        if (off.y < 0 && tgt.y > floorY + 1e-3) {
-          const k = (floorY - tgt.y) / off.y; // slide in toward the look point
-          off.multiplyScalar(k);
-          capDolly(k);
-        } else off.y = floorY - tgt.y; // look point at or below the floor: raise the eye
+        const need = floorY - tgt.y, len = off.length(), before = off.clone();
+        if (len > Math.abs(need)) {
+          const flat = Math.hypot(off.x, off.z) || 1, h = Math.sqrt(len * len - need * need);
+          off.set((off.x / flat) * h, need, (off.z / flat) * h);
+          const back = before.angleTo(off); // positive pitch lowers the eye
+          const v = orbit.pitch.value - back, keep = Math.min(orbit.pitch.target, v);
+          orbit.pitch.snap(v);
+          orbit.pitch.target = keep; // a drag back up (target above) is kept, not dropped
+        } else off.y = need; // looking at something far below the floor: raise the eye
       }
       camera.position.copy(tgt).add(off);
       camera.lookAt(tgt);
@@ -901,8 +906,12 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const detachInput = attachInput({
     canvas: o.stage,
     reducedMotion: o.reducedMotion,
+    // the monitor's panes (the terminal scrolls, so a drag there stays a scroll)
+    surfaces: [o.contactsEl, ...(o.infoEl ? [o.infoEl] : [])],
     zoom(f, x, y) {
       lastInput = performance.now();
+      // against a wall the view is nearer than the zoom setting: continue from what is seen
+      if (roomK < 1) { orbit.dolly.snap(orbit.dolly.value * roomK); roomK = 1; }
       const nd = clamp(orbit.dolly.target * f, lim.dolly[0], lim.dolly[1]);
       const k = nd / orbit.dolly.target; // the factor actually applied after clamping
       // the point under the cursor: first surface hit, else a point at the orbit distance

@@ -264,6 +264,16 @@
   font-size: var(--fs-2);
 }
 
+/* a generous invisible margin: in a close view a live screen sits right under the button, and
+   a slightly low tap must still mean "back", never open a contact link */
+@media (pointer: coarse) {
+  [data-mode="scene"] .back:not([hidden])::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 -20px; /* below only: sideways it would cover the toggles on narrow phones */
+  }
+}
+
 .back:hover {
   border-color: var(--c-fg-subtle);
 }

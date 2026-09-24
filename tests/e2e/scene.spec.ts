@@ -125,7 +125,7 @@ test.describe('3D desk', () => {
     expect(await page.evaluate(() => history.state?.away ?? null)).toBeNull();
   });
 
-  test('looking around never takes the eye under the desk top, at either height', async ({ page }) => {
+  test('looking around never takes the eye under the desk top or collapses the zoom, at either height', async ({ page }) => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
     for (const h of [0.74, 1.12]) {
@@ -147,10 +147,40 @@ test.describe('3D desk', () => {
       const r = await page.evaluate(() => { const s = (window as any).__scene; return { y: s.camera.position.y, d: s.orbit.dolly.value, ok: s.camera.position.toArray().every(Number.isFinite) }; });
       expect(r.ok).toBe(true);
       expect(r.d).toBeGreaterThan(0.1); // no collapse into the look point
-      expect(r.y).toBeGreaterThanOrEqual(h + 0.15 - 1e-3);
+      expect(r.y).toBeGreaterThanOrEqual(h + 0.04 - 1e-3);
       await page.evaluate(() => (window as any).__scene.world().fly('desk'));
       await page.waitForTimeout(2000);
     }
+  });
+
+  test('on a phone, a swipe on the monitor screen tilts the view (never zooms, traps or opens links)', async ({ page, isMobile, context }) => {
+    test.skip(!isMobile, 'touch gestures');
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await page.locator('#nav [data-landmark="monitor"]').click();
+    await page.waitForTimeout(2200);
+    const opened: string[] = [];
+    context.on('page', (p) => opened.push(p.url()));
+    const cdp = await context.newCDPSession(page);
+    const swipe = async (dy: number) => {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 200, y: 450 }] });
+      for (let i = 1; i <= 12; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 200, y: 450 + (dy * i) / 12 }] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await page.waitForTimeout(1200);
+      return page.evaluate(() => { const s = (window as any).__scene; return { y: s.camera.position.y, dolly: s.orbit.dolly.target, pitch: s.orbit.pitch.value }; });
+    };
+    expect(await page.evaluate(() => document.elementFromPoint(200, 450)?.closest('#contacts') !== null)).toBe(true);
+    const up = await swipe(-300);
+    expect(up.dolly).toBeCloseTo(1, 3); // the floor tilts the view; it never zooms in
+    expect(up.y).toBeGreaterThanOrEqual(0.74 + 0.04 - 1e-3);
+    const down = await swipe(250);
+    expect(down.pitch).toBeLessThan(up.pitch); // answers at once: no dead zone, no trap
+    expect(opened).toEqual([]);
+    // a slightly low tap on Back still means back, not the contact link under it
+    const back = (await page.locator('#back').boundingBox())!;
+    await page.touchscreen.tap(back.x + back.width / 2, back.y + back.height + 10);
+    await expect(page.locator('#nav [data-landmark="desk"]')).toHaveAttribute('aria-current', 'true', { timeout: 5000 });
+    expect(opened).toEqual([]);
   });
 
   test('the landmark views are exactly their preset poses, at either desk height', async ({ page }) => {
