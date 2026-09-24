@@ -71,6 +71,10 @@ export type LoadStep = 'manifest' | 'geometry' | 'lighting' | 'screens';
 export interface SceneHandle { world: SceneWorld; destroy(): void }
 
 const RING: Record<Ring, string> = { green: '#00ff82', purple: '#b061ff', off: '#161618' };
+// `PUBLIC_RECORDING=1 bun run build`: the video pipeline's build (video/). It renders frame by
+// frame on a GPU, so it takes full resolution, MSAA and the sharp atlases, and never steps
+// resolution down. Always false in the site's own builds.
+const RECORDING = import.meta.env.PUBLIC_RECORDING === '1';
 const FAN_SPEED = [0, 28, 42, 56]; // rad/s (shown as rotation up to FAN_MAX_STEP a frame, the rest as blur)
 // shown rotation is capped so it looks the same at any frame rate (30 fps idle, 60+ while
 // moving) and never strobes (5 blades 72° apart: a step near 36° reads as spinning backwards);
@@ -129,10 +133,10 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const canvas = document.createElement('canvas');
   canvas.className = 'stage-canvas';
   canvas.setAttribute('aria-hidden', 'true');
-  const dprCap = o.mobile ? 1.5 : 2;
+  const dprCap = RECORDING ? 4 : o.mobile ? 1.5 : 2;
   const renderer = new WebGLRenderer({
     canvas,
-    antialias: !o.softwareGL && devicePixelRatio < 2, // MSAA on the CPU costs more than it shows
+    antialias: RECORDING || (!o.softwareGL && devicePixelRatio < 2), // MSAA on the CPU costs more than it shows
     alpha: true, // screen regions are transparent windows onto the pinned DOM beneath
     powerPreference: o.mobile ? 'default' : 'high-performance',
   });
@@ -164,7 +168,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   };
 
   // ---------- assets ----------
-  const big = !o.mobile && Math.min(devicePixelRatio, 2) * innerWidth >= 1400 && ((navigator as any).deviceMemory ?? 8) >= 8;
+  const big = RECORDING || (!o.mobile && Math.min(devicePixelRatio, 2) * innerWidth >= 1400 && ((navigator as any).deviceMemory ?? 8) >= 8);
   const size = big ? '2048' : '1024';
   const texLoader = new TextureLoader();
   const loadAtlas = (t: 'day' | 'night') =>
@@ -801,7 +805,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       if (frameTimes.length >= 30) {
         const avg = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
         frameTimes.length = 0;
-        if (avg > 24 && dprScale > 0.55) { dprScale -= 0.15; applySize(); }
+        if (!RECORDING && avg > 24 && dprScale > 0.55) { dprScale -= 0.15; applySize(); }
         else if (avg < 18 && dprScale < 1) { dprScale = Math.min(1, dprScale + 0.1); applySize(); }
       }
     }
