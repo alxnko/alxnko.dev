@@ -115,6 +115,17 @@ describe('TermStore', () => {
     expect(s.state.overlay).toBeNull();
   });
 
+  it('setQueued holds at most one pending line; a later call replaces it, null drops it', () => {
+    const s = new TermStore();
+    expect(s.state.queued).toBeNull();
+    s.setQueued('whoami');
+    expect(s.state.queued).toBe('whoami');
+    s.setQueued('pwd'); // a later Enter replaces it, never stacks
+    expect(s.state.queued).toBe('pwd');
+    s.setQueued(null); // ^C drops it
+    expect(s.state.queued).toBeNull();
+  });
+
   it('strips non-allowlisted hrefs on print (defense in depth)', () => {
     const s = new TermStore();
     s.print([{ text: 'evil', href: 'https://evil.example' }, { text: 'gh', href: 'https://github.com/alxnko' }]);

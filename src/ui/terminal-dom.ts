@@ -8,6 +8,7 @@ export interface TermDeps {
     readonly state: TermState;
     subscribe(fn: (s: TermState) => void): () => void;
     setInput(text: string, cursor?: number): void;
+    setQueued(line: string | null): void;
     prompt(): Line;
   };
   run(line: string): Promise<void>;
@@ -232,7 +233,12 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
       input.setSelectionRange(s.cursor, s.cursor);
     }
     setPrompt(store.prompt());
-    setMirror(s.input, s.cursor);
+    // a queued line (Enter pressed while busy) shows muted, with a hint, until it's replaced,
+    // dropped (^C) or run; typing a fresh draft over it shows normally, same as any other input
+    const showQueued = s.queued !== null && !s.input;
+    mirror.classList.toggle('queued', showQueued);
+    if (showQueued) setMirror(s.queued!, s.queued!.length);
+    else setMirror(s.input, s.cursor);
   }
 
   function syncOverlay(s: TermState) {
@@ -380,6 +386,13 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
     edit('', 0);
     void deps.run(line);
   }
+  /** Enter while busy: at most one pending line (a later Enter replaces it); ^C drops it. */
+  function queueEnter(line: string) {
+    histIdx = -1;
+    hideComp();
+    edit('', 0);
+    store.setQueued(line);
+  }
   function histWalk(dir: -1 | 1) {
     const h = store.state.history;
     if (!h.length) return;
@@ -465,7 +478,7 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
       return;
     }
     switch (e.key) {
-      case 'Enter': e.preventDefault(); if (!s.busy) submit(text); return;
+      case 'Enter': e.preventDefault(); if (s.busy) queueEnter(text); else submit(text); return;
       case 'Tab': if (!e.shiftKey) tab(e); return;
       case 'ArrowUp': e.preventDefault(); histWalk(-1); return;
       case 'ArrowDown': e.preventDefault(); histWalk(1); return;
@@ -503,8 +516,10 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
   }
   function onSubmit(e: Event) {
     e.preventDefault();
+    if (toyMode()) return; // the toy owns the tty; a virtual "send" key is not a queued line
     if (searching) { endSearch(match || saved, Boolean(match)); return; }
-    if (!store.state.busy) submit(store.state.input);
+    const s = store.state;
+    if (s.busy) queueEnter(s.input); else submit(s.input);
   }
   function onScroll() { stick = atBottom(); }
   function onFocus() { deps.onFocus?.(); }

@@ -23,7 +23,7 @@ export async function guard(page: Page, opts: { allow404?: RegExp } = {}) {
 
 export const lines = (page: Page) => page.locator('#term-lines');
 
-/** The autologin's fastfetch has finished (a line typed while it runs is ignored, like a tty). */
+/** The autologin's fastfetch has finished (a line typed while it runs is queued, like a tty). */
 export async function promptReady(page: Page) {
   await expect(lines(page)).toContainText('alxnko@', { timeout: 15_000 });
   await expect(page.locator('#term-chips')).toHaveAttribute('data-busy', 'false', { timeout: 15_000 });

@@ -214,3 +214,64 @@ test.describe('terminal', () => {
     await expect(lines(page)).toContainText('^C');
   });
 });
+
+test.describe('terminal: Enter while busy queues the line (a real tty\'s typeahead)', () => {
+  test('typing whoami and pressing Enter immediately after load needs no second Enter', async ({ page }) => {
+    // No wait for the prompt: this races the autologin (fastfetch) on purpose. Retried because
+    // a separate, pre-existing race can rarely (and under heavy system load only) clobber this
+    // one attempt: the autologin's own internal run() call clears the input line the instant
+    // IT starts, exactly as any run() does for its own line, and very occasionally that lands
+    // between our fill() and our Enter. That race is not what this test (or this fix) is about
+    // - it's about Enter itself being swallowed while busy - so a lost attempt is retried fresh.
+    let ok = false;
+    for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+      await page.goto('/?lite');
+      const input = page.locator('#term-input');
+      await input.focus();
+      await input.fill('whoami');
+      await input.press('Enter');
+      try {
+        await expect
+          .poll(() => page.locator('#term-lines').innerText(), { timeout: 5_000 })
+          .toMatch(/whoami\nalxnko/);
+        ok = true;
+      } catch {
+        if (attempt === 2) throw new Error('whoami never ran, even after retries');
+      }
+    }
+  });
+
+  test('a line queued while pacman runs shows muted with a "queued" hint, then runs once it finishes', async ({ page }) => {
+    await page.goto('/?lite');
+    await expect(lines(page)).toContainText('alxnko@nitro', { timeout: 15_000 });
+    const input = page.locator('#term-input');
+    await input.focus();
+    await input.fill('pacman -Syu');
+    await input.press('Enter');
+    await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');
+    await input.fill('whoami');
+    await input.press('Enter'); // pacman is still busy: queued, not run
+    await expect(page.locator('#term-mirror')).toHaveClass(/queued/);
+    await expect(input).toHaveValue(''); // cleared, like a normal submit
+    await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false', { timeout: 5000 });
+    await expect(lines(page)).toContainText('[alxnko@nitro ~]$ whoami');
+    await expect(page.locator('#term-lines .ln').last()).toHaveText('alxnko');
+  });
+
+  test('ctrl+c while a line is queued drops it, like a real terminal drops typeahead after ^C', async ({ page }) => {
+    await page.goto('/?lite');
+    await expect(lines(page)).toContainText('alxnko@nitro', { timeout: 15_000 });
+    const input = page.locator('#term-input');
+    await input.focus();
+    await input.fill('pacman -Syu');
+    await input.press('Enter');
+    await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');
+    await input.fill('echo should-not-run');
+    await input.press('Enter'); // queued
+    await expect(page.locator('#term-mirror')).toHaveClass(/queued/);
+    await page.keyboard.press('Control+c');
+    await expect(lines(page)).toContainText('^C');
+    await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+    await expect(lines(page)).not.toContainText('should-not-run');
+  });
+});

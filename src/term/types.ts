@@ -68,6 +68,8 @@ export interface TermState {
   /** Absolute path. */
   cwd: string;
   busy: boolean;
+  /** Enter pressed while busy: the line to run once the prompt returns (at most one; ^C drops it). */
+  queued: string | null;
   history: string[];
   /** Transient full-screen toy frame (cmatrix); null normally. */
   overlay: Line[] | null;

@@ -97,6 +97,68 @@ describe('Shell.run', () => {
   });
 });
 
+/** Lets a test hold a command "running" until release(), or reject it via the abort signal. */
+function busyCommand() {
+  let release: () => void = () => {};
+  const sleep = (_ms: number, signal: AbortSignal): Promise<void> =>
+    new Promise((res, rej) => {
+      if (signal.aborted) return rej(new Error('aborted'));
+      release = res;
+      signal.addEventListener('abort', () => rej(new Error('aborted')), { once: true });
+    });
+  const harness = setup({ sleep });
+  harness.shell.registry.add({
+    name: 'wait', summary: '', usage: 'wait', group: 'fun', hidden: true,
+    async run(ctx) {
+      await ctx.sleep(999999);
+    },
+  });
+  return { ...harness, release: () => release() };
+}
+
+/** Real timers: gives the fire-and-forget queued run() (Shell.runQueued) a tick to land. */
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe('Shell: queued input (Enter while busy)', () => {
+  it('a queued line runs automatically once the prompt returns, recorded in history, pipes intact', async () => {
+    const { store, shell, release } = busyCommand();
+    const p = shell.run('wait');
+    expect(store.state.busy).toBe(true);
+    store.setQueued('echo a | wc -c');
+    release();
+    await p;
+    await flush();
+    expect(store.state.queued).toBeNull();
+    expect(store.state.busy).toBe(false);
+    expect(store.state.history.at(-1)).toBe('echo a | wc -c');
+    expect(text(store.state.lines.at(-1)!)).toBe('2');
+  });
+
+  it('a later Enter replaces an earlier queued line: only the last one runs', async () => {
+    const { store, shell, release } = busyCommand();
+    const p = shell.run('wait');
+    store.setQueued('echo first');
+    store.setQueued('echo second');
+    release();
+    await p;
+    await flush();
+    expect(store.state.history).not.toContain('echo first');
+    expect(store.state.history.at(-1)).toBe('echo second');
+  });
+
+  it('ctrl+c (interrupt) while busy drops the queued line, like real typeahead after ^C', async () => {
+    const { store, shell } = busyCommand();
+    const p = shell.run('wait');
+    store.setQueued('echo dropped');
+    shell.interrupt(); // aborts `wait`; its sleep rejects via the abort listener
+    await p;
+    await flush();
+    expect(store.state.queued).toBeNull();
+    expect(store.state.history).not.toContain('echo dropped');
+    expect(store.state.lines.map(text).join('\n')).not.toContain('dropped');
+  });
+});
+
 describe('didYouMean', () => {
   const names = ['help', 'clear', 'ls', 'fastfetch', 'history', 'cat', 'catsay', 'pwd'];
   it('finds close names (Damerau, transpositions count as 1)', () => {

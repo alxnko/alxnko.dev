@@ -271,6 +271,17 @@
   color: var(--ansi-white);
 }
 
+/* Enter pressed while busy: the queued line stays visible, muted, until it runs, is replaced
+   or is dropped (^C) */
+.term-mirror.queued {
+  color: var(--ansi-dim);
+}
+
+.term-mirror.queued::after {
+  content: ' (queued)';
+  color: var(--ansi-dim);
+}
+
 .term-field input {
   position: absolute;
   inset: 0;

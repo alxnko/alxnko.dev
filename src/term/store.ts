@@ -27,6 +27,7 @@ export class TermStore {
       cursor: 0,
       cwd: HOME,
       busy: false,
+      queued: null,
       history: loadHistory(this.historyKey),
       overlay: null,
       monitor: null,
@@ -73,6 +74,11 @@ export class TermStore {
 
   setBusy(b: boolean): void {
     this.commit({ busy: b });
+  }
+
+  /** Enter while busy (at most one line; a later call replaces it, `null` drops it). */
+  setQueued(line: string | null): void {
+    this.commit({ queued: line });
   }
 
   setOverlay(frame: Line[] | null): void {
