@@ -12,9 +12,16 @@ describe('_redirects', () => {
     ['/tg', 'https://t.me/ALXNK0'], ['/telegram', 'https://t.me/ALXNK0'],
     ['/in', 'https://linkedin.com/in/alxnko'], ['/li', 'https://linkedin.com/in/alxnko'], ['/linkedin', 'https://linkedin.com/in/alxnko'],
     ['/ig', 'https://instagram.com/alxnko'], ['/instagram', 'https://instagram.com/alxnko'],
-    ['/mail', 'mailto:aleksandrnyrko@gmail.com'], ['/email', 'mailto:aleksandrnyrko@gmail.com'],
     ['/meow', 'https://meow.alxnko.dev'], ['/chat', 'https://meowsenger.alxnko.dev'], ['/auth', 'https://auth.alxnko.dev'],
   ])('%s → %s (302)', (from, to) => {
     expect(map[from]).toEqual([to, '302']);
+  });
+
+  it('has no mailto: rules (Pages ignores them; /mail and /email are static pages)', () => {
+    expect(rules.filter(([, to]) => to?.startsWith('mailto:'))).toEqual([]);
+    for (const p of ['mail', 'email']) {
+      const page = readFileSync(new URL(`../../src/pages/${p}.astro`, import.meta.url), 'utf8');
+      expect(page).toContain('target="mailto:aleksandrnyrko@gmail.com"');
+    }
   });
 });
