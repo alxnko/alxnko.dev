@@ -26,7 +26,7 @@ function page() {
 }
 
 function fakeTerm() {
-  let state: TermState = { lines: [], input: '', cursor: 0, cwd: '/', busy: false, history: [], overlay: null, version: 0 };
+  let state: TermState = { lines: [], input: '', cursor: 0, cwd: '/', busy: false, history: [], overlay: null, monitor: null, version: 0 };
   const subs = new Set<(s: TermState) => void>();
   return {
     store: {
@@ -112,5 +112,25 @@ describe('app', () => {
     fillNotFound('/a%20b/<img>');
     expect(s.textContent).toBe('/a b/<img>');
     expect(s.querySelector('img')).toBeNull();
+  });
+
+  it('ctrl+c anywhere on the page stops a running job, unless text is selected', () => {
+    let deps!: ReturnType<typeof fakeTerm>;
+    app = start({ createTerm: () => (deps = fakeTerm()) });
+    const press = () => {
+      const e = new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true, cancelable: true });
+      document.body.dispatchEvent(e);
+      return e;
+    };
+    expect(press().defaultPrevented).toBe(false); // idle: the browser's
+    expect(deps.interrupt).not.toHaveBeenCalled();
+    (deps.store.state as { busy: boolean }).busy = true;
+    expect(press().defaultPrevented).toBe(true);
+    expect(deps.interrupt).toHaveBeenCalledTimes(1);
+    const r = document.createRange();
+    r.selectNodeContents(document.getElementById('link')!.appendChild(document.createTextNode('copy me')).parentNode!);
+    document.getSelection()!.addRange(r);
+    press(); // copy wins
+    expect(deps.interrupt).toHaveBeenCalledTimes(1);
   });
 });

@@ -7,6 +7,7 @@ export const MEOW_ALIASES: readonly string[] = [
 ];
 import { fail, untilAborted, type ShellEnv } from '../registry';
 import { themeName } from '../vfs';
+import { fg } from '../format';
 import type { Command, FanSpeed, Ring, SoundLevel } from '../types';
 
 export const DESK_PRESETS: Record<string, number> = { '1': 0.74, '2': 0.95, '3': 1.12 };
@@ -122,5 +123,51 @@ export function worldCommands(env: ShellEnv): Command[] {
   });
   const meows = [meowIn('meow', false), ...MEOW_ALIASES.map((n) => meowIn(n, true))];
 
-  return [theme, desk, ring, fan, sound, ...meows];
+  // tour: the desk shows itself off, step by step, and puts everything back
+  const tour: Command = {
+    name: 'tour',
+    summary: 'a short walk around the desk',
+    usage: 'tour',
+    group: 'world',
+    async run(ctx) {
+      const w = ctx.world;
+      if (!w.has3d()) {
+        // the page view has no desk to walk around: say so briefly instead of 13 s of text
+        ctx.out('tour: the tour walks around the 3d desk, and this view has none.');
+        ctx.out([{ text: 'open alxnko.dev/?3d for it, or try ' }, { text: 'contacts', fg: 'green', run: 'contacts' }, { text: ' and ' }, { text: 'fastfetch', fg: 'green', run: 'fastfetch' }, { text: '.' }]);
+        return;
+      }
+      const was = w.get();
+      const say = (n: number, what: string, cmd: string) =>
+        ctx.out([fg('muted', `${n}/5 `), { text: what + ' ' }, fg('muted', 'try: '), { text: cmd, fg: 'green', run: cmd }]);
+      const pause = () => ctx.sleep(2600);
+      ctx.out([fg('muted', 'tour: five stops, about fifteen seconds. ctrl+c ends it.')]);
+      try {
+        w.fly('laptop');
+        say(1, "the laptop: this terminal. it's real: pipes, history, tab completion.", 'ls ~/monitor | grep git');
+        await pause();
+        w.fly('monitor');
+        say(2, 'the monitor: contacts, one click each.', 'contacts');
+        await pause();
+        w.fly('desk');
+        say(3, 'the desk is sit-stand. up it goes.', 'desk 2');
+        await untilAborted(w.setDesk(DESK_PRESETS['2']), ctx.signal);
+        await pause();
+        say(4, 'the ring light behind the monitor.', 'ring purple');
+        w.setRing(was.ring === 'purple' ? 'green' : 'purple');
+        await pause();
+        say(5, 'and the cat on the fan.', 'meow');
+        w.meow();
+        await pause();
+      } finally {
+        // put the desk back as it was, even after ctrl+c
+        if (w.get().ring !== was.ring) w.setRing(was.ring);
+        if (Math.abs(w.get().desk - was.desk) > 0.005) void w.setDesk(was.desk);
+        w.fly('desk');
+      }
+      ctx.out([{ text: 'that was the tour. everything else: ' }, { text: 'help', fg: 'green', run: 'help' }]);
+    },
+  };
+
+  return [theme, desk, ring, fan, sound, tour, ...meows];
 }

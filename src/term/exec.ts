@@ -1,8 +1,9 @@
 // Shell: runs a parsed line against the registry (pipes, &&, ||, ;), owns busy + Ctrl+C.
 import { SITE } from '../content/site';
 import { catspeak } from './catspeak';
+import { phrase } from './phrases';
 import { text } from './format';
-import { expand, parse, ParseError, type Pipeline } from './parse';
+import { expand, parse, ParseError, type Chain, type Pipeline } from './parse';
 import { AbortedError, Registry, didYouMean, type ShellEnv } from './registry';
 import { MAX_INPUT, type TermStore } from './store';
 import { createFs, HOME, lookup, resolve, type VNode } from './vfs';
@@ -44,6 +45,28 @@ const defaultSleep = (ms: number, signal: AbortSignal): Promise<void> =>
     signal.addEventListener('abort', onAbort, { once: true });
   });
 
+/** Aliases every session starts with (like a distro's default ~/.bashrc). */
+export const DEFAULT_ALIASES: [string, string[]][] = [
+  ['ll', ['ls', '-l']],
+  ['la', ['ls', '-a']],
+];
+
+/**
+ * Commands people reach for that live elsewhere: a suggestion, or (`!`) a plain note.
+ * Did-you-mean covers typos; this covers habits from other systems.
+ */
+const SUBSTITUTES: Readonly<Record<string, string>> = {
+  neofetch: 'fastfetch', screenfetch: 'fastfetch', pfetch: 'fastfetch',
+  apt: 'pacman -Syu', 'apt-get': 'pacman -Syu', brew: 'pacman -Syu', dnf: 'pacman -Syu', yum: 'pacman -Syu',
+  cls: 'clear', dir: 'ls', quit: 'exit', logout: 'exit', about: 'cat ~/about.md', who: 'whoami',
+  vi: '!no editors on this desk: the files are read-only. try cat.',
+  vim: '!no editors on this desk: the files are read-only. try cat.',
+  nvim: '!no editors on this desk: the files are read-only. try cat.',
+  nano: '!no editors on this desk: the files are read-only. try cat.',
+  emacs: '!no editors on this desk: the files are read-only. try cat.',
+  git: '!no git here. the code lives on github: open github',
+};
+
 const toLines = (l: Line | string): Line[] => (typeof l === 'string' ? l.split('\n').map((t) => [{ text: t }]) : [l]);
 
 export class Shell {
@@ -52,6 +75,14 @@ export class Shell {
   private readonly sleepImpl: (ms: number, signal: AbortSignal) => Promise<void>;
   private ac: AbortController | null = null;
   private status = 0;
+  /** The running command's key handler (a full-screen toy owns the tty); null otherwise. */
+  private keyFn: ((key: string) => void) | null = null;
+  /** The line being run is one simple command (not-found then gets a friendly next step). */
+  private solo = false;
+  /** The running line counts as the visitor's (history, `last`); see run(). */
+  private record = true;
+  /** Last line run and its status (the suggestion chips follow it). */
+  last: { line: string; status: number } | null = null;
 
   constructor(
     private readonly store: TermStore,
@@ -72,6 +103,7 @@ export class Shell {
       bootTime: now(),
       tty: true,
       oldpwd: null,
+      aliases: new Map(DEFAULT_ALIASES),
     };
     for (const make of [infoCommands, fsCommands, sessionCommands, worldCommands, toyCommands, secretCommands, textCommands])
       this.registry.add(...make(this.env));
@@ -82,32 +114,57 @@ export class Shell {
     return this.ac !== null;
   }
 
+  /** True while the running command owns the keyboard (see CommandCtx.onKey). */
+  get ownsKeys(): boolean {
+    return this.ac !== null && this.keyFn !== null;
+  }
+
+  /** Hands a key to the running command that owns the keyboard. False when none does. */
+  key(k: string): boolean {
+    if (!this.ownsKeys) return false;
+    this.keyFn!(k);
+    return true;
+  }
+
   /** Echoes prompt+line, pushes history, executes. Ignored while busy. Input is clamped to 256 chars. */
-  async run(line: string): Promise<void> {
+  /**
+   * `record: false` is for lines the system types (the autologin's fastfetch): they run
+   * like any other, but stay out of the history and leave `last` (the chips) untouched.
+   */
+  async run(line: string, { record = true }: { record?: boolean } = {}): Promise<void> {
     if (this.store.state.busy || this.ac) return;
     const src = line.slice(0, MAX_INPUT);
     this.store.print([...this.store.prompt(), { text: src }]);
     this.store.setInput('');
     if (!src.trim()) return;
-    this.store.pushHistory(src);
+    this.record = record;
+    if (record) this.store.pushHistory(src);
 
     // Catspeak: a line that isn't a command but is all cat sounds / faces gets a cat reply
-    // (and the cat reacts) instead of "command not found".
+    // (and the cat reacts) instead of "command not found". Then plain-language lines
+    // ("who are you", "contact") answer with the real command that does it.
+    let cmdline = src;
     const first = src.trim().split(/\s+/)[0] ?? '';
-    if (!this.registry.get(first)) {
+    if (!this.known(first)) {
       const cat = catspeak(src, this.env.random);
       if (cat) {
         this.store.print([{ text: '=^..^=  ', fg: 'green' }, { text: cat.text }]);
         this.world.meow();
         if (cat.excited) setTimeout(() => this.world.meow(), 450);
-        this.status = 0;
+        this.done(src, 0);
         return;
+      }
+      const p = phrase(src);
+      if (p) {
+        this.store.print(p.say);
+        if (!p.run) return this.done(src, 0);
+        cmdline = p.run;
       }
     }
 
-    let chains;
+    let chains: Chain[];
     try {
-      chains = parse(src);
+      chains = parse(cmdline);
     } catch (e) {
       if (!(e instanceof ParseError)) throw e;
       this.store.print(
@@ -115,9 +172,9 @@ export class Shell {
           ? `bash: unexpected EOF while looking for matching \`${e.token}'`
           : `bash: ${e.message}`,
       );
-      this.status = 2;
-      return;
+      return this.done(src, 2);
     }
+    this.solo = chains.length === 1 && chains[0].pipeline.length === 1;
 
     const ac = new AbortController();
     this.ac = ac;
@@ -131,9 +188,22 @@ export class Shell {
       }
     } finally {
       this.ac = null;
+      this.keyFn = null;
       this.env.tty = true;
+      if (this.record) this.last = { line: src, status: this.status };
       this.store.setBusy(false);
     }
+  }
+
+  private done(line: string, status: number): void {
+    this.status = status;
+    if (this.record) this.last = { line, status };
+    this.store.setBusy(false); // one commit so the chips follow
+  }
+
+  /** A command or an alias. */
+  private known(name: string): boolean {
+    return !!this.registry.get(name) || this.env.aliases.has(name);
   }
 
   /**
@@ -170,9 +240,11 @@ export class Shell {
   }
 
   private async exec(words: string[], stdin: string | null, write: (l: Line | string) => void, signal: AbortSignal): Promise<number> {
-    const [name = '', ...args] = words;
+    // aliases expand once, like bash (so `alias ls='ls -l'` works)
+    const alias = words[0] === undefined ? undefined : this.env.aliases.get(words[0]);
+    const [name = '', ...args] = alias ? [...alias.map((w) => expand(w, (n) => this.variable(n))), ...words.slice(1)] : words;
     if (!name) return 0;
-    const err = (t: string) => {
+    const err = (t: string | Line) => {
       if (!signal.aborted) this.store.print(t);
     };
     const cmd = this.registry.get(name);
@@ -183,9 +255,21 @@ export class Shell {
         return node ? 126 : 127;
       }
       err(`bash: ${name}: command not found`);
-      const hint = didYouMean(name, this.registry.names());
-      if (hint) err(`did you mean '${hint}'?`);
+      const lower = name.toLowerCase();
+      const sub = SUBSTITUTES[lower];
+      const hint = lower !== name && this.known(lower) ? lower : sub?.startsWith('!') ? null : sub ?? didYouMean(name, [...this.registry.names(), ...this.env.aliases.keys()]);
+      if (sub?.startsWith('!')) err([{ text: sub.slice(1), fg: 'muted' }]);
+      else if (hint) err([{ text: 'did you mean \'' }, { text: hint, run: hint }, { text: "'?" }]);
+      else if (this.solo) err([{ text: 'type ', fg: 'muted' }, { text: 'help', fg: 'green', run: 'help' }, { text: " to see what's here.", fg: 'muted' }]);
       return 127;
+    }
+    // GNU style: --help anywhere before `--` prints the usage (echo prints it, like bash)
+    const dashes = args.indexOf('--');
+    const helpAt = args.indexOf('--help');
+    if (name !== 'echo' && helpAt >= 0 && (dashes < 0 || helpAt < dashes)) {
+      for (const l of cmd.help ?? [`usage: ${cmd.usage}`, `  ${cmd.summary}`]) write(l);
+      if (!cmd.help && !cmd.hidden) write([{ text: 'more: ', fg: 'muted' }, { text: `man ${cmd.name}`, fg: 'green', run: `man ${cmd.name}` }]);
+      return 0;
     }
     const ctx: CommandCtx = {
       args,
@@ -201,6 +285,10 @@ export class Shell {
       signal,
       sleep: (ms) => this.sleepImpl(ms, signal),
       history: () => this.store.state.history,
+      onKey: (fn) => {
+        // only the stage that owns the terminal takes it over (never a stage inside a pipe)
+        if (this.env.tty) this.keyFn = fn;
+      },
     };
     try {
       await cmd.run(ctx);

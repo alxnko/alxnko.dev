@@ -59,7 +59,7 @@ export function fsCommands(env: ShellEnv): Command[] {
         if (long) {
           const rows = entries.map(({ n, label: l, path }) => {
             const owner = path === HOME || path.startsWith(HOME + '/') ? 'alxnko' : 'root';
-            const size = n.kind === 'dir' ? 4096 : n.kind === 'link' ? (n.href ?? '').length : new TextEncoder().encode(content(n)).length;
+            const size = n.kind === 'dir' ? 4096 : n.kind === 'link' ? (n.href ?? '').length : new TextEncoder().encode(content(n) + '\n').length; // files end in a newline (as wc counts)
             const perms = n.kind === 'dir' ? 'drwxr-xr-x' : n.kind === 'link' ? 'lrwxrwxrwx' : '-rw-r--r--';
             const nlink = n.kind === 'dir' ? 2 + (n.children ?? []).filter((c) => c.kind === 'dir').length : 1;
             return { n, l, size, perms, nlink, owner };

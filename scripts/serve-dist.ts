@@ -28,6 +28,23 @@ export function parseHeaders(src: string): Rule[] {
 
 const rules = parseHeaders(readFileSync(join(DIST, '_headers'), 'utf8'));
 
+/**
+ * `_redirects` as Cloudflare Pages applies them for our rules (exact paths, a trailing slash
+ * matches too). Pages ignores rules whose destination is not http(s) or a path (mailto:),
+ * so this does too: those short links must be static pages.
+ */
+export function parseRedirects(src: string): Map<string, [string, number]> {
+  const m = new Map<string, [string, number]>();
+  for (const raw of src.split('\n')) {
+    const [from, to, code] = raw.trim().split(/\s+/);
+    if (!from || from.startsWith('#') || !to || !/^(https?:\/\/|\/)/.test(to)) continue;
+    m.set(from.replace(/\/$/, '') || '/', [to, Number(code ?? 302)]);
+  }
+  return m;
+}
+const redirectsFile = join(DIST, '_redirects');
+const redirects = existsSync(redirectsFile) ? parseRedirects(readFileSync(redirectsFile, 'utf8')) : new Map();
+
 function resolve(pathname: string): { file: string; status: number } {
   const p = normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, '');
   for (const cand of [p, join(p, 'index.html'), `${p}.html`]) {
@@ -41,6 +58,8 @@ Bun.serve({
   port,
   fetch(req) {
     const { pathname } = new URL(req.url);
+    const hop = redirects.get(pathname.replace(/\/$/, '') || '/');
+    if (hop) return new Response(null, { status: hop[1], headers: { Location: hop[0] } });
     const { file, status } = resolve(pathname);
     const headers = new Headers();
     for (const r of rules) {

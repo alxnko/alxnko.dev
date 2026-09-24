@@ -53,7 +53,8 @@ test.describe('SEO', () => {
     await page.goto('/does-not-exist');
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
     await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(0);
-    for (const p of ['/gh', '/mail']) {
+    // /gh itself is a 302 (links.spec.ts): its static fallback page is what gets checked here
+    for (const p of ['/gh/index.html', '/mail', '/email']) {
       const html = await (await request.get(p)).text();
       expect(html, p).toMatch(/<meta name="robots" content="noindex"\s*\/?>/);
       expect(html, p).toContain('http-equiv="refresh"');

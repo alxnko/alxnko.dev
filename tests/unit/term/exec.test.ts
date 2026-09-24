@@ -26,7 +26,8 @@ describe('Shell.run', () => {
 
   it('unknown command prints bash: foo: command not found and exits 127', async () => {
     const { out } = setup();
-    expect(await out('foo')).toBe('bash: foo: command not found');
+    // alone on the line it points at a next step; inside a list or pipe it stays terse
+    expect(await out('foo')).toBe("bash: foo: command not found\ntype help to see what's here.");
     expect(await out('foo; echo $?')).toBe('bash: foo: command not found\n127');
   });
 

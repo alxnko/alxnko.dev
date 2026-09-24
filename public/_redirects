@@ -7,8 +7,8 @@
 /linkedin https://linkedin.com/in/alxnko 302
 /ig https://instagram.com/alxnko 302
 /instagram https://instagram.com/alxnko 302
-/mail mailto:aleksandrnyrko@gmail.com 302
-/email mailto:aleksandrnyrko@gmail.com 302
+# /mail and /email are static pages (src/pages/mail.astro, email.astro): Cloudflare Pages
+# ignores _redirects rules whose destination is mailto:, so they can't live here.
 /meow https://meow.alxnko.dev 302
 /chat https://meowsenger.alxnko.dev 302
 /auth https://auth.alxnko.dev 302

@@ -7,6 +7,8 @@ export interface Completion {
   replace: [number, number];
   /** What to show when there are several (basenames for paths, dirs end in `/`). */
   candidates: string[];
+  /** The whole candidates (what `insert` would be for each; paths keep their directory). */
+  full: string[];
   /** Text to put in `replace`: the whole candidate (+ ' ' or '/') when unique, else the longest common prefix if it extends the word. */
   insert: string | null;
 }
@@ -67,5 +69,5 @@ export function complete(line: string, cursor: number, cwd: string, reg: Registr
     const p = lcp(full);
     if (p.length > word.length) insert = p;
   }
-  return { replace: [start, cursor], candidates: full.map(display), insert };
+  return { replace: [start, cursor], candidates: full.map(display), full, insert };
 }

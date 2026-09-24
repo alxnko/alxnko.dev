@@ -131,9 +131,10 @@ describe('interrupt (Ctrl+C)', () => {
     expect(store.state.overlay).toBeNull();
     expect(texts()).not.toContain('^C');
     expect(store.state.busy).toBe(false);
+    expect(shell.last).toEqual({ line: 'cmatrix', status: 130 });
   });
 
-  it('cmatrix runs at ~12 fps and stops by itself within 8 s', async () => {
+  it('cmatrix runs at ~12 fps with no time limit, until q or ctrl+c', async () => {
     const { shell, store } = timed();
     let frames = 0;
     store.subscribe((s) => void (s.overlay && frames++));
@@ -141,11 +142,102 @@ describe('interrupt (Ctrl+C)', () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(frames).toBeGreaterThanOrEqual(11);
     expect(frames).toBeLessThanOrEqual(13);
-    await vi.advanceTimersByTimeAsync(7100);
+    await vi.advanceTimersByTimeAsync(60_000); // a minute later: still raining
+    expect(frames).toBeGreaterThan(700);
+    expect(store.state.overlay).not.toBeNull();
+    expect(store.state.busy).toBe(true);
+    expect(shell.key('q')).toBe(true);
+    await vi.advanceTimersByTimeAsync(200);
     await p;
-    expect(frames).toBeLessThanOrEqual(97);
     expect(store.state.overlay).toBeNull();
     expect(store.state.busy).toBe(false);
+    expect(shell.last?.status).toBe(0); // q is a normal exit, like the real one
+    expect(shell.key('q')).toBe(false); // nobody owns the keyboard any more
+  });
+
+  it('cmatrix swallows other keys; -s quits on any key', async () => {
+    const { shell, store } = timed();
+    let p = shell.run('cmatrix');
+    await vi.advanceTimersByTimeAsync(300);
+    for (const k of ['x', 'Enter', ' ', 'ArrowUp', 'w']) expect(shell.key(k)).toBe(true);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(store.state.busy).toBe(true); // still raining
+    expect(store.state.input).toBe(''); // nothing reached the prompt
+    shell.interrupt();
+    await p;
+    p = shell.run('cmatrix -s');
+    await vi.advanceTimersByTimeAsync(300);
+    shell.key('x');
+    await vi.advanceTimersByTimeAsync(200);
+    await p;
+    expect(store.state.busy).toBe(false);
+    expect(shell.last?.status).toBe(0);
+  });
+
+  it('cmatrix --both rains on the monitor too (a 128-column frame) and clears both', async () => {
+    const { shell, store } = timed();
+    const seen: number[] = [];
+    store.subscribe((s) => void (s.monitor && seen.push(s.monitor[0].reduce((n, sp) => n + sp.text.length, 0))));
+    const p = shell.run('cmatrix --both -C blue');
+    await vi.advanceTimersByTimeAsync(500);
+    expect(seen.length).toBeGreaterThan(3);
+    expect(new Set(seen)).toEqual(new Set([128]));
+    expect(store.state.monitor).toHaveLength(24);
+    // the rain is blue (and white heads, dim tails): no green left
+    const colors = new Set([...store.state.overlay!, ...store.state.monitor!].flat().map((sp) => sp.fg).filter(Boolean));
+    expect(colors.has('blue')).toBe(true);
+    expect(colors.has('green')).toBe(false);
+    shell.interrupt();
+    await p;
+    expect(store.state.monitor).toBeNull();
+    expect(store.state.overlay).toBeNull();
+  });
+
+  it('cmatrix draws nothing while the tab is hidden, and picks up when it is shown', async () => {
+    const doc = Object.assign(new EventTarget(), { hidden: true });
+    vi.stubGlobal('document', doc);
+    try {
+      const { shell, store } = timed();
+      let frames = 0;
+      store.subscribe((s) => void (s.overlay && frames++));
+      const p = shell.run('cmatrix --both');
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(frames).toBe(0); // no commits, no monitor redraws
+      expect(vi.getTimerCount()).toBe(0); // and no timer ticking meanwhile
+      doc.hidden = false;
+      doc.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(frames).toBeGreaterThanOrEqual(11);
+      doc.hidden = true;
+      await vi.advanceTimersByTimeAsync(200);
+      const seen = frames;
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(frames).toBe(seen);
+      shell.interrupt(); // ctrl+c still ends it while hidden
+      await p;
+      expect(store.state.busy).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('cmatrix under reduced motion: one still frame until stopped', async () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduce'), media: q }));
+    try {
+      const { shell, store } = timed();
+      let frames = 0;
+      store.subscribe((s) => void (s.overlay && frames++));
+      const p = shell.run('cmatrix');
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(frames).toBe(1);
+      expect(vi.getTimerCount()).toBe(0); // it waits for the key, it doesn't poll
+      expect(store.state.overlay).not.toBeNull();
+      shell.interrupt();
+      await p;
+      expect(store.state.overlay).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('when idle, cancels the input line like bash', () => {

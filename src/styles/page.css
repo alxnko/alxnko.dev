@@ -489,3 +489,51 @@
     font-size: calc(var(--fs-7) * 2);
   }
 }
+
+/* ^C: the interrupt key for fingers, shown while a foreground job runs. It waits a moment
+   (a quick command never flashes it) and stands out when the running toy's screen is tapped. */
+.intr {
+  display: none;
+}
+
+.intr:not([hidden]) {
+  display: inline-flex;
+  position: fixed;
+  z-index: var(--z-chrome);
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + var(--sp-5));
+  transform: translateX(-50%);
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-m);
+  background: var(--c-bg);
+  color: var(--c-fg);
+  font-size: var(--fs-2);
+  animation: intr-in var(--d-fast) var(--ease) 0.6s both;
+}
+
+.intr kbd {
+  color: var(--c-accent);
+  font-weight: 700;
+}
+
+.intr:hover {
+  border-color: var(--c-fg-subtle);
+}
+
+.intr.nudge {
+  animation: intr-nudge 0.9s var(--ease) both;
+}
+
+@keyframes intr-in {
+  from { opacity: 0; visibility: hidden; }
+  to { opacity: 1; visibility: visible; }
+}
+
+@keyframes intr-nudge {
+  0%, 60% { border-color: var(--c-accent); }
+}

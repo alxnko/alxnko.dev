@@ -27,6 +27,12 @@ export function textCommands(env: ShellEnv): Command[] {
     return ok ? parts.join('\n') : null;
   }
 
+  /** No input: the files named were missing (already reported, exit 1), or nothing was given. */
+  function missing(ctx: CommandCtx, files: string[], usage: string): never {
+    if (files.length) throw new ExitError(1);
+    fail(ctx, `usage: ${usage}`, 2);
+  }
+
   /** `-n N`, `-nN`, `-N`; default 10. */
   function count(ctx: CommandCtx, cmd: string): { n: number; rest: string[] } {
     const rest: string[] = [];
@@ -56,8 +62,12 @@ export function textCommands(env: ShellEnv): Command[] {
     run(ctx) {
       const f = flags(ctx, 'grep', 'iv');
       const [pat, ...files] = f.rest;
-      const src = pat === undefined ? null : input(ctx, 'grep', files);
-      if (pat === undefined || src === null) fail(ctx, `usage: ${this.usage}`, 2);
+      if (pat === undefined) fail(ctx, `usage: ${this.usage}`, 2);
+      const src = input(ctx, 'grep', files);
+      if (src === null) {
+        if (files.length) throw new ExitError(2); // each missing file was already reported
+        fail(ctx, `usage: ${this.usage}`, 2);
+      }
       const ci = f.short.has('i');
       const needle = ci ? pat.toLowerCase() : pat;
       let hits = 0;
@@ -93,7 +103,7 @@ export function textCommands(env: ShellEnv): Command[] {
     run(ctx) {
       const { n, rest } = count(ctx, 'head');
       const src = input(ctx, 'head', rest);
-      if (src === null) fail(ctx, `usage: ${this.usage}`, 2);
+      if (src === null) return missing(ctx, rest, this.usage);
       for (const l of lines(src).slice(0, n)) ctx.out(l);
     },
   };
@@ -107,7 +117,7 @@ export function textCommands(env: ShellEnv): Command[] {
     run(ctx) {
       const { n, rest } = count(ctx, 'tail');
       const src = input(ctx, 'tail', rest);
-      if (src === null) fail(ctx, `usage: ${this.usage}`, 2);
+      if (src === null) return missing(ctx, rest, this.usage);
       for (const l of n ? lines(src).slice(-n) : []) ctx.out(l);
     },
   };
@@ -121,7 +131,7 @@ export function textCommands(env: ShellEnv): Command[] {
     run(ctx) {
       const f = flags(ctx, 'wc', 'lwc');
       const src = input(ctx, 'wc', f.rest);
-      if (src === null) fail(ctx, `usage: ${this.usage}`, 2);
+      if (src === null) return missing(ctx, f.rest, this.usage);
       const ls = lines(src);
       const counts = {
         l: ls.length,

@@ -206,8 +206,10 @@ Renderers subscribe to the store:
   - Ctrl+R (reverse search)
   - Home / End
 - Mobile: native keyboard, `autocapitalize=off`, `autocorrect=off`, `enterkeyhint=send`,
-  plus a small row of tappable suggestion chips above the input (`help`, `whoami`,
-  `ls monitor`, `fastfetch`, `desk up`).
+  plus a small row of tappable suggestion chips above the input. With an empty prompt they
+  offer what to try next (first `help`, `fastfetch`, `contacts`, `tour`, `cmatrix`, then
+  following the last command); while typing they are the Tab completions (tap = Tab).
+  A `^C` key (44 px) shows while a foreground job runs (R74).
 - Output is capped at 500 lines of scrollback.
 
 ### 5.3 Filesystem
@@ -226,14 +228,21 @@ Renderers subscribe to the store:
 prints `logout`.
 
 ### 5.4 Commands
-- **Info:** `help`, `man <cmd>`, `whoami`, `fastfetch` (ASCII cat mark plus facts),
-  `uname [-a]`, `uptime`, `date`, `echo`, `hostname`
+- **Info:** `help [name]` (fun first, clickable), `man <cmd>`, `whoami`, `fastfetch`
+  (ASCII cat mark plus facts), `contacts`, `uname [-a]`, `uptime`, `date`, `echo`,
+  `hostname`; `--help` works on every command
 - **Filesystem:** `ls [-la]`, `cd`, `pwd`, `cat`, `tree`, `open <contact|path>`
-- **Session:** `history`, `clear`, `exit`
-- **World:** `theme`, `desk`, `ring`, `fan`, `sound`, `meow`
+- **Session:** `history [-c]`, `clear`, `exit`, `alias`/`unalias` (`ll`, `la` built in),
+  `true`/`false` (hidden)
+- **World:** `theme`, `desk`, `ring`, `fan`, `sound`, `meow`, `tour`
+- **For people (R74):** a few plain-language lines (`hi`, `who are you`, `contact`,
+  `what is this`) answer with the real command, shown as a `# comment` first; not-found
+  suggests lower-case names, habits from other systems (`neofetch` → `fastfetch`) and typos.
 - **Toys (text only):**
   - `catsay <msg>`
-  - `cmatrix` (DOM/canvas rain; Ctrl+C or any key exits; 8 s max)
+  - `cmatrix [-s] [-C color] [--both]` (runs until `q` or Ctrl+C; other keys are
+    swallowed; Esc flies to the desk while it keeps raining; `-s` any key quits; `--both`
+    rains on the whole monitor, or over the contacts on the page view; R74)
   - `pacman -Syu` / `yay` (fake sync progress bars → "there is nothing to do")
   - `rm -rf /` (refuses with a gag)
   - `sl`-free
@@ -380,8 +389,8 @@ The DOM contacts panel docks over it with real links.
 - `/`: everything.
 - `404.html`: graphite page with the terminal line `bash: cd: <path>: No such file or
   directory`, the cat mark, and a link home.
-- Redirect pages and `_redirects` are unchanged (`/gh /tg /in /li /ig /mail /meow
-  /chat /auth …`).
+- Redirect pages and `_redirects` (`/gh /tg /in /li /ig /meow /chat /auth …`). `/mail`
+  and `/email` are static meta-refresh pages: Pages ignores `mailto:` redirect rules (R74).
 
 ### 7.2 SEO / meta
 - Title: `alex neko (alxnko) · tech lead`.
