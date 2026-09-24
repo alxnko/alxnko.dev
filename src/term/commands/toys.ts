@@ -1,5 +1,6 @@
 // catsay, cmatrix, pacman/yay, rm. Text-only toys.
 import { fg, pad } from '../format';
+import { loadText } from '../lazy';
 import { fail, flags, type ShellEnv } from '../registry';
 import { lookup, resolve } from '../vfs';
 import { ExitError, type Color, type Command, type Line } from '../types';
@@ -115,8 +116,8 @@ const bar = (name: string, size: string, rate: string): Line => [
 const colons = (t: string): Line => [fg('blue', '::'), { text: ` ${t}`, bold: true }];
 
 // the --help texts load with the rest of the long text, on first use (R75)
-const cmatrixHelp = () => import('../text').then((t) => t.CMATRIX_HELP, () => [`usage: cmatrix [-s] [-C color] [--both]`]);
-const pacmanHelp = () => import('../text').then((t) => t.PACMAN_HELP, () => ['usage:  pacman <operation> [...]']);
+const cmatrixHelp = async () => (await loadText())?.CMATRIX_HELP ?? ['usage: cmatrix [-s] [-C color] [--both]'];
+const pacmanHelp = async () => (await loadText())?.PACMAN_HELP ?? ['usage:  pacman <operation> [...]'];
 
 export function toyCommands(env: ShellEnv): Command[] {
   const catsay: Command = {

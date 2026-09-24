@@ -12,7 +12,6 @@ import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 const [input, output, check] = process.argv.slice(2);
 if (!input || !output) throw new Error('usage: optimize.ts in.glb out.glb [check.glb]');
 
-const BAKED = new Set(['static', 'desk_baked', 'kbd_accent', 'paddle_glyphs', 'fan_blades', 'cat_body', 'cat_head', 'cat_tail', 'shadow_floor', 'shadow_wall']);
 
 const LIT = new Set(['screen_laptop', 'screen_monitor', 'fan_display']);
 
@@ -49,7 +48,7 @@ for (const node of root.listNodes()) {
     const old = prim.getMaterial();
     if (old) prim.setMaterial(mats.get(old.getName()) ?? old);
     // every surface is unlit: only the screens' glass shader reads normals (fresnel)
-    if (BAKED.has(owner) || !LIT.has(owner)) prim.setAttribute('NORMAL', null);
+    if (!LIT.has(owner)) prim.setAttribute('NORMAL', null);
     for (const sem of prim.listSemantics()) {
       if (sem !== 'POSITION' && sem !== 'NORMAL' && sem !== 'TEXCOORD_0') prim.setAttribute(sem, null);
     }

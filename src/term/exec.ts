@@ -3,6 +3,7 @@ import { SITE } from '../content/site';
 import { text } from './format';
 import { expand, parse, ParseError, type Chain, type Pipeline } from './parse';
 import { AbortedError, Registry, didYouMean, type ShellEnv } from './registry';
+import { loadText } from './lazy';
 import { MAX_INPUT, type TermStore } from './store';
 import { createFs, HOME, lookup, resolve, type VNode } from './vfs';
 import { ExitError, type CommandCtx, type Line, type WorldPort } from './types';
@@ -72,7 +73,8 @@ export class Shell {
   private readonly env: ShellEnv;
   private readonly sleepImpl: (ms: number, signal: AbortSignal) => Promise<void>;
   private ac: AbortController | null = null;
-  private loading = false;
+  /** A first word that is no command waits on the answers chunk: ctrl+c drops the wait. */
+  private loading: AbortController | null = null;
   private status = 0;
   /** The running command's key handler (a full-screen toy owns the tty); null otherwise. */
   private keyFn: ((key: string) => void) | null = null;
@@ -145,10 +147,17 @@ export class Shell {
     let cmdline = src;
     const first = src.trim().split(/\s+/)[0] ?? '';
     if (!this.known(first)) {
-      // the answers are long text, loaded on first use (R75); no second line starts meanwhile
-      this.loading = true;
-      const text = await import('./text').catch(() => null);
-      this.loading = false;
+      // the answers are long text, loaded on first use (R75): at most TEXT_WAIT_MS, then it
+      // answers as if the chunk were missing; no second line starts meanwhile, ctrl+c ends it
+      const wait = (this.loading = new AbortController());
+      this.store.setBusy(true);
+      const text = await Promise.race([
+        loadText(),
+        new Promise<'abort'>((r) => wait.signal.addEventListener('abort', () => r('abort'), { once: true })),
+      ]);
+      this.loading = null;
+      this.store.setBusy(false);
+      if (text === 'abort') return this.done(src, 130);
       const cat = text?.catspeak(src, this.env.random);
       if (cat) {
         this.store.print([{ text: '=^..^=  ', fg: 'accent' }, { text: cat.text }]);
@@ -214,6 +223,11 @@ export class Shell {
    * like cmatrix is up, so "any key quits" can call this too). When idle: cancels the input line.
    */
   interrupt(): void {
+    if (this.loading) {
+      this.loading.abort();
+      this.store.print('^C');
+      return;
+    }
     if (this.ac) {
       const quiet = this.store.state.overlay !== null;
       this.ac.abort();

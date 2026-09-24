@@ -17,6 +17,7 @@ import { loadRgb, saveRgb } from './accent';
 import { SOUND_EVENT, soundLevel, start } from './app';
 import { currentTheme, setTheme, THEME_EVENT } from './theme';
 import { FrameView } from './terminal-dom';
+import { prefetchText } from '../term/lazy';
 
 const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const narrow = () => innerWidth < 640;
@@ -111,6 +112,19 @@ async function boot(first: boolean) {
   }
   // the autologin's own command: not the visitor's history, and the first chips stay put
   await shell.run(first && !narrow() ? 'fastfetch' : 'fastfetch --compact', { record: false });
+}
+
+/**
+ * The terminal's long text (man pages, phrases) warms in idle time once nothing else is loading:
+ * after the desk is up, or when there is no desk to wait for (R90). Once per visit.
+ */
+let warmed = false;
+function warmText() {
+  if (warmed) return;
+  warmed = true;
+  const ric = (globalThis as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+  if (ric) ric(prefetchText, { timeout: 4000 });
+  else setTimeout(prefetchText, 1500);
 }
 
 /** Answered once in <head> (Base.astro); probe only if that script did not run. */
@@ -231,6 +245,7 @@ function enter3d() {
       document.body.dataset.scene = 'ready';
       syncMonitorLinks();
       if (btn) btn.hidden = true;
+      warmText();
       // the live desk covers the poster for good: a download still under way is dropped
       const img = document.querySelector<HTMLImageElement>('#poster img');
       if (img && !img.complete) { img.parentElement?.querySelectorAll('source').forEach((s) => s.remove()); img.removeAttribute('src'); }
@@ -254,6 +269,7 @@ function leave3d() {
   delete document.body.dataset.scene;
   syncMonitorLinks();
   delete document.documentElement.dataset.boot; // reveal the page (no loader, no 3D)
+  warmText();
   const btn = $('enter3d') as HTMLButtonElement | null;
   if (btn && hasWebGL2()) { btn.hidden = false; btn.disabled = false; btn.textContent = 'enter 3d'; }
 }
@@ -283,6 +299,7 @@ function afterIdle() {
   btn?.addEventListener('click', enter3d);
   if (gate === 'auto' && !booting3d) enter3d();
   else if (gate === 'offer' && btn) btn.hidden = false;
+  if (gate !== 'auto' && !booting3d) warmText(); // no desk loading: nothing to compete with
 }
 
 // A pinned screen seen from afar is one big button: the first click flies you there (links

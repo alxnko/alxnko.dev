@@ -16,6 +16,11 @@ export interface Span {
   art?: boolean;
   /** A command line: the span is a button that runs it (help's command names, hints). */
   run?: string;
+  /**
+   * An exact #rrggbb for the text, drawn over `fg` (the `rgb` chips, each in its own colour's
+   * dark-theme shade). Renderers apply it only when it is a strict six-digit hex.
+   */
+  swatch?: string;
 }
 export type Line = Span[];
 

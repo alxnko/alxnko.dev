@@ -2,7 +2,8 @@
 import { CONTACTS, SITE } from '../../content/site';
 import { CAT_MARK } from '../../content/mark';
 import { b, fg, link, pad, PALETTE } from '../format';
-import { fail, flags, type ShellEnv } from '../registry';
+import { fail, flags, untilAborted, type ShellEnv } from '../registry';
+import { loadText } from '../lazy';
 import type { Command, Line } from '../types';
 
 export const KERNEL = '7.2.6-meow';
@@ -128,9 +129,10 @@ export function infoCommands(env: ShellEnv): Command[] {
       ctx.out(`       ${c.usage}`);
       ctx.out('');
       ctx.out([b('DESCRIPTION')]);
-      const MAN = (await import('../text').catch(() => null))?.MAN ?? {};
-      const desc = MAN[c.name] ?? c.summary[0].toUpperCase() + c.summary.slice(1) + '.';
+      const text = await untilAborted(loadText(), ctx.signal);
+      const desc = text?.MAN[c.name] ?? c.summary[0].toUpperCase() + c.summary.slice(1) + '.';
       for (const l of wrapWords(desc, 57)) ctx.out(`       ${l}`);
+      if (!text) ctx.out([fg('muted', '       (full manual unavailable right now)')]);
     },
   };
 

@@ -43,7 +43,7 @@ export function parseRgb(input: unknown): string | null {
   if (typeof input !== 'string' || input.length > 64) return null;
   const s = input.trim().toLowerCase();
   if (s.length > 7) return null;
-  if (s === 'off' || s in PRESETS) return s;
+  if (s === 'off' || Object.hasOwn(PRESETS, s)) return s;
   if (!HEX.test(s)) return null;
   const hex = s.length === 4 ? '#' + [...s.slice(1)].map((c) => c + c).join('') : s;
   return PRESET_NAMES.find((n) => PRESETS[n].fill === hex) ?? hex;
@@ -51,7 +51,7 @@ export function parseRgb(input: unknown): string | null {
 
 /** The palette for a non-off spec (a preset, or derived from the hex). */
 export function palette(spec: string): Palette {
-  return spec in PRESETS ? PRESETS[spec as Preset] : derive(spec);
+  return Object.hasOwn(PRESETS, spec) ? PRESETS[spec as Preset] : derive(spec);
 }
 
 /** Compact form for the <head> script (Base.astro): `dark,light,fill,onFill`. */

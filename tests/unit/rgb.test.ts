@@ -50,6 +50,10 @@ describe('rgb palettes', () => {
     }
   });
 
+  it('pure magenta: the day-theme shade the e2e no-flash test expects', () => {
+    expect(derive('#ff00ff').light).toBe('#ac00ac');
+  });
+
   it('keeps the hue: a derived text shade is the colour itself when that already passes', () => {
     expect(derive('#ff00ff').dark).toBe('#ff00ff');
     expect(derive('#22e5ff').dark).toBe('#22e5ff');

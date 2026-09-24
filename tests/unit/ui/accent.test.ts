@@ -23,7 +23,7 @@ describe('rgb preference', () => {
     saveRgb('#ff00ff', '#ff00ff');
     const p = ls();
     expect(p['alxnko:rgb']).toBe('#ff00ff');
-    expect(p['alxnko:rgb-accent']).toBe('#ff00ff');
+    expect(p['alxnko:rgb-accent']).toBeUndefined(); // only kept while the lights are off
     expect(p['alxnko:rgb-css']).toMatch(/^#ff00ff,#[0-9a-f]{6},#ff00ff,#[0-9a-f]{6}$/);
     expect(vars()[2]).toBe('#ff00ff');
     expect(loadRgb()).toEqual({ rgb: '#ff00ff', accent: '#ff00ff' });
@@ -31,11 +31,20 @@ describe('rgb preference', () => {
 
   it('off keeps the last accent, and green clears everything again', () => {
     saveRgb('off', 'cyan');
+    expect(localStorage.getItem('alxnko:rgb-accent')).toBe('cyan');
     expect(loadRgb()).toEqual({ rgb: 'off', accent: 'cyan' });
     expect(vars()).toEqual(cssOf(PRESETS.cyan).split(','));
     saveRgb('green', 'green');
     expect(ls()).toEqual({});
     expect(vars()).toEqual(['', '', '', '']);
+  });
+
+  it('reads what an older build stored (a colour with its accent alongside)', () => {
+    localStorage.setItem('alxnko:rgb', 'cyan');
+    localStorage.setItem('alxnko:rgb-accent', 'cyan');
+    expect(loadRgb()).toEqual({ rgb: 'cyan', accent: 'cyan' });
+    saveRgb('cyan', 'cyan');
+    expect(localStorage.getItem('alxnko:rgb-accent')).toBeNull();
   });
 
   it('migrates the old ring preference once', () => {

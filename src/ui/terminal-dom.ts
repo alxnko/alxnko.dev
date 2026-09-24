@@ -57,6 +57,7 @@ function spans(line: Line, into: HTMLElement): HTMLElement {
       if (/^https?:/.test(s.href!)) el.setAttribute('target', '_blank');
     }
     if (s.fg && COLORS.has(s.fg)) el.classList.add(`c-${s.fg}`);
+    swatch(el, s);
     if (s.bold) el.classList.add('b');
     if (s.art) el.setAttribute('aria-hidden', 'true');
     el.textContent = s.text;
@@ -65,12 +66,19 @@ function spans(line: Line, into: HTMLElement): HTMLElement {
   return into;
 }
 
+const HEX6 = /^#[0-9a-f]{6}$/;
+/** A span's exact colour (CSSOM, like every inline style here: the CSP allows it), if any. */
+function swatch(el: HTMLElement, s: Span) {
+  if (s.swatch !== undefined && HEX6.test(s.swatch)) el.style.setProperty('color', s.swatch);
+}
+
 /** A command a click runs (or, ending in a space, starts in the prompt): a button in the log. */
 function runButton(s: Span, doc: Document): HTMLElement {
   const el = doc.createElement('button');
   el.type = 'button';
   el.className = 'run';
   if (s.fg && COLORS.has(s.fg)) el.classList.add(`c-${s.fg}`);
+  swatch(el, s);
   if (s.bold) el.classList.add('b');
   el.tabIndex = -1; // typing is the keyboard way; the log must not become a wall of tab stops
   el.dataset.cmd = s.run!.trimEnd();

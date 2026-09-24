@@ -1,12 +1,19 @@
 import { expect, test, type Page } from '@playwright/test';
 import { guard, lines, run } from './helpers';
+import { readFileSync } from 'node:fs';
+
+// the presets as shipped (read as data: the e2e runner loads no app modules)
+const PRESETS = JSON.parse(readFileSync(new URL('../../design/rgb.json', import.meta.url), 'utf8'));
+// derive('#ff00ff') in src/lib/rgb.ts (unit-tested): the day-theme text shade of pure magenta
+const MAGENTA_LIGHT = '#ac00ac';
 
 // `rgb` (R86): one colour for the accent tokens, the terminal and the desk's lights and parts.
 
 /** The autologin's fastfetch has finished: the prompt takes commands. */
 async function ready(page: Page) {
-  await expect(lines(page)).toContainText('alxnko@');
-  await expect(page.locator('#term-chips')).toHaveAttribute('data-busy', 'false');
+  // the boot log plus fastfetch: generous, a loaded CI box renders it slowly
+  await expect(lines(page)).toContainText('alxnko@', { timeout: 15_000 });
+  await expect(page.locator('#term-chips')).toHaveAttribute('data-busy', 'false', { timeout: 15_000 });
 }
 
 /** What the accent looks like right now: tokens, a UI element, a terminal span. */
@@ -44,7 +51,7 @@ test.describe('rgb on the page', () => {
     expect(pink.skip).toBe('rgb(255, 0, 255)');
     expect(pink.prompt).toBe('rgb(255, 0, 255)'); // the prompt's path is the terminal accent
     expect(pink.green).toBe('#00ff82'); // the ANSI green itself is not the accent
-    expect(pink.stored).toEqual(['alxnko:rgb', 'alxnko:rgb-accent', 'alxnko:rgb-css']);
+    expect(pink.stored).toEqual(['alxnko:rgb', 'alxnko:rgb-css']);
     // fastfetch's cat is the accent too
     await run(page, 'fastfetch --compact');
     const cat = page.locator('#term-lines [aria-hidden="true"].c-accent').last();
@@ -74,6 +81,34 @@ test.describe('rgb on the page', () => {
     expect(early.skip).toBe('rgb(255, 0, 255)');
     expect(early.accent).toBe(pink.accent);
     expect(early.inline).toBe(pink.inline);
+  });
+
+  test('no flash in the day theme: the <head> paints the palette\'s light shade as the accent', async ({ browser }) => {
+    const ctx = await browser.newContext({ colorScheme: 'light' });
+    const page = await ctx.newPage();
+    await page.goto('/?lite');
+    await ready(page);
+    await run(page, 'rgb #ff00ff');
+    await expect(lines(page)).toContainText('rgb: #ff00ff');
+    await page.route(/\/_astro\/.*\.js$/, (r) => r.abort());
+    await page.reload();
+    const early = await look(page);
+    expect(early.accent).toBe(MAGENTA_LIGHT);
+    expect(early.focus).toBe(MAGENTA_LIGHT);
+    expect(early.fill).toBe('#ff00ff');
+    await ctx.close();
+  });
+
+  test('rapid changes: rgb red then rgb blue within the tween ends on blue', async ({ page }) => {
+    await page.goto('/?lite');
+    await ready(page);
+    await page.locator('#term-input').focus();
+    await page.keyboard.insertText('rgb red');
+    await page.keyboard.press('Enter');
+    await page.keyboard.insertText('rgb blue');
+    await page.keyboard.press('Enter');
+    await expect(lines(page)).toContainText('rgb: blue');
+    expect((await look(page)).fill).toBe(PRESETS.blue.fill);
   });
 
   test('day theme: every preset and a pale hex stay readable on the paper', async ({ page }) => {
@@ -131,6 +166,36 @@ test.describe('rgb on the page', () => {
   });
 });
 
+test.describe('the lazy terminal text (R90)', () => {
+  test('a failed chunk: unknown words still answer at once, man notes the missing manual', async ({ page }) => {
+    await page.route(/\/_astro\/text\.[^/]*\.js$/, (r) => r.abort());
+    await page.goto('/?lite');
+    await ready(page);
+    const t0 = Date.now();
+    await run(page, 'hi');
+    await expect(lines(page)).toContainText('bash: hi: command not found', { timeout: 2000 });
+    expect(Date.now() - t0).toBeLessThan(2000);
+    await run(page, 'man rgb');
+    await expect(lines(page)).toContainText('(full manual unavailable right now)');
+  });
+
+  test('a stalled chunk: the wait ends by itself, and ctrl+c ends it at once', async ({ page }) => {
+    await page.route(/\/_astro\/text\.[^/]*\.js$/, () => {}); // never answered
+    await page.goto('/?lite');
+    await ready(page);
+    await run(page, 'hi');
+    await expect(page.locator('#term-chips')).toHaveAttribute('data-busy', 'true');
+    await page.keyboard.press('Control+c');
+    await expect(page.locator('#term-chips')).toHaveAttribute('data-busy', 'false', { timeout: 1000 });
+    await expect(lines(page)).toContainText('^C');
+    await run(page, 'echo still-alive');
+    await expect(lines(page)).toContainText('still-alive');
+    // left alone, the wait gives up after ~3 s and answers as if the chunk were missing
+    await run(page, 'hello there');
+    await expect(lines(page)).toContainText('bash: hello: command not found', { timeout: 6000 });
+  });
+});
+
 test.describe('rgb on the 3D desk', () => {
   test.setTimeout(60_000);
 
@@ -165,7 +230,8 @@ test.describe('rgb on the 3D desk', () => {
     expect(green).toMatchObject({ ring: '#00ff82', fanRing: '#00ff82', led: '#00ff82', same: true });
 
     await run(page, 'rgb #ff00ff');
-    await expect.poll(async () => (await sceneColours(page)).ring).toBe('#ff00ff');
+    await expect.poll(async () => (await sceneColours(page)).led).toBe('#ff00ff');
+    await page.waitForTimeout(350); // the tween has ended
     const pink = await sceneColours(page);
     expect(pink.led).toBe('#ff00ff');
     expect(pink.keys).not.toEqual(green.keys);
@@ -174,15 +240,32 @@ test.describe('rgb on the 3D desk', () => {
 
     await run(page, 'rgb off');
     await expect.poll(async () => (await sceneColours(page)).ring).toBe('#161618');
+    await page.waitForTimeout(350);
     const off = await sceneColours(page);
     expect(off.led).toBe('#ff00ff'); // the status LED keeps the accent
     expect(off.keys).not.toEqual(pink.keys); // the lime caps are back
     expect(off.keys[1]).toBeGreaterThan(off.keys[2]);
 
     await run(page, 'rgb green');
-    await expect.poll(async () => (await sceneColours(page)).ring).toBe('#00ff82');
-    expect(await sceneColours(page)).toEqual(green);
+    // once the 300 ms tween ends, every colour is exactly the default again
+    await expect.poll(() => sceneColours(page)).toEqual(green);
     g.check();
+  });
+
+  test('rapid changes: red then blue inside the 300 ms tween ends on blue', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await ready(page);
+    await page.locator('#term-input').focus();
+    for (const c of ['rgb red', 'rgb blue']) {
+      await page.keyboard.insertText(c);
+      await page.keyboard.press('Enter');
+    }
+    await expect(lines(page)).toContainText('rgb: blue');
+    await expect.poll(async () => (await sceneColours(page)).ring).toBe(PRESETS.blue.fill);
+    await page.waitForTimeout(400);
+    expect((await sceneColours(page)).ring).toBe(PRESETS.blue.fill);
+    expect((await look(page)).fill).toBe(PRESETS.blue.fill);
   });
 
   test('a saved colour is on the desk from its first frame', async ({ page }) => {

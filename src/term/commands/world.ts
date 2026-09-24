@@ -8,7 +8,7 @@ export const MEOW_ALIASES: readonly string[] = [
 import { fail, untilAborted, type ShellEnv } from '../registry';
 import { themeName } from '../vfs';
 import { fg } from '../format';
-import { parseRgb, PRESET_NAMES } from '../../lib/rgb';
+import { parseRgb, PRESET_NAMES, PRESETS, type Preset } from '../../lib/rgb';
 import type { Command, FanSpeed, Line, SoundLevel } from '../types';
 
 export const DESK_PRESETS: Record<string, number> = { '1': 0.74, '2': 0.95, '3': 1.12 };
@@ -78,7 +78,8 @@ export function worldCommands(env: ShellEnv): Command[] {
       if (a === undefined) {
         ctx.out(w.rgb === 'off' ? `rgb: off (the lights are off; the accent stays ${w.accent})` : `rgb: ${w.rgb}`);
         const line: Line = [fg('muted', 'presets: ')];
-        PRESET_NAMES.forEach((n, i) => line.push(...(i ? [{ text: ' ' }] : []), chip(n)));
+        // each preset in its own colour (its dark shade: made for the terminal's dark screen)
+        PRESET_NAMES.forEach((n, i) => line.push(...(i ? [{ text: ' ' }] : []), { ...chip(n), swatch: PRESETS[n as Preset].dark }));
         ctx.out(line);
         return ctx.out([fg('muted', 'or any hex: '), chip('#ff8800'), fg('muted', ', and '), chip(w.rgb === 'off' ? 'on' : 'off')]);
       }

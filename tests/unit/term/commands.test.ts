@@ -8,7 +8,7 @@ import { bootLines } from '../../../src/term/boot';
 import { PALETTE, text } from '../../../src/term/format';
 import { HOME } from '../../../src/term/vfs';
 import { setup } from './harness';
-import { PRESET_NAMES } from '../../../src/lib/rgb';
+import { PRESET_NAMES, PRESETS } from '../../../src/lib/rgb';
 
 beforeEach(() => localStorage.clear());
 
@@ -325,6 +325,8 @@ describe('world commands', () => {
     ]);
     // every preset is a chip that runs it
     expect(shown[1].filter((s) => s.run).map((s) => s.run)).toEqual(PRESET_NAMES.map((n) => `rgb ${n}`));
+    // each chip is drawn in its own preset's dark shade (made for the dark terminal)
+    expect(shown[1].filter((s) => s.run).map((s) => s.swatch)).toEqual(PRESET_NAMES.map((n) => PRESETS[n].dark));
     expect(await out('rgb purple')).toBe('rgb: purple');
     expect(world.get()).toMatchObject({ rgb: 'purple', accent: 'purple' });
     expect(await out('rgb #F0A')).toBe('rgb: #ff00aa');

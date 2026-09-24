@@ -1,5 +1,5 @@
 import { chromium, expect, test, type Page } from '@playwright/test';
-import { expectRain, guard, rainView, run } from './helpers';
+import { expectRain, guard, promptReady, rainView, run } from './helpers';
 
 test.describe('3D desk', () => {
   test.setTimeout(60_000);
@@ -16,6 +16,7 @@ test.describe('3D desk', () => {
   test('continuity: the live terminal stays pinned on the laptop at every distance', async ({ page }) => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await promptReady(page);
     await run(page, 'echo continuity-check');
     for (const l of ['wide', 'desk', 'laptop']) {
       await page.locator(`#nav [data-landmark="${l}"]`).click();
@@ -69,6 +70,7 @@ test.describe('3D desk', () => {
     });
     const open = await holes();
     expect(open[0]).toBeLessThan(1); // the contacts window is open
+    await promptReady(page);
     await run(page, 'cmatrix --both');
     await expect(page.locator('body')).toHaveAttribute('data-rain', '');
     await expect.poll(holes).toEqual([2, 2, 2, 2]); // every window closed: the rain is the screen
