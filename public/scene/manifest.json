@@ -1,5 +1,5 @@
 {
-  "version": "31f91316",
+  "version": "113aa4c8",
   "deskBase": 0.74,
   "presets": [
     0.74,
@@ -138,36 +138,36 @@
     }
   },
   "files": {
-    "glb": "desk.31f91316.glb",
+    "glb": "desk.113aa4c8.glb",
     "atlas": {
       "day": {
-        "2048": "atlas-day-2048.25d972be.webp",
-        "1024": "atlas-day-1024.f9888aae.webp"
+        "2048": "atlas-day-2048.4490d899.webp",
+        "1024": "atlas-day-1024.ca24cf10.webp"
       },
       "night": {
-        "2048": "atlas-night-2048.eec84b52.webp",
-        "1024": "atlas-night-1024.29998ffe.webp"
+        "2048": "atlas-night-2048.de71e349.webp",
+        "1024": "atlas-night-1024.5339a1f2.webp"
       }
     },
     "poster": {
       "day": {
         "1600": {
-          "avif": "poster-day-1600.ce41255d.avif",
-          "webp": "poster-day-1600.247dc5ce.webp"
+          "avif": "poster-day-1600.2b0ec07a.avif",
+          "webp": "poster-day-1600.f54f5c9e.webp"
         },
         "800": {
-          "avif": "poster-day-800.416d3629.avif",
-          "webp": "poster-day-800.160fd8d5.webp"
+          "avif": "poster-day-800.f0dc1ee4.avif",
+          "webp": "poster-day-800.e48f3307.webp"
         }
       },
       "night": {
         "1600": {
-          "avif": "poster-night-1600.2eab9c2c.avif",
-          "webp": "poster-night-1600.852ec089.webp"
+          "avif": "poster-night-1600.2d4c1de6.avif",
+          "webp": "poster-night-1600.69b7aee2.webp"
         },
         "800": {
-          "avif": "poster-night-800.9ff371ad.avif",
-          "webp": "poster-night-800.ea548b70.webp"
+          "avif": "poster-night-800.178c3d87.avif",
+          "webp": "poster-night-800.53a0f411.webp"
         }
       }
     },
@@ -196,6 +196,7 @@
       "rule": "same position/target as cam_desk; keep hfov (50 deg) and widen yfov for aspect < 1.6"
     },
     "ring": "green",
+    "tint": "#14995a",
     "fanRing": "green",
     "backlight": "green",
     "fanDisplay": "100",
@@ -220,7 +221,7 @@
       "note": "group; set position.y = deskHeight (translation y = 0.74 at preset 1); everything on the desk rides along",
       "baseY": 0.74
     },
-    "desk_baked": "merged baked mesh (top, upper legs, rails, tray, paddle + button legends, laptop, monitor + stand, keyboard, mouse, pad, gamepad, fan body + bracket); atlas. Clean desk: no charger, no cables",
+    "desk_baked": "merged baked mesh (top, upper legs, rails, tray, paddle + buttons, laptop, monitor + stand, keyboard, mouse, pad, gamepad, fan body + bracket); atlas. Clean desk: no charger, no cables",
     "screen_laptop": "flat 16:10 quad, runtime CanvasTexture + dock target; corners in manifest.screens.laptop",
     "screen_monitor": "curved strip (R 1.5 m), runtime CanvasTexture + dock target",
     "fan_blades": {
@@ -235,6 +236,24 @@
         1
       ],
       "note": "spin about the node's local +Z (glTF); pivot = hub = node origin"
+    },
+    "kbd_accent": "the keyboard's accent caps (were lime); baked neutral, runtime tint (see `tint`)",
+    "paddle_glyphs": "the paddle button legends 1 2 3 up down; baked neutral, runtime tint (see `tint`)",
+    "tint": {
+      "nodes": [
+        "kbd_accent",
+        "paddle_glyphs",
+        "cat_body",
+        "cat_head",
+        "cat_tail"
+      ],
+      "base": "#bcbcbc",
+      "own": {
+        "kbd_accent": "#a4d60e",
+        "paddle_glyphs": "#f2f2f4",
+        "cat": "#14995a"
+      },
+      "note": "baked with a neutral grey albedo (`base`, edge wear lighter grey): runtime colour = atlas (linear) x tint / base (linear), day and night alike. `rgb` drives the tint; `rgb off` shows each part's own colour (`own`)"
     },
     "cat_body": {
       "hierarchy": "desk_rig > cat_body > (cat_head, cat_tail)",
@@ -656,22 +675,22 @@
   },
   "stats": {
     "tris": 26260,
-    "verts": 28946,
+    "verts": 27388,
     "bytes": {
-      "desk.31f91316.glb": 254204,
-      "atlas-day-2048.25d972be.webp": 171632,
-      "atlas-day-1024.f9888aae.webp": 75206,
-      "atlas-night-2048.eec84b52.webp": 110478,
-      "atlas-night-1024.29998ffe.webp": 42648,
-      "poster-day-1600.ce41255d.avif": 43795,
-      "poster-day-1600.247dc5ce.webp": 65032,
-      "poster-day-800.416d3629.avif": 23547,
-      "poster-day-800.160fd8d5.webp": 34192,
-      "poster-night-1600.2eab9c2c.avif": 37196,
-      "poster-night-1600.852ec089.webp": 56986,
-      "poster-night-800.9ff371ad.avif": 17570,
-      "poster-night-800.ea548b70.webp": 25718,
-      "../og.png": 528946
+      "desk.113aa4c8.glb": 246920,
+      "atlas-day-2048.4490d899.webp": 164726,
+      "atlas-day-1024.ca24cf10.webp": 72970,
+      "atlas-night-2048.de71e349.webp": 106426,
+      "atlas-night-1024.5339a1f2.webp": 41874,
+      "poster-day-1600.2b0ec07a.avif": 43319,
+      "poster-day-1600.f54f5c9e.webp": 64764,
+      "poster-day-800.f0dc1ee4.avif": 23444,
+      "poster-day-800.e48f3307.webp": 34170,
+      "poster-night-1600.2d4c1de6.avif": 36890,
+      "poster-night-1600.69b7aee2.webp": 56778,
+      "poster-night-800.178c3d87.avif": 17332,
+      "poster-night-800.53a0f411.webp": 25532,
+      "../og.png": 528264
     },
     "quality": {
       "atlas-day-2048": 82,

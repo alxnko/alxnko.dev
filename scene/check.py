@@ -30,7 +30,7 @@ def main():
         name = ob.name.split("__geo")[0] if "__geo" in ob.name else ob.name
         if ob.type == "MESH" or name not in objs:
             objs[name] = ob
-    need = ["static", "desk_baked", "screen_laptop", "screen_monitor", "ring", "ring_glow", "cam_desk", "cam_wide",
+    need = ["static", "desk_baked", "kbd_accent", "paddle_glyphs", "cat_body", "screen_laptop", "screen_monitor", "ring", "ring_glow", "cam_desk", "cam_wide",
             "fan_ring", "fan_display", "kbd_glow", "laptop_kbd_glow", "hit_paddle_1", "hit_paddle_down"]
     missing = [n for n in need if n not in objs]
     assert not missing, f"missing after import: {missing}"
