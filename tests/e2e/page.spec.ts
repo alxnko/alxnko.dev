@@ -17,6 +17,25 @@ test.describe('page (no 3D)', () => {
     g.check();
   });
 
+  test('boots at the real default path (/) with zero errors and no CSP/Trusted Types violations', async ({ page }) => {
+    const g = await guard(page);
+    await page.goto('/');
+    await expect(page.locator('h1')).toContainText('alxnko');
+    await page.waitForTimeout(1500);
+    g.check();
+  });
+
+  test('the mail/email static pages load with zero errors and no CSP/Trusted Types violations', async ({ page }) => {
+    // these pages redirect via `location.replace('mailto:…')`: a non-http navigation that never
+    // fires 'load' in a headless browser, so wait only for the response to commit.
+    for (const path of ['/mail/', '/email/']) {
+      const g = await guard(page);
+      await page.goto(path, { waitUntil: 'commit' });
+      await page.waitForTimeout(300);
+      g.check();
+    }
+  });
+
   test('no placeholder or unfinished text, and the distro is never named', async ({ page }) => {
     await page.goto('/?lite');
     await page.waitForTimeout(1500);
@@ -30,6 +49,10 @@ test.describe('page (no 3D)', () => {
     expect(csp).toContain("default-src 'none'");
     expect(csp).not.toContain('unsafe-inline');
     expect(csp).not.toMatch(/https?:\/\//);
+    // Trusted Types are enforced (R83/R85): in the real CSP, no Report-Only header alongside it.
+    expect(csp).toContain("require-trusted-types-for 'script'");
+    expect(csp).toContain("trusted-types 'none'");
+    expect(r.headers()['content-security-policy-report-only']).toBeUndefined();
     expect(r.headers()['x-content-type-options']).toBe('nosniff');
     // HTTPS only: a year of HSTS, subdomains included, eligible for the browser preload list
     expect(r.headers()['strict-transport-security']).toMatch(/max-age=(3153600\d|[4-9]\d{7,}).*includeSubDomains.*preload/);
