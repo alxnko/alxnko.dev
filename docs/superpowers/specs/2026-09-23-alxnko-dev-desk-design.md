@@ -33,7 +33,7 @@ Success means:
 | Repo | Standalone `alxnko.dev` repo. The site gets its **own new design system** ("graphite"), independent of `@meowerse/ui`. |
 | Visual direction | "A1 Graphite": neutral black/graphite hardware and UI with **no green tint**. Green `#00ff82` is a *signal only* (prompt, cursor, active state, links, the cat, one LED, the ring light). One amber. Dark and light themes: the light theme is "daytime at the desk", and screens stay dark in both. |
 | 3D | Hero object, lazy loaded: the owner's full desk (from reference photos), **built and baked in headless Blender via Python scripts committed to the repo**. |
-| Ring light | Monitor back ring glow is **green by default**, switchable at runtime: `ring green\|purple\|off`. |
+| Ring light | Monitor back ring glow is **green by default**, switchable at runtime: `rgb <preset\|#hex\|off\|on>` (was `ring`; `ring`, `color`, `colour` still work). One colour drives the site accent, the terminal, the desk's lights and the tinted parts (R86). |
 | Cat | The plush on the fan becomes a **faceted low-poly cat built from the brand-mark geometry**, in accent green. It is the only green object. |
 | CLI | Virtual filesystem, Arch-flavored rituals, toys and easter eggs. Real shell ergonomics. |
 | Architecture | **Approach A**: the DOM terminal is the real UI and the 3D scene is its stage. Live DOM overlays dock onto screens, and a canvas mirror shows the same state from afar. (B, WebGL-only text, and C, permanent CSS3D, were rejected: text quality, mobile keyboard, a11y and SEO, Safari fragility.) |
@@ -107,7 +107,7 @@ Success means:
 |---|---|
 | `desk 1\|2\|3\|up\|down` | Paddle LED on → motor sound (if enabled) → the desk rig moves over ~1.5 s (ease in-out). The monitor, laptop and everything on top ride along, the upper legs telescope, and the cable drop stretches. The terminal prints the height. LED off. |
 | `theme day\|night` (and toggle) | Lighting cross-fades 600 ms between baked day/night atlases. The window sky changes. Page tokens switch. |
-| `ring green\|purple\|off` | Ring emissive plus wall-glow decal re-tint over 300 ms. |
+| `rgb <preset\|#hex\|off\|on>` | Ring, fan ring, wall glow, both backlights, the server status LED and the tint of `kbd_accent` / `paddle_glyphs` / the cat, in one 300 ms tween; the page's `--rgb-*` accent properties at once (R86). |
 | `fan` / `fan 0-3` | Blade speed eases to the new level. Hum pitch follows (if sound is on). |
 | `meow` | Cat: head tilt plus tail flick, ring pulse, synthesized meow (if sound is on). |
 | `sudo …` (the one scene secret) | Prints the sudoers incident line. The cat slowly turns to stare into the camera for 3 s, then returns. |
@@ -234,7 +234,7 @@ prints `logout`.
 - **Filesystem:** `ls [-la]`, `cd`, `pwd`, `cat`, `tree`, `open <contact|path>`
 - **Session:** `history [-c]`, `clear`, `exit`, `alias`/`unalias` (`ll`, `la` built in),
   `true`/`false` (hidden)
-- **World:** `theme`, `desk`, `ring`, `fan`, `sound`, `meow`, `tour`
+- **World:** `theme`, `desk`, `rgb` (aliases `color`, `colour`, `ring`), `fan`, `sound`, `meow`, `tour`
 - **For people (R74):** a few plain-language lines (`hi`, `who are you`, `contact`,
   `what is this`) answer with the real command, shown as a `# comment` first; not-found
   suggests lower-case names, habits from other systems (`neofetch` → `fastfetch`) and typos.
@@ -319,8 +319,9 @@ end to end, deterministically: fixed seeds, fixed sample counts.
 | `screen_laptop` | quad, UV 0–1 | terminal mirror (CanvasTexture) and dock target |
 | `screen_monitor` | curved strip, UV 0–1 | contacts canvas and dock target |
 | `fan_blades` | mesh, pivot at hub | spin about local Z |
-| `cat_body`, `cat_head`, `cat_tail` | meshes with pivots (neck, tail base) | cat animation |
+| `cat_body`, `cat_head`, `cat_tail` | meshes with pivots (neck, tail base) | cat animation; baked neutral, runtime `rgb` tint (R86) |
 | `ring` | torus | emissive, runtime tint |
+| `kbd_accent`, `paddle_glyphs` | the accent keycaps, the paddle legends | baked with a neutral grey albedo; runtime atlas × tint / base (`rgb`, R86) |
 | `ring_glow` | quad on the wall behind the monitor | additive radial glow, runtime tint (parented to rig) |
 | `led_*` | tiny meshes | runtime emissive color (`led_paddle`, `led_kbd`, `led_srv_0..5`) |
 | `cable_drop` | mesh, origin at floor anchor | scale Y with desk height |
