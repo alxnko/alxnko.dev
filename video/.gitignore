@@ -3,5 +3,7 @@ dist
 out
 .site
 # captured footage, audio and the Blender hook are build outputs (bun run video recreates them)
-public/footage
+public/footage/**/*.mp4
+public/footage/**/*.mov
+public/footage/**/*.wav
 public/hook

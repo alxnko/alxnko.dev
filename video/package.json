@@ -10,6 +10,7 @@
     "@remotion/fonts": "4.0.527",
     "@remotion/media": "4.0.527",
     "@remotion/transitions": "4.0.527",
+    "playwright": "^1.63.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "4.0.527"

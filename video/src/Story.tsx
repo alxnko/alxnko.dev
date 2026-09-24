@@ -20,7 +20,7 @@ export const SCENES: Scene[] = [
   { name: "laptop", from: 6, to: -24, caps: [{ at: "tap", lines: ["tap the laptop."], for: 40 }, { at: "type", lines: ["it's a real", "terminal."], for: 60 }] },
   { name: "monitor", from: 6, to: -14, caps: [{ at: "tap", lines: ["tap a screen", "to get closer."], for: 66 }] },
   { name: "daynight", from: 6, to: -22, caps: [{ at: "theme", lines: ["day or night."], for: 50 }, { at: "desk", lines: ["the desk moves", "too."], for: 48 }] },
-  { name: "cat", from: 4, to: -20, caps: [{ at: "pinch", lines: ["type meow."], for: 60 }, { at: "meow", lines: ["the cat", "answers."], for: 44 }] },
+  { name: "cat", from: 4, to: -18, caps: [{ at: "type", lines: ["type meow."], for: 60 }, { at: "pinch", lines: ["the cat", "answers."], for: 78 }] },
 ];
 
 export const HOOK_FRAMES = 105;

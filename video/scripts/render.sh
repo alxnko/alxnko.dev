@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Render both formats, then finish for Instagram: loudness-normalised site sound (-16 LUFS),
+# Render both formats, then finish for Instagram: loudness-mastered site sound (-18 LUFS),
 # H.264 High, faststart; plus a silent copy of each (for adding music in Instagram).
 set -euo pipefail
 cd "$(dirname "$0")/.."

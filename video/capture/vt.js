@@ -23,6 +23,12 @@
 
   performance.now = () => (on ? vNow : real.now());
   Date.now = () => (on ? Math.round(vNow + dateOffset) : real.dateNow());
+  // new Date() with no arguments follows the frozen clock too (the terminal's clock)
+  const RealDate = Date;
+  window.Date = new Proxy(RealDate, {
+    construct: (T, args) => (args.length ? new T(...args) : new T(Date.now())),
+    apply: (T, self, args) => (args.length ? T(...args) : new T(Date.now()).toString()),
+  });
 
   const addTimer = (fn, ms, args, every) => {
     const id = nextId++;
@@ -48,7 +54,8 @@
   const yieldTask = () => new Promise((r) => { waiting.push(r); channel.port2.postMessage(0); });
 
   const call = (fn, args) => {
-    try { typeof fn === 'function' ? fn(...args) : (0, eval)(String(fn)); } catch (e) { console.error(e); }
+    if (typeof fn !== 'function') { console.warn('vt: string timer ignored'); return; }
+    try { fn(...args); } catch (e) { console.error(e); }
   };
 
   // ---- audio: the site's WebAudio renders offline on the virtual clock ----
@@ -105,6 +112,7 @@
         if (t.every) t.at += t.every; else timers.delete(id);
         call(t.fn, t.args);
         await yieldTask();
+        if (guard === 4999) console.warn('vt: timer guard ran out; later timers wait for the next step');
       }
       vNow = target;
       const cbs = [...frames.values()];

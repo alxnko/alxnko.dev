@@ -71,10 +71,11 @@ export type LoadStep = 'manifest' | 'geometry' | 'lighting' | 'screens';
 export interface SceneHandle { world: SceneWorld; destroy(): void }
 
 const RING: Record<Ring, string> = { green: '#00ff82', purple: '#b061ff', off: '#161618' };
-// `PUBLIC_RECORDING=1 bun run build`: the video pipeline's build (video/). It renders frame by
-// frame on a GPU, so it takes full resolution, MSAA and the sharp atlases, and never steps
-// resolution down. Always false in the site's own builds.
-const RECORDING = import.meta.env.PUBLIC_RECORDING === '1';
+// `astro build --mode recording`: the video pipeline's build (video/). It renders frame by frame
+// on a GPU, so it takes full resolution, MSAA and the sharp atlases, and never steps
+// resolution down. MODE is a build-time constant: in the site's own builds this is
+// "production" === "recording", folded away, and no environment variable can turn it on.
+const RECORDING = import.meta.env.MODE === 'recording';
 const FAN_SPEED = [0, 28, 42, 56]; // rad/s (shown as rotation up to FAN_MAX_STEP a frame, the rest as blur)
 // shown rotation is capped so it looks the same at any frame rate (30 fps idle, 60+ while
 // moving) and never strobes (5 blades 72° apart: a step near 36° reads as spinning backwards);

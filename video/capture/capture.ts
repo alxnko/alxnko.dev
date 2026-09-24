@@ -10,7 +10,6 @@ import { chromium, type Page, type CDPSession } from 'playwright';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const SITE = join(ROOT, '.site');
-const OUT = join(ROOT, 'public/footage', process.argv.find((a) => a.startsWith('--format='))?.slice(9) ?? '9x16');
 const FPS = 30, DT = 1000 / FPS;
 // Formats: a phone-shaped CSS viewport, rendered at 4× and downscaled to the output size
 // (the site frames its camera for the screen's shape, so each format is captured natively)
@@ -22,22 +21,25 @@ const fmtArg = process.argv.find((a) => a.startsWith('--format='))?.slice(9) ?? 
 if (!(fmtArg in FORMATS)) throw new Error(`--format must be one of ${Object.keys(FORMATS).join(', ')}`);
 const FMT = FORMATS[fmtArg as keyof typeof FORMATS];
 const VIEW = FMT.view;
+const OUT = join(ROOT, 'public/footage', fmtArg);
+mkdirSync(OUT, { recursive: true });
 const SCALE = FMT.out[0] / VIEW.width;
+const DSF = 4; // rendered at 4× the CSS viewport, downscaled to the output (supersampling)
 /** Scene coordinates are fractions of the screen, so one script plays in every format. */
 const X = (f: number) => f * VIEW.width, Y = (f: number) => f * VIEW.height;
 const WARMUP = 24; // frames stepped before recording (the view settles)
-mkdirSync(OUT, { recursive: true });
 
 // ---- the recording build, served as-is ----
 const TYPES: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.glb': 'model/gltf-binary', '.webp': 'image/webp', '.avif': 'image/avif', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
 if (!existsSync(join(SITE, 'index.html'))) throw new Error('no recording build: run `bun run site` first');
 const server = Bun.serve({
   port: 0,
+  hostname: '127.0.0.1',
   fetch(req: Request) {
     let p = decodeURIComponent(new URL(req.url).pathname);
     if (p.endsWith('/')) p += 'index.html';
     const f = join(SITE, p);
-    if (!f.startsWith(SITE) || !existsSync(f) || statSync(f).isDirectory()) return new Response('not found', { status: 404 });
+    if (!f.startsWith(SITE + '/') || !existsSync(f) || statSync(f).isDirectory()) return new Response('not found', { status: 404 });
     return new Response(Bun.file(f), { headers: { 'content-type': TYPES[extname(f)] ?? 'application/octet-stream' } });
   },
 });
@@ -59,7 +61,9 @@ class Take {
   /** Advance one frame and record it. */
   async frame() {
     await this.page.evaluate((dt) => (window as any).__vt.step(dt), DT);
-    const { data } = await this.cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 96, optimizeForSpeed: false });
+    // clip.scale = the device scale: without it CDP returns CSS pixels (405×720), not the 4×
+    // frame the GPU rendered, and the video ends up an upscale
+    const { data } = await this.cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 96, clip: { x: 0, y: 0, width: VIEW.width, height: VIEW.height, scale: DSF } });
     const buf = Buffer.from(data, 'base64');
     if (!this.ff.stdin!.write(buf)) await new Promise((r) => this.ff.stdin!.once('drain', r));
     this.f++;
@@ -142,14 +146,14 @@ class Take {
     this.ff.stdin!.end();
     await new Promise<void>((res, rej) => this.ff.on('close', (c) => (c === 0 ? res() : rej(new Error(`ffmpeg ${c}`)))));
     this.log.frames = this.f;
-    const seconds = (this.pre + this.f) * DT / 1000;
+    const seconds = (this.pre + 1 + this.f) * DT / 1000; // frame n shows time (pre + n + 1)·DT
     const b64 = await this.page.evaluate((s) => (window as any).__vt.audio(s), seconds + 0.5);
     const video = join(OUT, `${this.name}.video.mp4`), out = join(OUT, `${this.name}.mp4`);
     if (b64) {
       const wav = join(OUT, `${this.name}.wav`);
       writeFileSync(wav, Buffer.from(b64, 'base64'));
       // the audio timeline starts at the clock freeze; the picture after the warmup frames
-      await run('ffmpeg', ['-v', 'error', '-y', '-i', video, '-ss', String(this.pre * DT / 1000), '-i', wav, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'pcm_s16le', '-shortest', out.replace(/\.mp4$/, '.mov')]);
+      await run('ffmpeg', ['-v', 'error', '-y', '-i', video, '-ss', String((this.pre + 1) * DT / 1000), '-i', wav, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'pcm_s16le', '-shortest', out.replace(/\.mp4$/, '.mov')]);
     } else {
       await run('ffmpeg', ['-v', 'error', '-y', '-i', video, '-c', 'copy', out.replace(/\.mp4$/, '.mov')]);
     }
@@ -223,43 +227,45 @@ const SCENES: Record<string, { setup: Setup; play(t: Take): Promise<void> }> = {
       await t.hold(2.3);
     },
   },
-  // "say meow": at the laptop, drag the cat into view, type meow
+  // "type meow." (the reply, readable up close) → "the cat answers." (glide back, pinch in on
+  // the cat, a second word: the cat reacts)
   cat: {
     setup: { theme: 'light', at: 'laptop' },
     async play(t) {
       await t.hold(0.3);
-      if (VIEW.height / VIEW.width < 1.5) {
-        // squarer screens: the laptop close-up can't pull out far enough, so from the desk view
-        // pinch in on the cat (zoom goes toward the fingers); the terminal keeps its focus
-        const c = await t.project('cat_head');
-        t.mark('pinch');
-        await t.pinch(c.x, c.y + Y(0.03), X(0.12), X(0.5), 1.1);
-        await t.hold(0.3);
-      } else {
-        // zoom out with a pinch and swing left: the cat on the fan comes into view
-        t.mark('pinch');
-        await t.pinch(X(0.494), Y(0.597), X(0.543), X(0.222), 0.9);
-        t.mark('drag');
-        await t.drag(X(0.272), Y(0.653), X(0.617), Y(0.653), 0.8);
-        await t.hold(0.3);
-      }
       t.mark('type');
       await t.type('meow');
       t.mark('meow');
-      await t.hold(2.2);
+      await t.hold(1.0);
+      // back to the desk (focus stays in the terminal, so typing won't fly to the laptop)
+      t.mark('out');
+      await t.page.evaluate(() => (window as any).__scene.world().fly('desk'));
+      await t.hold(1.3);
+      const c = await t.project('cat_head');
+      t.mark('pinch');
+      await t.pinch(c.x, c.y + Y(0.03), X(0.12), X(0.45), 1.0);
+      await t.hold(0.2);
+      t.mark('nya');
+      await t.type('nya');
+      t.mark('react');
+      await t.hold(1.5);
     },
   },
 };
 
 // ---- run ----
 const NV = { __EGL_VENDOR_LIBRARY_FILENAMES: '/usr/share/glvnd/egl_vendor.d/10_nvidia.json', __NV_PRIME_RENDER_OFFLOAD: '1', __GLX_VENDOR_LIBRARY_NAME: 'nvidia' };
-const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=gl-egl', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'], env: { ...process.env, ...NV } as Record<string, string> });
+// the compositor finishes every stage (full-resolution raster included) before a frame is
+// drawn: without this, a frame grabbed right after a clock step shows the low-res tiles
+// Chrome paints first, and scaled text (the pinned screens) comes out soft
+const DETERMINISTIC = ['--run-all-compositor-stages-before-draw', '--disable-low-res-tiling', '--disable-checker-imaging', '--disable-new-content-rendering-timeout', '--disable-threaded-animation', '--disable-threaded-scrolling', '--enable-gpu-rasterization'];
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=gl-egl', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required', ...DETERMINISTIC], env: { ...process.env, ...NV } as Record<string, string> });
 const vt = readFileSync(join(ROOT, 'capture/vt.js'), 'utf8');
 const want = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 try {
   for (const [name, scene] of Object.entries(SCENES)) {
     if (want.length && !want.includes(name)) continue;
-    const ctx = await browser.newContext({ viewport: VIEW, deviceScaleFactor: 4, isMobile: true, hasTouch: true });
+    const ctx = await browser.newContext({ viewport: VIEW, deviceScaleFactor: DSF, isMobile: true, hasTouch: true });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => console.error(`[${name}] pageerror`, e.message));
     await page.addInitScript(vt);
@@ -282,8 +288,6 @@ try {
     if (scene.setup.at === 'laptop') {
       await page.evaluate(() => { const s = (window as any).__scene; s.world().fly('laptop'); });
       await page.evaluate(() => (document.getElementById('term-input') as HTMLInputElement).focus({ preventScroll: true }));
-      // squarer screens start the cat scene from the desk view, focus kept (see the cat scene)
-      if (name === 'cat' && VIEW.height / VIEW.width < 1.5) await page.evaluate(() => (window as any).__scene.world().fly('desk'));
     }
     const pre = WARMUP + (scene.setup.at ? 60 : 0); // (+2 s to arrive at a starting landmark)
     for (let i = 0; i < pre; i++) await page.evaluate((dt) => (window as any).__vt.step(dt), DT);
