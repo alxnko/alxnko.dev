@@ -5,15 +5,32 @@ import { text } from '../../../src/term/format';
 import { setup } from './harness';
 
 describe('Shell.run', () => {
-  it('echoes the prompt and the line, clears input, pushes history', async () => {
+  it('echoes the prompt and the line, pushes history', async () => {
     const { store, shell } = setup();
-    store.setInput('pwd');
     await shell.run('pwd');
     expect(text(store.state.lines[0])).toBe('[alxnko@nitro ~]$ pwd');
     expect(text(store.state.lines[1])).toBe('/home/alxnko');
-    expect(store.state.input).toBe('');
     expect(store.state.history.at(-1)).toBe('pwd');
     expect(store.state.busy).toBe(false);
+  });
+
+  it('never touches the input line itself: the caller owns clearing it', async () => {
+    const { store, shell } = setup();
+    store.setInput('typed alongside the run', 6);
+    await shell.run('pwd');
+    expect(store.state.input).toBe('typed alongside the run');
+    expect(store.state.cursor).toBe(6);
+  });
+
+  it('text typed in the input survives a system-issued run (e.g. the autologin fastfetch)', async () => {
+    const { store, shell } = setup();
+    store.setInput('whoami', 3); // a visitor typing while the autologin's own run() fires
+    await shell.run('fastfetch --compact', { record: false });
+    expect(store.state.input).toBe('whoami');
+    expect(store.state.cursor).toBe(3);
+    // the system run itself still worked normally
+    expect(text(store.state.lines[0])).toBe('[alxnko@nitro ~]$ fastfetch --compact');
+    expect(store.state.history).not.toContain('fastfetch --compact'); // record: false
   });
 
   it('an empty line only echoes the prompt and is not stored in history', async () => {
@@ -94,6 +111,68 @@ describe('Shell.run', () => {
   it('an empty expansion as the command is a no-op', async () => {
     const { out } = setup();
     expect(await out('$NOPE')).toBe('');
+  });
+});
+
+/** Lets a test hold a command "running" until release(), or reject it via the abort signal. */
+function busyCommand() {
+  let release: () => void = () => {};
+  const sleep = (_ms: number, signal: AbortSignal): Promise<void> =>
+    new Promise((res, rej) => {
+      if (signal.aborted) return rej(new Error('aborted'));
+      release = res;
+      signal.addEventListener('abort', () => rej(new Error('aborted')), { once: true });
+    });
+  const harness = setup({ sleep });
+  harness.shell.registry.add({
+    name: 'wait', summary: '', usage: 'wait', group: 'fun', hidden: true,
+    async run(ctx) {
+      await ctx.sleep(999999);
+    },
+  });
+  return { ...harness, release: () => release() };
+}
+
+/** Real timers: gives the fire-and-forget queued run() (Shell.runQueued) a tick to land. */
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe('Shell: queued input (Enter while busy)', () => {
+  it('a queued line runs automatically once the prompt returns, recorded in history, pipes intact', async () => {
+    const { store, shell, release } = busyCommand();
+    const p = shell.run('wait');
+    expect(store.state.busy).toBe(true);
+    store.setQueued('echo a | wc -c');
+    release();
+    await p;
+    await flush();
+    expect(store.state.queued).toBeNull();
+    expect(store.state.busy).toBe(false);
+    expect(store.state.history.at(-1)).toBe('echo a | wc -c');
+    expect(text(store.state.lines.at(-1)!)).toBe('2');
+  });
+
+  it('a later Enter replaces an earlier queued line: only the last one runs', async () => {
+    const { store, shell, release } = busyCommand();
+    const p = shell.run('wait');
+    store.setQueued('echo first');
+    store.setQueued('echo second');
+    release();
+    await p;
+    await flush();
+    expect(store.state.history).not.toContain('echo first');
+    expect(store.state.history.at(-1)).toBe('echo second');
+  });
+
+  it('ctrl+c (interrupt) while busy drops the queued line, like real typeahead after ^C', async () => {
+    const { store, shell } = busyCommand();
+    const p = shell.run('wait');
+    store.setQueued('echo dropped');
+    shell.interrupt(); // aborts `wait`; its sleep rejects via the abort listener
+    await p;
+    await flush();
+    expect(store.state.queued).toBeNull();
+    expect(store.state.history).not.toContain('echo dropped');
+    expect(store.state.lines.map(text).join('\n')).not.toContain('dropped');
   });
 });
 

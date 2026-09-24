@@ -15,7 +15,7 @@ function page() {
   const screen = mk('div', 'term-screen');
   screen.append(mk('div', 'term-lines'), mk('div', 'term-comp'));
   const form = mk('form', 'term-form');
-  form.append(mk('span', 'term-prompt'), mk('div', 'term-mirror'), mk('input', 'term-input'));
+  form.append(mk('span', 'term-announce'), mk('span', 'term-prompt'), mk('div', 'term-mirror'), mk('input', 'term-input'));
   term.append(screen, mk('div', 'term-overlay'), form);
   document.body.replaceChildren(
     mk('button', 't-theme', { 'aria-pressed': 'false' }),
@@ -26,13 +26,14 @@ function page() {
 }
 
 function fakeTerm() {
-  let state: TermState = { lines: [], input: '', cursor: 0, cwd: '/', busy: false, history: [], overlay: null, monitor: null, version: 0 };
+  let state: TermState = { lines: [], input: '', cursor: 0, cwd: '/', busy: false, queued: null, history: [], overlay: null, monitor: null, version: 0 };
   const subs = new Set<(s: TermState) => void>();
   return {
     store: {
       get state() { return state; },
       subscribe(f: (s: TermState) => void) { subs.add(f); return () => subs.delete(f); },
       setInput(text: string, cursor = text.length) { state = { ...state, input: text, cursor, version: state.version + 1 }; subs.forEach((f) => f(state)); },
+      setQueued(line: string | null) { state = { ...state, queued: line, version: state.version + 1 }; subs.forEach((f) => f(state)); },
       prompt: () => [{ text: '$ ' }],
     },
     run: vi.fn(async () => {}),

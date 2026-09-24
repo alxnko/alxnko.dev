@@ -8,6 +8,7 @@ export interface TermDeps {
     readonly state: TermState;
     subscribe(fn: (s: TermState) => void): () => void;
     setInput(text: string, cursor?: number): void;
+    setQueued(line: string | null): void;
     prompt(): Line;
   };
   run(line: string): Promise<void>;
@@ -154,6 +155,7 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
   const overlay = need<HTMLElement>('#term-overlay');
   const form = need<HTMLFormElement>('#term-form');
   const promptEl = need<HTMLElement>('#term-prompt');
+  const announce = need<HTMLElement>('#term-announce');
   const mirror = need<HTMLElement>('#term-mirror');
   const input = need<HTMLInputElement>('#term-input');
   const chipsEl = root.querySelector<HTMLElement>('#term-chips');
@@ -173,6 +175,7 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
   let stick = true;
   let promptKey = '';
   let lastVersion = -1;
+  let wasQueued = false;
 
   // History walk.
   let histIdx = -1;
@@ -232,7 +235,12 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
       input.setSelectionRange(s.cursor, s.cursor);
     }
     setPrompt(store.prompt());
-    setMirror(s.input, s.cursor);
+    // a queued line (Enter pressed while busy) shows muted, with a hint, until it's replaced,
+    // dropped (^C) or run; typing a fresh draft over it shows normally, same as any other input
+    const showQueued = s.queued !== null && !s.input;
+    mirror.classList.toggle('queued', showQueued);
+    if (showQueued) setMirror(s.queued!, s.queued!.length);
+    else setMirror(s.input, s.cursor);
   }
 
   function syncOverlay(s: TermState) {
@@ -272,6 +280,19 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
     }));
   }
 
+  /**
+   * A line becoming queued (Enter while busy) is announced once, for screen readers: the hint
+   * text in the mirror is `aria-hidden`. Replacing an already-queued line doesn't re-announce
+   * (only the null → non-null edge does); running or dropping it says nothing extra - its
+   * output (or ^C) already reaches the log.
+   */
+  function syncQueueAnnounce(s: TermState) {
+    const isQueued = s.queued !== null;
+    if (isQueued && !wasQueued) announce.textContent = 'command queued';
+    else if (!isQueued && wasQueued) announce.textContent = '';
+    wasQueued = isQueued;
+  }
+
   function render(s: TermState) {
     if (s.version === lastVersion) return;
     lastVersion = s.version;
@@ -279,6 +300,7 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
     syncOverlay(s);
     form.dataset.busy = s.busy ? 'true' : 'false';
     syncInput(s);
+    syncQueueAnnounce(s);
     syncChips(s);
     if (stick) screen.scrollTop = screen.scrollHeight;
   }
@@ -380,6 +402,13 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
     edit('', 0);
     void deps.run(line);
   }
+  /** Enter while busy: at most one pending line (a later Enter replaces it); ^C drops it. */
+  function queueEnter(line: string) {
+    histIdx = -1;
+    hideComp();
+    edit('', 0);
+    store.setQueued(line);
+  }
   function histWalk(dir: -1 | 1) {
     const h = store.state.history;
     if (!h.length) return;
@@ -465,7 +494,7 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
       return;
     }
     switch (e.key) {
-      case 'Enter': e.preventDefault(); if (!s.busy) submit(text); return;
+      case 'Enter': e.preventDefault(); if (s.busy) queueEnter(text); else submit(text); return;
       case 'Tab': if (!e.shiftKey) tab(e); return;
       case 'ArrowUp': e.preventDefault(); histWalk(-1); return;
       case 'ArrowDown': e.preventDefault(); histWalk(1); return;
@@ -503,8 +532,10 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
   }
   function onSubmit(e: Event) {
     e.preventDefault();
+    if (toyMode()) return; // the toy owns the tty; a virtual "send" key is not a queued line
     if (searching) { endSearch(match || saved, Boolean(match)); return; }
-    if (!store.state.busy) submit(store.state.input);
+    const s = store.state;
+    if (s.busy) queueEnter(s.input); else submit(s.input);
   }
   function onScroll() { stick = atBottom(); }
   function onFocus() { deps.onFocus?.(); }

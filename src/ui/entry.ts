@@ -204,9 +204,9 @@ function enter3d() {
           store.print([{ text: 'desk: ' }, { text: `${Math.round(h * 100)} cm`, fg: 'white' }]);
         },
         onPaddle(key) {
-          // the paddle is just another way to type `desk N`: the terminal shows it too
-          const { input, cursor } = store.state; // a half-typed line survives the press
-          void shell.run(`desk ${key}`).then(() => store.setInput(input, cursor));
+          // the paddle is just another way to type `desk N`: the terminal shows it too.
+          // Shell.run() never touches the input line, so a half-typed line survives the press.
+          void shell.run(`desk ${key}`);
         },
         onAway(away) {
           const b = $('back');

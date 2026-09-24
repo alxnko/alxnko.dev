@@ -31,7 +31,7 @@ function fixture(): HTMLElement {
   const form = el('form', 'term-form');
   const field = el('div');
   field.append(el('div', 'term-mirror'), el('input', 'term-input'));
-  form.append(el('span', 'term-prompt'), field);
+  form.append(el('span', 'term-announce', { 'aria-live': 'polite' }), el('span', 'term-prompt'), field);
   root.append(view, chips, form);
   document.body.append(root);
   return root;
@@ -40,7 +40,7 @@ function fixture(): HTMLElement {
 function fakeDeps(init: Partial<TermState> = {}) {
   const subs = new Set<(s: TermState) => void>();
   let state: TermState = {
-    lines: [], input: '', cursor: 0, cwd: '/home/alxnko', busy: false,
+    lines: [], input: '', cursor: 0, cwd: '/home/alxnko', busy: false, queued: null,
     history: [], overlay: null, monitor: null, version: 1, ...init,
   };
   const emit = () => subs.forEach((f) => f(state));
@@ -52,6 +52,7 @@ function fakeDeps(init: Partial<TermState> = {}) {
     get state() { return state; },
     subscribe(fn: (s: TermState) => void) { subs.add(fn); return () => subs.delete(fn); },
     setInput: vi.fn((text: string, cursor = text.length) => update({ input: text, cursor })),
+    setQueued: vi.fn((line: string | null) => update({ queued: line })),
     prompt: (): Line => [{ text: '[alxnko@nitro ', fg: 'green' }, { text: '~' }, { text: ']$ ' }],
   };
   const deps = {
@@ -264,6 +265,90 @@ describe('terminal-dom keyboard', () => {
     root.querySelector('#term-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     expect(f.deps.run).toHaveBeenCalledTimes(1);
     expect(f.deps.run).toHaveBeenCalledWith('help');
+  });
+
+  it('Enter while busy queues the line instead of swallowing it: input clears, run() waits', () => {
+    const f = fakeDeps({ busy: true });
+    handle = mountTerminal(root, f.deps);
+    type(input, 'whoami');
+    const e = key(input, 'Enter');
+    expect(e.defaultPrevented).toBe(true);
+    expect(f.deps.run).not.toHaveBeenCalled();
+    expect(f.state.queued).toBe('whoami');
+    expect(f.state.input).toBe('');
+    expect(input.value).toBe('');
+    // shown muted with a hint, in place of the (now empty) input
+    const mirror = root.querySelector('#term-mirror')!;
+    expect(mirror.classList.contains('queued')).toBe(true);
+    expect(mirror.textContent).toContain('whoami');
+  });
+
+  it('a second Enter while still busy replaces the queued line', () => {
+    const f = fakeDeps({ busy: true });
+    handle = mountTerminal(root, f.deps);
+    type(input, 'ls');
+    key(input, 'Enter');
+    expect(f.state.queued).toBe('ls');
+    type(input, 'pwd');
+    key(input, 'Enter');
+    expect(f.state.queued).toBe('pwd');
+    expect(f.deps.run).not.toHaveBeenCalled();
+  });
+
+  it('announces "command queued" once to screen readers; a replacement or a run/drop stays quiet', () => {
+    const f = fakeDeps({ busy: true });
+    handle = mountTerminal(root, f.deps);
+    const announce = root.querySelector('#term-announce')!;
+    expect(announce.textContent).toBe('');
+    type(input, 'ls');
+    key(input, 'Enter');
+    expect(announce.textContent).toBe('command queued');
+    // a later Enter replaces the queued line: no second announcement
+    type(input, 'pwd');
+    key(input, 'Enter');
+    expect(f.state.queued).toBe('pwd');
+    expect(announce.textContent).toBe('command queued');
+    // busy ends (it ran, or ^C dropped it): nothing extra is announced, the live region clears
+    f.update({ busy: false, queued: null });
+    expect(announce.textContent).toBe('');
+    // queuing again afterwards announces fresh
+    f.update({ busy: true });
+    type(input, 'whoami');
+    key(input, 'Enter');
+    expect(announce.textContent).toBe('command queued');
+  });
+
+  it('typing a fresh draft after queueing shows normally, not muted', () => {
+    const f = fakeDeps({ busy: true });
+    handle = mountTerminal(root, f.deps);
+    type(input, 'ls');
+    key(input, 'Enter');
+    const mirror = root.querySelector('#term-mirror')!;
+    expect(mirror.classList.contains('queued')).toBe(true);
+    type(input, 'p');
+    expect(mirror.classList.contains('queued')).toBe(false);
+    expect(mirror.textContent).toContain('p');
+  });
+
+  it('form submit while busy (mobile send key) also queues, not runs', () => {
+    const f = fakeDeps({ busy: true });
+    handle = mountTerminal(root, f.deps);
+    type(input, 'help');
+    root.querySelector('#term-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(f.deps.run).not.toHaveBeenCalled();
+    expect(f.state.queued).toBe('help');
+    expect(f.state.input).toBe('');
+  });
+
+  it('once busy ends, the queued line is the caller\'s job (store.state.queued) to run', () => {
+    // terminal-dom only records the queue; Shell (exec.ts) drains it — see exec.test.ts.
+    const f = fakeDeps({ busy: true });
+    handle = mountTerminal(root, f.deps);
+    type(input, 'whoami');
+    key(input, 'Enter');
+    expect(f.state.queued).toBe('whoami');
+    f.update({ busy: false }); // a real store would also clear `queued` itself (Shell.done)
+    expect(f.deps.run).not.toHaveBeenCalled(); // terminal-dom never auto-runs it
   });
 
   it('ArrowUp/ArrowDown walk history and restore the draft', () => {
