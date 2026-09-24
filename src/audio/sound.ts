@@ -125,10 +125,10 @@ export function createSound(): Sound {
       o.start(t);
       return () => {
         if (!ctx) return;
+        // glide down from wherever the ramp is (reading .value mid-automation is unreliable)
         const e = ctx.currentTime;
         g.gain.cancelScheduledValues(e);
-        g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), e);
-        g.gain.exponentialRampToValueAtTime(0.0001, e + 0.15);
+        g.gain.setTargetAtTime(0.0001, e, 0.04);
         o.stop(e + 0.2);
       };
     },

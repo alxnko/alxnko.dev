@@ -1,0 +1,36 @@
+{
+  "name": "alxnko-story",
+  "version": "1.0.0",
+  "description": "Instagram story (9:16) for alxnko.dev: Blender hook + frame-exact site capture + Remotion edit",
+  "repository": {},
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.527",
+    "@remotion/fonts": "4.0.527",
+    "@remotion/media": "4.0.527",
+    "@remotion/transitions": "4.0.527",
+    "playwright": "^1.63.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.527"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.527",
+    "@types/bun": "^1.4.2",
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "eslint": "9.19.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "video": "bash scripts/video.sh",
+    "site": "bash scripts/site.sh",
+    "capture": "bun capture/capture.ts",
+    "hook": "bash scripts/hook.sh",
+    "studio": "remotion studio",
+    "render": "bash scripts/render.sh",
+    "lint": "tsc --noEmit"
+  }
+}
