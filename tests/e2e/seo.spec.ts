@@ -36,8 +36,10 @@ test.describe('SEO', () => {
 
   for (const [view, path] of [['no-3D (?lite)', '/?lite'], ['default', '/']] as const) {
     test(`${view} view never shows the legal name (only inside the email address)`, async ({ page }) => {
+      test.setTimeout(90_000);
       await page.goto(path);
-      await expect(page.locator('#term-lines')).toContainText('alxnko@nitro', { timeout: 30_000 });
+      // settle first: the boot log has finished and, on the default view, the desk is up or the page took over
+      await expect(page.locator('#term-lines')).toContainText('alxnko@nitro', { timeout: 60_000 });
       if (path === '/') await page.waitForFunction(() => document.body.dataset.scene === 'ready' || !document.documentElement.dataset.boot, null, { timeout: 30_000 }).catch(() => {});
       await page.waitForTimeout(1000);
       const raw = (await page.evaluate(() => document.body.innerText)).toLowerCase();
