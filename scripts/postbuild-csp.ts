@@ -2,11 +2,12 @@
 // CSP (spec §7.3) into dist/_headers in place of the `__CSP__` placeholder.
 // No 'unsafe-inline', no third-party origin. 'wasm-unsafe-eval' is only for the meshopt decoder.
 // Trusted Types (every DOM script sink needs a trusted value, no policy may exist; the site and
-// three.js write no HTML or script strings) ship REPORT-ONLY by default, in a
-// Content-Security-Policy-Report-Only header: Cloudflare's email obfuscation, if it ignores the
-// <!--email_off--> markers, injects a decoder that writes innerHTML, and enforcing would then
-// break the email link (R78, R83). `CSP_TT=enforce` moves them into the enforced policy, the
-// one-line follow-up once production shows no email-decode.min.js.
+// three.js write no HTML or script strings) are ENFORCED by default (R78, R83, R85): production
+// was verified to have no Cloudflare `email-decode.min.js` (email addresses stay inside
+// `<!--email_off-->` markers, R79), so there is no injected innerHTML write left to break.
+// `CSP_TT=report` is kept as an escape hatch, staging Trusted Types report-only instead via a
+// Content-Security-Policy-Report-Only header, with no Trusted Types directives in the enforced
+// policy, if that ever needs to be reverted.
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -67,7 +68,7 @@ function walk(dir: string): string[] {
   });
 }
 
-export function run(dist: string, tt: 'enforce' | 'report' = 'report'): string {
+export function run(dist: string, tt: 'enforce' | 'report' = 'enforce'): string {
   const files = walk(dist).filter((f) => /\.(html|svg)$/.test(f));
   const docs = files.map((f) => readFileSync(f, 'utf8'));
   const withAttrs = files.filter((_, i) => files[i].endsWith('.html') && styleAttrs(docs[i]) > 0);
@@ -84,6 +85,6 @@ export function run(dist: string, tt: 'enforce' | 'report' = 'report'): string {
 
 if (import.meta.main) {
   const dist = new URL('../dist', import.meta.url).pathname;
-  const csp = run(dist, process.env.CSP_TT === 'enforce' ? 'enforce' : 'report');
+  const csp = run(dist, process.env.CSP_TT === 'report' ? 'report' : 'enforce');
   console.log(`csp: ${csp.length} chars, ${(csp.match(/sha256-/g) ?? []).length} hashes → dist/_headers`);
 }

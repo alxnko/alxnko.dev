@@ -409,10 +409,13 @@ The DOM contacts panel docks over it with real links.
   frame-ancestors 'none'; upgrade-insecure-requests`.
   - There is no `'unsafe-inline'` and no third-party origin.
   - `'wasm-unsafe-eval'` is needed only for the meshopt decoder.
-  - Trusted Types (R78, R83): `require-trusted-types-for 'script'; trusted-types 'none'` ships
-    in a `Content-Security-Policy-Report-Only` header until production shows no Cloudflare
-    `email-decode.min.js`; `CSP_TT=enforce` then moves it into the enforced policy. Nothing in
-    the site or three.js writes HTML or script strings.
+  - Trusted Types (R78, R83, R85): `require-trusted-types-for 'script'; trusted-types 'none'`
+    ships enforced, in the CSP itself, by default. Production was verified to carry no
+    Cloudflare `email-decode.min.js` (email addresses stay inside `<!--email_off-->` markers,
+    R79), so there is no injected `innerHTML` write left for Trusted Types to break.
+    `CSP_TT=report` is an escape hatch: it stages Trusted Types report-only again, in a
+    `Content-Security-Policy-Report-Only` header, with no Trusted Types directives in the
+    enforced policy. Nothing in the site or three.js writes HTML or script strings.
   - Every stylesheet is inlined (`build.inlineStylesheets: 'always'`) and hashed.
   - Email addresses in page bodies sit inside `<!--email_off-->` markers, so Cloudflare
     never injects its `email-decode` script (which writes `innerHTML`, R79).
