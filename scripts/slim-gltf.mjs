@@ -5,6 +5,13 @@
 // the bundler then drops their classes. Quantization and unlit are handled by the loader core.
 // tests/unit/scene-assets.test.ts checks the glb needs nothing outside KEEP.
 
+/**
+ * The glTF extensions the slimmed loader still reads: meshopt (the kept plugin), quantization
+ * and unlit (the loader core). A glb that uses anything else must not load half-parsed: the
+ * scene's build() refuses it (and the page takes over), and a unit test checks the committed glb.
+ */
+export const SUPPORTED_EXTENSIONS = ['EXT_meshopt_compression', 'KHR_mesh_quantization', 'KHR_materials_unlit'];
+
 /** Plugin classes kept (the rest are unregistered). */
 export const KEEP = ['GLTFMeshoptCompression'];
 

@@ -158,8 +158,14 @@ function enter3d() {
         contactsEl,
         infoEl: $('mon-info') ?? undefined,
         onLandmark(l) {
+          const from = document.activeElement;
           document.body.dataset.view = l; // scene.css: only the screen you're at is selectable
           syncMonitorLinks();
+          // arrived by keyboard (the contacts' tab stop, or the nav's monitor button): focus
+          // goes on to the first contact, which is live now
+          if (l === 'monitor' && (from === $('contacts') || (from as HTMLElement | null)?.dataset?.landmark === 'monitor')) {
+            document.querySelector<HTMLElement>('#contacts a')?.focus({ preventScroll: true });
+          }
           for (const b of document.querySelectorAll<HTMLButtonElement>('#nav [data-landmark]')) {
             if (b.dataset.landmark === l) b.setAttribute('aria-current', 'true');
             else b.removeAttribute('aria-current');
@@ -237,6 +243,9 @@ function enter3d() {
 let handle3d: { destroy(): void } | null = null;
 let stopMotor: (() => void) | null = null;
 function leave3d() {
+  // a <head> probe context the desk never took (the chunk failed to load, or the boot timed
+  // out first) is released now rather than whenever it is collected
+  takeProbe()?.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
   handle3d?.destroy();
   handle3d = null;
   world.scene = null;
@@ -407,6 +416,7 @@ const nudge = () => {
 // on the monitor itself and the pinned panels step aside (scene.css, [data-rain])
 const wallEl = $('contacts-rain');
 const wall = wallEl ? new FrameView(wallEl) : null;
+const contactsEl = $('contacts');
 const contactList = document.querySelector<HTMLElement>('#contacts ul');
 const infoList = document.querySelector<HTMLElement>('#mon-info dl');
 /**
@@ -423,6 +433,21 @@ function syncMonitorLinks() {
     el.inert = off;
     if (off) el.setAttribute('aria-hidden', 'true');
     else el.removeAttribute('aria-hidden');
+  }
+  // while its links are out of reach in 3D, the contacts panel itself is one tab stop that
+  // says what it does (focusing it flies to the monitor, see the focusin handler below), so
+  // the keyboard and screen readers still get to the contacts
+  if (!contactsEl) return;
+  const stop = off && b.mode === 'scene' && b.rain === undefined;
+  if (stop === (contactsEl.getAttribute('tabindex') === '0')) return;
+  if (stop) {
+    contactsEl.tabIndex = 0;
+    contactsEl.setAttribute('aria-label', 'contacts: show them on the monitor');
+    contactsEl.removeAttribute('aria-labelledby');
+  } else {
+    contactsEl.removeAttribute('tabindex');
+    contactsEl.removeAttribute('aria-label');
+    contactsEl.setAttribute('aria-labelledby', 'contacts-h');
   }
 }
 store.subscribe((s) => {

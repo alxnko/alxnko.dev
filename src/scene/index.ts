@@ -16,7 +16,7 @@ import { catStep, constrainGaze, clamp, easeOut, frameInterval, nextFlickIn, SPI
 import { attachInput } from './input';
 import { Dock } from './dock';
 import { resolveTarget, type Named } from './pick';
-import { watchMonitor, yieldToMain } from './phases';
+import { unsupportedExtensions, watchMonitor, yieldToMain } from './phases';
 import { isSoftwareRenderer } from './gate';
 import type { Line, TermState } from '../term/types';
 
@@ -243,6 +243,10 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     }).then((g) => { step('geometry', 'ok'); return g; }),
     atlas(themeKey(o.initial.theme)).then((t) => { step('lighting', 'ok'); return t; }),
   ]);
+  // the loader is slimmed to the extensions the desk uses: a glb needing more would load half
+  // parsed, so refuse it (the boot then falls back to the page)
+  const unsupported = unsupportedExtensions(gltf.parser.json as { extensionsUsed?: string[] });
+  if (unsupported.length) throw new Error(`glb needs unsupported glTF extensions: ${unsupported.join(', ')}`);
   o.onProgress?.(0.8);
   step('screens', 'run');
   // the mount runs as a few short tasks, not one long one: input and paint get in between
@@ -634,7 +638,17 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
 
   // ---------- render loop ----------
   let raf = 0, timer = 0, last = performance.now();
-  undo.push(() => { disposed = true; cancelAnimationFrame(raf); clearTimeout(timer); });
+  // the monitor clock: when no frames run (reduced motion, or a GPU-less still view), a timer
+  // wakes at each minute boundary and redraws only if the shown minute is really out of date
+  let clockTimer = 0;
+  const tickClock = () => {
+    clockTimer = window.setTimeout(() => {
+      if (disposed) return;
+      if (monitor.stale()) invalidate();
+      tickClock();
+    }, 60_000 - (Date.now() % 60_000) + 50);
+  };
+  undo.push(() => { disposed = true; cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(clockTimer); });
   const frameTimes: number[] = [];
   let slept = -1; // ms this frame was deliberately delayed by (-1: it was not scheduled as a paced frame)
   const hidden = () => document.visibilityState === 'hidden';
@@ -1130,6 +1144,8 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   // the monitor's canvas is drawn in the site font (before its first upload below)
   await document.fonts?.load('400 24px "JetBrains Mono"').catch(() => {});
   monitor.update();
+  // the loader's bar keeps moving through the tail: 0.8 → 0.98, then 1 with the first frame
+  const tailStep = (k: number) => o.onProgress?.(0.8 + 0.18 * k);
   await yieldToMain();
   // shaders: linked in parallel where the driver can (KHR_parallel_shader_compile), then each
   // program's link status and uniforms read in a task of its own. The invisible hit targets
@@ -1140,6 +1156,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const compiled = renderer.extensions.has('KHR_parallel_shader_compile') ? renderer.compileAsync(scene, camera) : renderer.compile(scene, camera);
   hitMeshes.forEach((m, i) => (m.material = hitMats[i]));
   await compiled;
+  tailStep(0.3);
   await yieldToMain();
   const programs = new Set<{ getUniforms(): unknown }>();
   scene.traverse((c) => {
@@ -1147,14 +1164,17 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     const p = m && !Array.isArray(m) ? (renderer.properties.get(m) as { currentProgram?: { getUniforms(): unknown } }).currentProgram : undefined;
     if (p) programs.add(p);
   });
+  let pi = 0;
   for (const p of programs) {
     p.getUniforms();
+    tailStep(0.3 + (0.25 * ++pi) / programs.size);
     await yieldToMain();
   }
   // texture uploads, one per task (the atlas, then the 2048×858 monitor canvas)
-  for (const t of [firstAtlas, monitor.texture, fanReadout?.texture]) {
-    if (!t) continue;
+  const uploads = [firstAtlas, monitor.texture, fanReadout?.texture].filter((t): t is Texture => !!t);
+  for (const [i, t] of uploads.entries()) {
     renderer.initTexture(t);
+    tailStep(0.55 + (0.25 * (i + 1)) / uploads.length);
     await yieldToMain();
   }
   // Warm-up while the canvas is still off the page: one draw of the whole view clipped to a
@@ -1173,7 +1193,9 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     renderer.setScissorTest(true);
     renderer.render(scene, camera);
     renderer.setScissorTest(false);
+    tailStep(0.9);
     await gpuDone(renderer.getContext() as WebGL2RenderingContext);
+    tailStep(1);
   }
   // first frame, then reveal (the app fades the poster out). Drawn directly, not in a rAF: a
   // covered or background window gets no animation frames, and the desk must still finish
@@ -1181,6 +1203,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   o.stage.after(canvas); // above the pinned screens (they show through its windows)
   drawing = true;
   frame(performance.now());
+  tickClock();
   step('screens', 'ok');
   o.onProgress?.(1);
   idleViews();
@@ -1198,6 +1221,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       disposed = true;
       cancelAnimationFrame(raf);
       clearTimeout(timer);
+      clearTimeout(clockTimer);
       detachInput();
       dock.destroy();
       removeEventListener('resize', onResize);

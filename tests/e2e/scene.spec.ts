@@ -1,4 +1,4 @@
-import { chromium, expect, test } from '@playwright/test';
+import { chromium, expect, test, type Page } from '@playwright/test';
 import { expectRain, guard, rainView, run } from './helpers';
 
 test.describe('3D desk', () => {
@@ -316,6 +316,10 @@ test.describe('3D desk', () => {
   });
 });
 
+/** The camera has landed on `l` and nothing is left to animate (the flight spring is done). */
+const landed = (page: Page, l: string) =>
+  expect.poll(() => page.evaluate((l) => { const s = (window as any).__scene; return s.dest() === l && s.flight.value === 1; }, l), { timeout: 15_000 }).toBe(true);
+
 test.describe('3D desk: load and redraw cost', () => {
   test.setTimeout(60_000);
 
@@ -342,7 +346,7 @@ test.describe('3D desk: load and redraw cost', () => {
       return (await renders()) - a;
     };
     await page.locator('#nav [data-landmark="laptop"]').click();
-    await page.waitForTimeout(1500);
+    await landed(page, 'laptop');
     await run(page, 'cmatrix'); // 12 frames a second of terminal output, on the laptop only
     await expect(page.locator('#term-overlay')).toBeVisible({ timeout: 10_000 });
     // once the flight, the cat's glance at the typing and the sharp settle are over, the
@@ -353,8 +357,10 @@ test.describe('3D desk: load and redraw cost', () => {
     await page.keyboard.press('Control+c');
     await run(page, 'cmatrix --both'); // the rain is drawn into the monitor's texture
     await expect(page.locator('body')).toHaveAttribute('data-rain', '');
-    await page.waitForTimeout(6000); // the same settling time
-    expect(await rendersOver(2000)).toBeGreaterThanOrEqual(3); // (12 fps, fewer on a busy CPU)
+    // the rain keeps drawing into the monitor's texture: frames keep coming, long after any
+    // settle (12 fps, fewer on a busy CPU)
+    await expect.poll(() => rendersOver(2000), { timeout: 30_000, intervals: [250] }).toBeGreaterThanOrEqual(3);
+    expect(await rendersOver(2000)).toBeGreaterThanOrEqual(3);
     await page.keyboard.press('Control+c');
     await expect(page.locator('body')).not.toHaveAttribute('data-rain', '');
   });
@@ -385,7 +391,8 @@ test.describe('3D desk: load and redraw cost', () => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
     await page.locator('#nav [data-landmark="monitor"]').tap();
-    await page.waitForTimeout(2000);
+    await landed(page, 'monitor');
+    await expect(page.locator('#contacts')).toHaveAttribute('data-dock', 'screen');
     const boxes = await page.locator('#contacts a').evaluateAll((as) => as.map((a) => a.getBoundingClientRect().toJSON() as DOMRect));
     expect(boxes.length).toBe(5);
     for (const [i, b] of boxes.entries()) {
@@ -393,6 +400,91 @@ test.describe('3D desk: load and redraw cost', () => {
       expect(b.width).toBeGreaterThanOrEqual(200);
       if (i) expect(b.top).toBeGreaterThanOrEqual(boxes[i - 1].bottom - 1); // no overlap
     }
+  });
+
+  test('keyboard: Tab from the terminal reaches the contacts, through a named tab stop', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    const section = page.locator('#contacts');
+    // at the desk the list is inert, and the panel is one tab stop with a meaningful name
+    await expect(section).toHaveAttribute('tabindex', '0');
+    await expect(page.getByRole('region', { name: 'contacts: show them on the monitor' })).toHaveCount(1);
+    await page.locator('#term-input').focus();
+    let reached = '';
+    for (let i = 0; i < 40 && !reached; i++) {
+      await page.keyboard.press('Tab');
+      reached = await page.evaluate(() => (document.activeElement?.closest('#contacts a') as HTMLElement | null)?.dataset.contact ?? '');
+      // landing on the panel flies to the monitor and hands focus to the first link
+      if (!reached && (await page.evaluate(() => document.activeElement?.id)) === 'contacts') {
+        await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.contact ?? '')).toBe('github');
+        reached = 'github';
+      }
+    }
+    expect(reached).toBe('github');
+    await landed(page, 'monitor');
+    // at the monitor the list is live and the panel is no tab stop, named by its heading again
+    await expect(section).not.toHaveAttribute('tabindex', /.*/);
+    await expect(page.getByRole('region', { name: 'contacts' })).toHaveCount(1);
+    await expect(section.getByRole('link', { name: /github/ })).toBeVisible();
+  });
+
+  test('keyboard: the nav monitor button hands focus to the first contact', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await page.locator('#nav [data-landmark="monitor"]').focus();
+    await page.keyboard.press('Enter');
+    await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.contact ?? '')).toBe('github');
+  });
+
+  test('one GL context: the desk renders with the <head> probe context when its attributes fit', async ({ page }) => {
+    await page.addInitScript(() => {
+      const get = HTMLCanvasElement.prototype.getContext;
+      (window as any).__gls = [];
+      HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, t: string, a?: unknown) {
+        const c = (get as any).call(this, t, a);
+        if (t === 'webgl2' && c && !(window as any).__gls.includes(c)) (window as any).__gls.push(c);
+        return c;
+      } as any;
+    });
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    const r = await page.evaluate(() => {
+      const gls = (window as any).__gls as WebGL2RenderingContext[];
+      const s = (window as any).__scene, gl = s.renderer.getContext();
+      const probe = gls[0];
+      const want = !/swiftshader|llvmpipe|softpipe|software|basic render/i.test(String(gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info')!.UNMASKED_RENDERER_WEBGL))) && devicePixelRatio < 2;
+      return {
+        // (a released probe context reports no attributes: it did not fit)
+        fits: !probe.isContextLost() && probe.getContextAttributes()?.antialias === want,
+        same: s.renderer.domElement === probe.canvas,
+        probeLost: probe.isContextLost(),
+        live: gls.filter((g) => !g.isContextLost()).length,
+      };
+    });
+    if (r.fits) expect(r.same).toBe(true); // (on the CPU at DPR ≥ 2, e.g. the Pixel 7 project)
+    else {
+      expect(r.same).toBe(false); // attributes differ (CPU at DPR 1: no MSAA wanted): a fresh context
+      expect(r.probeLost).toBe(true); // and the probe's is released, not left alive
+    }
+    expect(r.live).toBe(1);
+  });
+
+  test('one frame loop: at most one render per animation frame', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await page.evaluate(() => {
+      const r = (window as any).__scene.renderer, draw = r.render.bind(r);
+      r.frames = [];
+      r.render = (...a: unknown[]) => { r.frames.push(document.timeline.currentTime); return draw(...a); };
+    });
+    // a flight keeps frames coming; every rAF callback of one frame shares its timeline time
+    for (const l of ['laptop', 'monitor', 'desk']) {
+      await page.locator(`#nav [data-landmark="${l}"]`).click();
+      await landed(page, l);
+    }
+    const frames: number[] = await page.evaluate(() => (window as any).__scene.renderer.frames);
+    expect(frames.length).toBeGreaterThan(10);
+    expect(frames.length - new Set(frames).size).toBe(0);
   });
 
   test('the desk poster is the loader backdrop while the 3D boots, then the live desk replaces it', async ({ page }) => {

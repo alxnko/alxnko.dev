@@ -51,7 +51,7 @@ describe('postbuild CSP', () => {
     expect(buildCsp([html], { trustedTypes: false })).not.toMatch(/trusted-types/);
   });
 
-  it('can stage Trusted Types report-only, keeping the enforced policy otherwise equal', () => {
+  it('ships Trusted Types report-only by default; CSP_TT=enforce enforces them (R83)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'csp-'));
     try {
       const put = () => {
@@ -59,10 +59,10 @@ describe('postbuild CSP', () => {
         writeFileSync(join(dir, '_headers'), '/*\n  Content-Security-Policy: __CSP__\n');
       };
       put();
-      const enforced = run(dir);
+      const enforced = run(dir, 'enforce');
       expect(readFileSync(join(dir, '_headers'), 'utf8')).not.toContain('Report-Only');
       put();
-      const staged = run(dir, 'report');
+      const staged = run(dir);
       const h = readFileSync(join(dir, '_headers'), 'utf8');
       expect(staged).toBe(buildCsp([html], { trustedTypes: false }));
       expect(enforced).toBe(csp);

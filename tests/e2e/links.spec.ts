@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { CONTACTS } from '../../src/content/site';
 
 // Every short link (shared in bios, cards, QR codes) lands on the right contact. The server
@@ -45,14 +46,21 @@ test.describe('short links', () => {
 });
 
 // Cloudflare's email obfuscation would rewrite the address into a span decoded by a script
-// that writes innerHTML (refused under Trusted Types): every address in a page body sits inside
-// <!--email_off--> … <!--/email_off-->, which Cloudflare leaves alone (R79).
-test('every email address in a page body is marked email_off', async ({ request }) => {
-  for (const path of ['/', '/email', '/mail']) {
-    const html = await (await request.get(path)).text();
+// that writes innerHTML (refused under Trusted Types): every address in a page body, on every
+// built page (404 included), sits inside <!--email_off--> … <!--/email_off-->, which Cloudflare
+// leaves alone (R79).
+test('every email address in a page body is marked email_off', () => {
+  const dist = new URL('../../dist/', import.meta.url).pathname;
+  const pages = (readdirSync(dist, { recursive: true }) as string[]).filter((f) => f.endsWith('.html'));
+  expect(pages).toContain('404.html');
+  expect(pages).toContain('index.html');
+  let seen = 0;
+  for (const f of pages) {
+    const html = readFileSync(join(dist, f), 'utf8');
     const body = html.slice(html.indexOf('<body')).replace(/<script\b[\s\S]*?<\/script>/g, '');
     const outside = body.replace(/<!--email_off-->[\s\S]*?<!--\/email_off-->/g, '');
-    expect(body, path).toMatch(/@gmail\.com/);
-    expect(outside, path).not.toMatch(/@gmail\.com/);
+    expect(outside, f).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.]+/);
+    if (/@gmail\.com/.test(body)) seen++;
   }
+  expect(seen).toBeGreaterThanOrEqual(3); // the home page, /email and /mail
 });

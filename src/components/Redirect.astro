@@ -38,7 +38,7 @@ const { target, title } = Astro.props;
   </style>
 </head>
 <body>
-  <!-- the markers below keep Cloudflare from obfuscating the address (no email-decode script, R79) -->
+  {/* the markers below keep Cloudflare from obfuscating the address (no email-decode script, R79) */}
   <!--email_off--><p>redirecting: {title}<br /><a href={target}>{target}</a></p><!--/email_off-->
   <script define:vars={{ target }}>
     window.location.replace(target);

@@ -1,5 +1,7 @@
 // Small, pure helpers the desk's mount and store wiring use (unit-tested without WebGL).
 import type { TermState } from '../term/types';
+// (the build helper's one constant: the bundler drops the Vite plugin around it)
+import { SUPPORTED_EXTENSIONS } from '../../scripts/slim-gltf.mjs';
 
 /**
  * The only terminal state the 3D draws itself: cmatrix --both's frames on the monitor. The
@@ -28,4 +30,12 @@ export function yieldToMain(g: { scheduler?: Sched; setTimeout: (f: () => void, 
   const y = g.scheduler?.yield;
   if (typeof y === 'function') return y.call(g.scheduler);
   return new Promise((r) => { g.setTimeout(r, 0); });
+}
+
+/**
+ * The glTF extensions a glb uses that the slimmed GLTFLoader (scripts/slim-gltf.mjs) no longer
+ * reads. Anything here would load silently wrong, so the scene refuses the file instead.
+ */
+export function unsupportedExtensions(json: { extensionsUsed?: string[] }): string[] {
+  return (json.extensionsUsed ?? []).filter((e) => !(SUPPORTED_EXTENSIONS as string[]).includes(e));
 }

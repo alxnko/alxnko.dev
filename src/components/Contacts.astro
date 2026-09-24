@@ -6,8 +6,8 @@ import Icon from './Icon.astro';
   <h2 id="contacts-h" class="label">
     <span>contacts</span><span class="label-path" aria-hidden="true">~/monitor/*.lnk</span>
   </h2>
-  <!-- the markers keep Cloudflare from obfuscating the (public) address into a script-decoded
-       span (its email-decode script writes innerHTML, which Trusted Types refuse, R79) -->
+  {/* the markers keep Cloudflare from obfuscating the (public) address into a script-decoded
+      span (its email-decode script writes innerHTML, which Trusted Types refuse, R79) */}
   <!--email_off--><ul>
     {CONTACTS.map((c) => (
       <li>

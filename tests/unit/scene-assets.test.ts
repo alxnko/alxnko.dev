@@ -82,10 +82,18 @@ describe('scene assets', () => {
 describe('slim GLTFLoader (scripts/slim-gltf.mjs)', () => {
   const loaderSrc = readFileSync(fileURLToPath(new URL('../../node_modules/three/examples/jsm/loaders/GLTFLoader.js', import.meta.url)), 'utf8');
 
-  it('the desk glb needs no extension the slimmed loader dropped', () => {
+  it('the desk glb needs no extension the slimmed loader dropped', async () => {
+    const { SUPPORTED_EXTENSIONS } = await import('../../scripts/slim-gltf.mjs');
     const j = glbJson(dir + manifest.files.glb);
-    // meshopt is the kept plugin; quantization and unlit are handled by the loader core
-    for (const e of j.extensionsUsed ?? []) expect(['EXT_meshopt_compression', 'KHR_mesh_quantization', 'KHR_materials_unlit']).toContain(e);
+    for (const e of j.extensionsUsed ?? []) expect(SUPPORTED_EXTENSIONS).toContain(e);
+  });
+
+  it('the scene refuses a glb with an extension the slimmed loader dropped', async () => {
+    const { SUPPORTED_EXTENSIONS } = await import('../../scripts/slim-gltf.mjs');
+    const { unsupportedExtensions } = await import('../../src/scene/phases');
+    expect(unsupportedExtensions({ extensionsUsed: SUPPORTED_EXTENSIONS })).toEqual([]);
+    expect(unsupportedExtensions({})).toEqual([]);
+    expect(unsupportedExtensions({ extensionsUsed: ['KHR_mesh_quantization', 'KHR_texture_basisu', 'KHR_lights_punctual'] })).toEqual(['KHR_texture_basisu', 'KHR_lights_punctual']);
   });
 
   it('keeps the meshopt registrations and drops every other plugin', async () => {
