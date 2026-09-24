@@ -13,10 +13,10 @@ function page() {
   };
   const term = mk('section', 'term');
   const screen = mk('div', 'term-screen');
-  screen.append(mk('div', 'term-lines'), mk('div', 'term-comp'), mk('div', 'term-overlay'));
+  screen.append(mk('div', 'term-lines'), mk('div', 'term-comp'));
   const form = mk('form', 'term-form');
   form.append(mk('span', 'term-prompt'), mk('div', 'term-mirror'), mk('input', 'term-input'));
-  term.append(screen, form);
+  term.append(screen, mk('div', 'term-overlay'), form);
   document.body.replaceChildren(
     mk('button', 't-theme', { 'aria-pressed': 'false' }),
     mk('button', 't-sound', { 'aria-pressed': 'false' }),

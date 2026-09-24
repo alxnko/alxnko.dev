@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { lines, run } from './helpers';
+import { expectRain, lines, rainView, run } from './helpers';
 
 test.describe('terminal', () => {
   test.beforeEach(async ({ page }) => {
@@ -22,6 +22,21 @@ test.describe('terminal', () => {
     expect(await page.locator('#term-lines [aria-hidden="true"]').count()).toBeGreaterThan(5);
     await expect(page.locator('#term-lines').getByText('tech lead').last()).not.toHaveAttribute('aria-hidden', 'true');
     await expect(page.locator('#term-overlay')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  test('cmatrix rains on the visible screen and any key stops it', async ({ page }) => {
+    await expectRain(page);
+  });
+
+  test('cmatrix under reduced motion: one visible still frame of rain', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await run(page, 'fastfetch');
+    await run(page, 'cmatrix');
+    await expect.poll(async () => (await rainView(page)).shown).toBe(true);
+    const v = await rainView(page);
+    expect(v.covers).toBe(true);
+    expect(v.text.replace(/\s/g, '').length).toBeGreaterThan(200);
+    await expect(page.locator('#term-overlay')).toBeHidden({ timeout: 4000 });
   });
 
   test('block-art lines stay on the monospace grid (our font draws the blocks)', async ({ page }) => {

@@ -132,6 +132,8 @@ export function toyCommands(env: ShellEnv): Command[] {
       const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
       const frameMs = still ? 1500 : Math.round(1000 / MATRIX_FPS);
       const frames = still ? 1 : Math.floor(MATRIX_MAX_MS / frameMs);
+      // the rain starts above the screen; the still frame shows it already falling
+      if (still) for (let i = 0; i < MATRIX_ROWS; i++) m.step();
       try {
         for (let f = 0; f < frames && !ctx.signal.aborted; f++) {
           m.step();

@@ -9,12 +9,14 @@ const post = ']$ ';
     <h2 id="term-h" class="term-title">tty1 <span class="dim">— {SITE.handle}@{SITE.host}</span></h2>
     <span class="term-clock" aria-hidden="true">kg <time id="clock" class="num"></time></span>
   </header>
-  <div id="term-screen" class="term-screen" role="log" aria-live="polite" aria-label="terminal output" tabindex="0">
-    <div id="term-lines" class="term-lines">
-      <div class="ln">{pre}<span class="c-green">~</span>{post}whoami</div>
-      <div class="ln">{SITE.name.toLowerCase()} · {SITE.role} · {SITE.country.toLowerCase()}</div>
+  <div class="term-view">
+    <div id="term-screen" class="term-screen" role="log" aria-live="polite" aria-label="terminal output" tabindex="0">
+      <div id="term-lines" class="term-lines">
+        <div class="ln">{pre}<span class="c-green">~</span>{post}whoami</div>
+        <div class="ln">{SITE.name.toLowerCase()} · {SITE.role} · {SITE.country.toLowerCase()}</div>
+      </div>
+      <div id="term-comp" class="term-comp" hidden></div>
     </div>
-    <div id="term-comp" class="term-comp" hidden></div>
     <div id="term-overlay" class="term-overlay" aria-hidden="true" hidden></div>
   </div>
   <form id="term-form" class="term-form" data-busy="false">

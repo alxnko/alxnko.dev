@@ -391,6 +391,7 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
     [screen, 'scroll', onScroll],
     [root, 'click', onChip],
     [screen, 'mouseup', onPointerUp],
+    [overlay, 'mouseup', onPointerUp],
   ];
   for (const [t, ev, fn] of on) t.addEventListener(ev, fn);
   const unsub = store.subscribe(render);

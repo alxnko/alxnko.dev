@@ -1,5 +1,5 @@
 import { chromium, expect, test } from '@playwright/test';
-import { guard, run } from './helpers';
+import { expectRain, guard, run } from './helpers';
 
 test.describe('3D desk', () => {
   test.setTimeout(60_000);
@@ -25,6 +25,14 @@ test.describe('3D desk', () => {
       const box = await page.locator('#term').boundingBox();
       expect(box && box.width > 20 && box.height > 10).toBeTruthy();
     }
+  });
+
+  test('cmatrix rains on the laptop screen and any key stops it', async ({ page }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await page.locator('#nav [data-landmark="laptop"]').click();
+    await page.waitForTimeout(1500);
+    await expectRain(page);
   });
 
   test('esc and the back button return to the desk view', async ({ page }) => {

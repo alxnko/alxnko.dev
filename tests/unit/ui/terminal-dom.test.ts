@@ -18,7 +18,10 @@ function fixture(): HTMLElement {
   ssr.textContent = 'static transcript';
   const lines = el('div', 'term-lines');
   lines.append(ssr);
-  screen.append(lines, el('div', 'term-comp', { hidden: '' }), el('div', 'term-overlay', { hidden: '' }));
+  screen.append(lines, el('div', 'term-comp', { hidden: '' }));
+  // the overlay is the scroller's sibling, not its child (R72)
+  const view = el('div');
+  view.append(screen, el('div', 'term-overlay', { hidden: '' }));
   const chips = el('div', 'term-chips');
   for (const c of ['help', 'whoami', 'ls monitor']) {
     const b = el('button', undefined, { type: 'button', 'data-cmd': c });
@@ -29,7 +32,7 @@ function fixture(): HTMLElement {
   const field = el('div');
   field.append(el('div', 'term-mirror'), el('input', 'term-input'));
   form.append(el('span', 'term-prompt'), field);
-  root.append(screen, chips, form);
+  root.append(view, chips, form);
   document.body.append(root);
   return root;
 }
@@ -183,6 +186,16 @@ describe('terminal-dom rendering', () => {
     expect(ov.textContent).toBe('rain');
     f.update({ overlay: null, busy: false });
     expect(ov.hidden).toBe(true);
+  });
+
+  it('a tap on the rain focuses the prompt (so a phone keyboard can stop it)', () => {
+    const f = fakeDeps({ busy: true, overlay: [[{ text: 'rain' }]] });
+    handle = mountTerminal(root, f.deps);
+    const ov = root.querySelector('#term-overlay') as HTMLElement;
+    expect(ov.closest('#term-screen')).toBeNull(); // never inside the scrolling log
+    (document.activeElement as HTMLElement | null)?.blur();
+    ov.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    expect(document.activeElement).toBe(root.querySelector('#term-input'));
   });
 
   it('marks the form busy while a command runs', () => {
