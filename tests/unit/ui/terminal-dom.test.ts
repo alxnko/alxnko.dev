@@ -31,7 +31,7 @@ function fixture(): HTMLElement {
   const form = el('form', 'term-form');
   const field = el('div');
   field.append(el('div', 'term-mirror'), el('input', 'term-input'));
-  form.append(el('span', 'term-prompt'), field);
+  form.append(el('span', 'term-announce', { 'aria-live': 'polite' }), el('span', 'term-prompt'), field);
   root.append(view, chips, form);
   document.body.append(root);
   return root;
@@ -293,6 +293,29 @@ describe('terminal-dom keyboard', () => {
     key(input, 'Enter');
     expect(f.state.queued).toBe('pwd');
     expect(f.deps.run).not.toHaveBeenCalled();
+  });
+
+  it('announces "command queued" once to screen readers; a replacement or a run/drop stays quiet', () => {
+    const f = fakeDeps({ busy: true });
+    handle = mountTerminal(root, f.deps);
+    const announce = root.querySelector('#term-announce')!;
+    expect(announce.textContent).toBe('');
+    type(input, 'ls');
+    key(input, 'Enter');
+    expect(announce.textContent).toBe('command queued');
+    // a later Enter replaces the queued line: no second announcement
+    type(input, 'pwd');
+    key(input, 'Enter');
+    expect(f.state.queued).toBe('pwd');
+    expect(announce.textContent).toBe('command queued');
+    // busy ends (it ran, or ^C dropped it): nothing extra is announced, the live region clears
+    f.update({ busy: false, queued: null });
+    expect(announce.textContent).toBe('');
+    // queuing again afterwards announces fresh
+    f.update({ busy: true });
+    type(input, 'whoami');
+    key(input, 'Enter');
+    expect(announce.textContent).toBe('command queued');
   });
 
   it('typing a fresh draft after queueing shows normally, not muted', () => {

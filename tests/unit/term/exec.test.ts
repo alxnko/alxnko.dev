@@ -5,15 +5,32 @@ import { text } from '../../../src/term/format';
 import { setup } from './harness';
 
 describe('Shell.run', () => {
-  it('echoes the prompt and the line, clears input, pushes history', async () => {
+  it('echoes the prompt and the line, pushes history', async () => {
     const { store, shell } = setup();
-    store.setInput('pwd');
     await shell.run('pwd');
     expect(text(store.state.lines[0])).toBe('[alxnko@nitro ~]$ pwd');
     expect(text(store.state.lines[1])).toBe('/home/alxnko');
-    expect(store.state.input).toBe('');
     expect(store.state.history.at(-1)).toBe('pwd');
     expect(store.state.busy).toBe(false);
+  });
+
+  it('never touches the input line itself: the caller owns clearing it', async () => {
+    const { store, shell } = setup();
+    store.setInput('typed alongside the run', 6);
+    await shell.run('pwd');
+    expect(store.state.input).toBe('typed alongside the run');
+    expect(store.state.cursor).toBe(6);
+  });
+
+  it('text typed in the input survives a system-issued run (e.g. the autologin fastfetch)', async () => {
+    const { store, shell } = setup();
+    store.setInput('whoami', 3); // a visitor typing while the autologin's own run() fires
+    await shell.run('fastfetch --compact', { record: false });
+    expect(store.state.input).toBe('whoami');
+    expect(store.state.cursor).toBe(3);
+    // the system run itself still worked normally
+    expect(text(store.state.lines[0])).toBe('[alxnko@nitro ~]$ fastfetch --compact');
+    expect(store.state.history).not.toContain('fastfetch --compact'); // record: false
   });
 
   it('an empty line only echoes the prompt and is not stored in history', async () => {

@@ -217,28 +217,17 @@ test.describe('terminal', () => {
 
 test.describe('terminal: Enter while busy queues the line (a real tty\'s typeahead)', () => {
   test('typing whoami and pressing Enter immediately after load needs no second Enter', async ({ page }) => {
-    // No wait for the prompt: this races the autologin (fastfetch) on purpose. Retried because
-    // a separate, pre-existing race can rarely (and under heavy system load only) clobber this
-    // one attempt: the autologin's own internal run() call clears the input line the instant
-    // IT starts, exactly as any run() does for its own line, and very occasionally that lands
-    // between our fill() and our Enter. That race is not what this test (or this fix) is about
-    // - it's about Enter itself being swallowed while busy - so a lost attempt is retried fresh.
-    let ok = false;
-    for (let attempt = 0; attempt < 3 && !ok; attempt++) {
-      await page.goto('/?lite');
-      const input = page.locator('#term-input');
-      await input.focus();
-      await input.fill('whoami');
-      await input.press('Enter');
-      try {
-        await expect
-          .poll(() => page.locator('#term-lines').innerText(), { timeout: 5_000 })
-          .toMatch(/whoami\nalxnko/);
-        ok = true;
-      } catch {
-        if (attempt === 2) throw new Error('whoami never ran, even after retries');
-      }
-    }
+    // No wait for the prompt: this races the autologin (fastfetch) on purpose. Enter, wherever
+    // it lands (the boot log, or busy while fastfetch runs), submits or queues "whoami" -
+    // Shell.run() never clobbers a concurrently-typed draft, so this is deterministic: no retry.
+    await page.goto('/?lite');
+    const input = page.locator('#term-input');
+    await input.focus();
+    await input.fill('whoami');
+    await input.press('Enter');
+    await expect
+      .poll(() => page.locator('#term-lines').innerText(), { timeout: 15_000 })
+      .toMatch(/whoami\nalxnko/);
   });
 
   test('a line queued while pacman runs shows muted with a "queued" hint, then runs once it finishes', async ({ page }) => {
@@ -246,7 +235,7 @@ test.describe('terminal: Enter while busy queues the line (a real tty\'s typeahe
     await expect(lines(page)).toContainText('alxnko@nitro', { timeout: 15_000 });
     const input = page.locator('#term-input');
     await input.focus();
-    await input.fill('pacman -Syu');
+    await input.fill('pacman -Syu; pacman -Syu'); // a longer busy window: room to act under load
     await input.press('Enter');
     await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');
     await input.fill('whoami');
@@ -263,7 +252,7 @@ test.describe('terminal: Enter while busy queues the line (a real tty\'s typeahe
     await expect(lines(page)).toContainText('alxnko@nitro', { timeout: 15_000 });
     const input = page.locator('#term-input');
     await input.focus();
-    await input.fill('pacman -Syu');
+    await input.fill('pacman -Syu; pacman -Syu'); // a longer busy window: room to act under load
     await input.press('Enter');
     await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');
     await input.fill('echo should-not-run');

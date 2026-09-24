@@ -127,8 +127,12 @@ export class Shell {
     return true;
   }
 
-  /** Echoes prompt+line, pushes history, executes. Ignored while busy. Input is clamped to 256 chars. */
   /**
+   * Echoes prompt+line, pushes history, executes. Ignored while busy. Input is clamped to 256
+   * chars. Never touches the input line itself: a normal submit already cleared it (see
+   * terminal-dom.ts's `submit()`), and a system-issued run (the autologin, the paddle's `desk N`,
+   * a queued line landing) must not clobber whatever a visitor is concurrently typing.
+   *
    * `record: false` is for lines the system types (the autologin's fastfetch): they run
    * like any other, but stay out of the history and leave `last` (the chips) untouched.
    */
@@ -136,7 +140,6 @@ export class Shell {
     if (this.store.state.busy || this.ac || this.loading) return;
     const src = line.slice(0, MAX_INPUT);
     this.store.print([...this.store.prompt(), { text: src }]);
-    this.store.setInput('');
     if (!src.trim()) return;
     this.record = record;
     if (record) this.store.pushHistory(src);

@@ -15,7 +15,7 @@ function page() {
   const screen = mk('div', 'term-screen');
   screen.append(mk('div', 'term-lines'), mk('div', 'term-comp'));
   const form = mk('form', 'term-form');
-  form.append(mk('span', 'term-prompt'), mk('div', 'term-mirror'), mk('input', 'term-input'));
+  form.append(mk('span', 'term-announce'), mk('span', 'term-prompt'), mk('div', 'term-mirror'), mk('input', 'term-input'));
   term.append(screen, mk('div', 'term-overlay'), form);
   document.body.replaceChildren(
     mk('button', 't-theme', { 'aria-pressed': 'false' }),

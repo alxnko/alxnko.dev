@@ -155,6 +155,7 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
   const overlay = need<HTMLElement>('#term-overlay');
   const form = need<HTMLFormElement>('#term-form');
   const promptEl = need<HTMLElement>('#term-prompt');
+  const announce = need<HTMLElement>('#term-announce');
   const mirror = need<HTMLElement>('#term-mirror');
   const input = need<HTMLInputElement>('#term-input');
   const chipsEl = root.querySelector<HTMLElement>('#term-chips');
@@ -174,6 +175,7 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
   let stick = true;
   let promptKey = '';
   let lastVersion = -1;
+  let wasQueued = false;
 
   // History walk.
   let histIdx = -1;
@@ -278,6 +280,19 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
     }));
   }
 
+  /**
+   * A line becoming queued (Enter while busy) is announced once, for screen readers: the hint
+   * text in the mirror is `aria-hidden`. Replacing an already-queued line doesn't re-announce
+   * (only the null → non-null edge does); running or dropping it says nothing extra - its
+   * output (or ^C) already reaches the log.
+   */
+  function syncQueueAnnounce(s: TermState) {
+    const isQueued = s.queued !== null;
+    if (isQueued && !wasQueued) announce.textContent = 'command queued';
+    else if (!isQueued && wasQueued) announce.textContent = '';
+    wasQueued = isQueued;
+  }
+
   function render(s: TermState) {
     if (s.version === lastVersion) return;
     lastVersion = s.version;
@@ -285,6 +300,7 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
     syncOverlay(s);
     form.dataset.busy = s.busy ? 'true' : 'false';
     syncInput(s);
+    syncQueueAnnounce(s);
     syncChips(s);
     if (stick) screen.scrollTop = screen.scrollHeight;
   }
