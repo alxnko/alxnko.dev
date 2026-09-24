@@ -60,7 +60,8 @@ export async function expectRain(page: Page, cmd = 'cmatrix') {
     seen.add(v.text);
   }
   expect(seen.size).toBeGreaterThanOrEqual(5); // it animates
-  expect([...seen].at(-1)!.replace(/\s/g, '').length).toBeGreaterThan(100); // and it rains
+  // and it rains (it starts above the screen: a slow software-GL runner needs a few more frames)
+  await expect.poll(async () => (await rainView(page)).text.replace(/\s/g, '').length, { timeout: 10_000 }).toBeGreaterThan(100);
   await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');
   // the toy owns the tty: typing is swallowed and does not stop it
   await page.keyboard.type('xyz');
