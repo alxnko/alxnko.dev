@@ -16,6 +16,29 @@ export const SITE = {
   },
 } as const;
 
+/**
+ * Machine-readable only (decision R71): spellings of the owner's legal name, published in the
+ * JSON-LD Person as `alternateName`/`givenName`/`familyName` so name searches can find the site.
+ * NEVER render these. The visible page shows only `SITE.name` and `SITE.handle`; e2e asserts
+ * that no real-name spelling appears in the visible text (the email address is the one exception).
+ * Ordered by how likely a search is to use them.
+ */
+export const LEGAL_NAME = {
+  given: ['Aleksandr', 'Александр'],
+  family: ['Nyrko', 'Нырко'],
+  variants: [
+    'Aleksandr Nyrko',
+    'Александр Нырко',
+    'Alexander Nyrko',
+    'Alexandr Nyrko',
+    'Alex Nyrko',
+    'Sasha Nyrko',
+    'Саша Нырко',
+    'Aleksander Nyrko',
+    'Алекс Нырко',
+  ],
+} as const;
+
 export interface Contact {
   id: 'github' | 'telegram' | 'linkedin' | 'instagram' | 'email';
   short: string;
