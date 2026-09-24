@@ -78,3 +78,22 @@ describe('scene assets', () => {
     expect(png.readUInt32BE(20)).toBe(630);
   });
 });
+
+describe('slim GLTFLoader (scripts/slim-gltf.mjs)', () => {
+  const loaderSrc = readFileSync(fileURLToPath(new URL('../../node_modules/three/examples/jsm/loaders/GLTFLoader.js', import.meta.url)), 'utf8');
+
+  it('the desk glb needs no extension the slimmed loader dropped', () => {
+    const j = glbJson(dir + manifest.files.glb);
+    // meshopt is the kept plugin; quantization and unlit are handled by the loader core
+    for (const e of j.extensionsUsed ?? []) expect(['EXT_meshopt_compression', 'KHR_mesh_quantization', 'KHR_materials_unlit']).toContain(e);
+  });
+
+  it('keeps the meshopt registrations and drops every other plugin', async () => {
+    const { slimGltf, KEEP } = await import('../../scripts/slim-gltf.mjs');
+    const out: string = slimGltf(loaderSrc);
+    const registered = [...out.matchAll(/this\.register\( function \( parser \) \{\s*return new (\w+)/g)].map((m) => m[1]);
+    expect(registered).toEqual(['GLTFMeshoptCompression', 'GLTFMeshoptCompression']);
+    expect(KEEP).toEqual(['GLTFMeshoptCompression']);
+    expect(() => slimGltf('no registrations here')).toThrow();
+  });
+});

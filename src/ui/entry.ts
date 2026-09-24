@@ -93,6 +93,9 @@ const shell = new Shell(store, world, fs);
 let booting: AbortController | null = null;
 
 async function boot(first: boolean) {
+  // fastfetch's block-art cat and box lines use the symbols subset (R69). It is fetched here,
+  // during the boot log, not preloaded in <head> where it competed with the first paint
+  void document.fonts?.load('400 16px "JetBrains Mono"', '█─').catch(() => {});
   if (first) {
     booting = new AbortController();
     const { signal } = booting;
@@ -122,6 +125,14 @@ function hasWebGL2(): boolean {
   }
 }
 
+/** The <head> gate's WebGL canvas (Base.astro), handed to the desk once so its context is reused. */
+function takeProbe(): HTMLCanvasElement | undefined {
+  const w = window as typeof window & { __glProbe?: HTMLCanvasElement };
+  const c = w.__glProbe;
+  delete w.__glProbe;
+  return c;
+}
+
 // the same deadline as the head watchdog (Base.astro): once the page has been revealed the
 // desk never takes it over mid-read
 const MOUNT_TIMEOUT_MS = 15000;
@@ -141,13 +152,14 @@ function enter3d() {
         store,
         initial,
         reducedMotion: reducedMotion(),
-        softwareGL: document.documentElement.dataset.glsw === '1',
+        probe: takeProbe(),
         mobile: matchMedia('(pointer: coarse)').matches || innerWidth < 720,
         termEl,
         contactsEl,
         infoEl: $('mon-info') ?? undefined,
         onLandmark(l) {
           document.body.dataset.view = l; // scene.css: only the screen you're at is selectable
+          syncMonitorLinks();
           for (const b of document.querySelectorAll<HTMLButtonElement>('#nav [data-landmark]')) {
             if (b.dataset.landmark === l) b.setAttribute('aria-current', 'true');
             else b.removeAttribute('aria-current');
@@ -210,7 +222,11 @@ function enter3d() {
       if (now.desk !== was.desk) void handle.world.setDesk(now.desk);
       document.body.dataset.mode = 'scene';
       document.body.dataset.scene = 'ready';
+      syncMonitorLinks();
       if (btn) btn.hidden = true;
+      // the live desk covers the poster for good: a download still under way is dropped
+      const img = document.querySelector<HTMLImageElement>('#poster img');
+      if (img && !img.complete) { img.parentElement?.querySelectorAll('source').forEach((s) => s.remove()); img.removeAttribute('src'); }
     })
     .catch((e) => {
       console.warn('3d unavailable:', e);
@@ -226,6 +242,7 @@ function leave3d() {
   world.scene = null;
   document.body.dataset.mode = 'page';
   delete document.body.dataset.scene;
+  syncMonitorLinks();
   delete document.documentElement.dataset.boot; // reveal the page (no loader, no 3D)
   const btn = $('enter3d') as HTMLButtonElement | null;
   if (btn && hasWebGL2()) { btn.hidden = false; btn.disabled = false; btn.textContent = 'enter 3d'; }
@@ -391,6 +408,23 @@ const nudge = () => {
 const wallEl = $('contacts-rain');
 const wall = wallEl ? new FrameView(wallEl) : null;
 const contactList = document.querySelector<HTMLElement>('#contacts ul');
+const infoList = document.querySelector<HTMLElement>('#mon-info dl');
+/**
+ * The monitor's links are live only when they can be used: in 3D, while the camera is at the
+ * monitor (from afar the panel is a small far-off screen, and a tap there flies to it: the
+ * capture handler below), and never under the cmatrix rain. Elsewhere they are out of the tab
+ * order and the accessibility tree, so no tiny off-view target is reachable or announced.
+ */
+function syncMonitorLinks() {
+  const b = document.body.dataset;
+  const off = b.rain !== undefined || (b.mode === 'scene' && b.view !== 'monitor');
+  for (const el of [contactList, infoList]) {
+    if (!el || el.inert === off) continue;
+    el.inert = off;
+    if (off) el.setAttribute('aria-hidden', 'true');
+    else el.removeAttribute('aria-hidden');
+  }
+}
 store.subscribe((s) => {
   if (intr && intr.hidden === s.busy) {
     intr.hidden = !s.busy;
@@ -400,8 +434,7 @@ store.subscribe((s) => {
   if (raining !== (document.body.dataset.rain !== undefined)) {
     if (raining) document.body.dataset.rain = '';
     else delete document.body.dataset.rain;
-    // links under the rain are out of reach for the keyboard too
-    if (contactList) contactList.inert = raining;
+    syncMonitorLinks(); // links under the rain are out of reach for the keyboard too
   }
   wall?.show(document.body.dataset.mode === 'scene' ? null : s.monitor);
 });

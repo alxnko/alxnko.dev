@@ -43,3 +43,16 @@ test.describe('short links', () => {
     expect(rules.some(([, to]) => to.startsWith('mailto:'))).toBe(false);
   });
 });
+
+// Cloudflare's email obfuscation would rewrite the address into a span decoded by a script
+// that writes innerHTML (refused under Trusted Types): every address in a page body sits inside
+// <!--email_off--> … <!--/email_off-->, which Cloudflare leaves alone (R79).
+test('every email address in a page body is marked email_off', async ({ request }) => {
+  for (const path of ['/', '/email', '/mail']) {
+    const html = await (await request.get(path)).text();
+    const body = html.slice(html.indexOf('<body')).replace(/<script\b[\s\S]*?<\/script>/g, '');
+    const outside = body.replace(/<!--email_off-->[\s\S]*?<!--\/email_off-->/g, '');
+    expect(body, path).toMatch(/@gmail\.com/);
+    expect(outside, path).not.toMatch(/@gmail\.com/);
+  }
+});
