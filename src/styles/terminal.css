@@ -55,6 +55,13 @@
 }
 
 /* scrollback ------------------------------------------------------------------------ */
+/* holds the scrolling log and the toys' overlay above it (the overlay must not live inside
+   the scroller: an absolute box there sits at scroll offset 0, off-screen once it scrolls) */
+.term-view {
+  position: relative;
+  min-height: 0;
+}
+
 .term-screen {
   position: relative;
   height: calc(var(--term-rows) * var(--term-lh) * 1em + 2 * var(--sp-3));
@@ -87,7 +94,7 @@
   display: none;
 }
 
-/* full-screen toys (cmatrix) paint over the scrollback */
+/* full-screen toys (cmatrix) paint over the visible screen, like a terminal's alternate screen */
 .term-overlay {
   position: absolute;
   inset: 0;

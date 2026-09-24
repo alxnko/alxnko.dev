@@ -29,3 +29,41 @@ export async function run(page: Page, cmd: string) {
   await input.fill(cmd);
   await input.press('Enter');
 }
+
+/** What the eye sees of the cmatrix overlay: its glyphs, and whether it covers the visible screen. */
+export const rainView = (page: Page) =>
+  page.evaluate(() => {
+    const o = document.getElementById('term-overlay')!;
+    const s = document.getElementById('term-screen')!.getBoundingClientRect();
+    const r = o.getBoundingClientRect();
+    return {
+      shown: !o.hidden && r.width > 0 && r.height > 0,
+      // the overlay sits on the screen's visible box, whatever the scrollback's scroll position
+      covers: Math.abs(r.top - s.top) < 2 && Math.abs(r.left - s.left) < 2 && Math.abs(r.bottom - s.bottom) < 2 && Math.abs(r.right - s.right) < 2,
+      text: o.textContent ?? '',
+    };
+  });
+
+/** cmatrix over a scrolled scrollback: visible, changing rain for a while, then any key stops it. */
+export async function expectRain(page: Page) {
+  // fill the scrollback past one screen so the log is scrolled (the live-site case)
+  await run(page, 'fastfetch');
+  await run(page, 'help');
+  await expect.poll(() => page.evaluate(() => document.getElementById('term-screen')!.scrollTop)).toBeGreaterThan(0);
+  await run(page, 'cmatrix');
+  const seen = new Set<string>();
+  for (let i = 0; i < 6; i++) {
+    await page.waitForTimeout(250);
+    const v = await rainView(page);
+    expect(v.shown, `frame ${i} shown`).toBe(true);
+    expect(v.covers, `frame ${i} covers the screen`).toBe(true);
+    seen.add(v.text);
+  }
+  expect(seen.size).toBeGreaterThanOrEqual(5); // it animates
+  expect([...seen].at(-1)!.replace(/\s/g, '').length).toBeGreaterThan(100); // and it rains
+  await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');
+  await page.keyboard.press('x');
+  await expect(page.locator('#term-overlay')).toBeHidden();
+  await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+  await expect(page.locator('#term-input')).toHaveValue(''); // the stopping key is swallowed
+}

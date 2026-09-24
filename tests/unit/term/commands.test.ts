@@ -378,6 +378,23 @@ describe('toys', () => {
     expect(store.state.overlay).toBeNull();
   });
 
+  it('cmatrix under reduced motion shows one still frame of rain already falling', async () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduce'), media: q }));
+    try {
+      const { run, store } = setup();
+      const frames: string[] = [];
+      store.subscribe((s) => void (s.overlay && frames.push(s.overlay.map((row) => row.map((sp) => sp.text).join('')).join('\n'))));
+      await run('cmatrix');
+      expect(frames.length).toBe(1);
+      // not the near-empty first step (every trail still above the top row)
+      const glyphs = frames[0].replace(/[\s]/g, '').length;
+      expect(glyphs).toBeGreaterThan(80 * 24 * 0.15);
+      expect(store.state.overlay).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('pacman -Syu and yay', async () => {
     const { out } = setup();
     const p = await out('pacman -Syu');

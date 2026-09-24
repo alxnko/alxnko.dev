@@ -183,6 +183,12 @@
   font-size: 0.8em;
 }
 
+[data-mode="scene"] .term .term-view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
 [data-mode="scene"] .term .term-screen {
   flex: 1;
   height: auto;
