@@ -193,6 +193,34 @@ describe('interrupt (Ctrl+C)', () => {
     expect(store.state.overlay).toBeNull();
   });
 
+  it('cmatrix draws nothing while the tab is hidden, and picks up when it is shown', async () => {
+    const doc = Object.assign(new EventTarget(), { hidden: true });
+    vi.stubGlobal('document', doc);
+    try {
+      const { shell, store } = timed();
+      let frames = 0;
+      store.subscribe((s) => void (s.overlay && frames++));
+      const p = shell.run('cmatrix --both');
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(frames).toBe(0); // no commits, no monitor redraws
+      expect(vi.getTimerCount()).toBe(0); // and no timer ticking meanwhile
+      doc.hidden = false;
+      doc.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(frames).toBeGreaterThanOrEqual(11);
+      doc.hidden = true;
+      await vi.advanceTimersByTimeAsync(200);
+      const seen = frames;
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(frames).toBe(seen);
+      shell.interrupt(); // ctrl+c still ends it while hidden
+      await p;
+      expect(store.state.busy).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('cmatrix under reduced motion: one still frame until stopped', async () => {
     vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduce'), media: q }));
     try {
@@ -202,6 +230,7 @@ describe('interrupt (Ctrl+C)', () => {
       const p = shell.run('cmatrix');
       await vi.advanceTimersByTimeAsync(30_000);
       expect(frames).toBe(1);
+      expect(vi.getTimerCount()).toBe(0); // it waits for the key, it doesn't poll
       expect(store.state.overlay).not.toBeNull();
       shell.interrupt();
       await p;

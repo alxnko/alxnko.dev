@@ -22,6 +22,16 @@ describe('plain-language lines (command_not_found_handle for people)', () => {
     expect(text((await run('github'))[0])).toBe('github is a contact, not a command. try open github.');
   });
 
+  it('no phrase starts with a command (it could never be reached)', () => {
+    const { shell } = setup();
+    const samples = ['who are you', 'about', 'tell me about yourself', 'how can i reach you', 'email', 'socials', 'what is this',
+      'what can i do', 'commands', 'menu', 'start', 'i need help', '?', 'show me around', 'demo', 'quit', 'bye', 'log out', 'cls', 'hi', 'hey there', 'thanks', 'github'];
+    for (const p of samples) {
+      expect(phrase(p), p).not.toBeNull();
+      expect(shell.registry.get(p.split(' ')[0]), p).toBeUndefined();
+    }
+  });
+
   it('never shadows a real command, and cat sounds stay catspeak', async () => {
     expect(phrase('meow')).toBeNull(); // catspeak and the meow command own it
     const { out } = setup();
@@ -111,8 +121,18 @@ describe('contacts and tour', () => {
     expect(text(ls[6])).toContain('short links: alxnko.dev/gh /tg /in /ig /mail');
   });
 
+  it('tour on the page view (no 3D) says so briefly and points at ?3d', async () => {
+    const { out, world } = setup();
+    const fly = vi.spyOn(world, 'fly');
+    const o = await out('tour');
+    expect(o).toContain('alxnko.dev/?3d');
+    expect(o.split('\n')).toHaveLength(2);
+    expect(fly).not.toHaveBeenCalled();
+  });
+
   it('tour visits the landmarks, moves things, and puts everything back (also after ctrl+c)', async () => {
     const { out, world } = setup();
+    world.threeD = true;
     const fly = vi.spyOn(world, 'fly');
     const was = world.get();
     const o = await out('tour');
@@ -140,6 +160,12 @@ describe('suggestion chips', () => {
     }
   });
 
+  it('never offer the tour on the page view', () => {
+    for (const l of [null, { line: 'help', status: 0 }, { line: 'x', status: 127 }, { line: 'cmatrix', status: 0 }])
+      expect(suggest(l, w, false)).not.toContain('tour');
+    expect(suggest(null, w, false)).toEqual(['help', 'fastfetch', 'contacts', 'cmatrix']);
+  });
+
   it('every suggestion runs cleanly', async () => {
     const lines = new Set<string>();
     for (const l of [null, ...['help', 'contacts', 'ls', 'desk 1', 'desk 3', 'theme', 'cmatrix', 'tour', 'x', 'fastfetch'].map((line) => ({ line, status: 0 }))])
@@ -149,5 +175,19 @@ describe('suggestion chips', () => {
       await shell.run(c);
       expect(shell.last?.status, c).toBe(0);
     }
+  });
+});
+
+describe('system-typed lines', () => {
+  it('run({ record: false }) stays out of history and leaves last (the chips) alone', async () => {
+    const { shell, store } = setup();
+    const h = store.state.history.length;
+    await shell.run('fastfetch', { record: false });
+    expect(store.state.lines.length).toBeGreaterThan(5); // it did run
+    expect(store.state.history.length).toBe(h);
+    expect(shell.last).toBeNull();
+    await shell.run('pwd');
+    expect(store.state.history.at(-1)).toBe('pwd');
+    expect(shell.last).toEqual({ line: 'pwd', status: 0 });
   });
 });

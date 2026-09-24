@@ -15,8 +15,12 @@ export const DEFAULT_WORLD: Readonly<WorldState> = {
 export class NullWorld implements WorldPort {
   private s: WorldState;
 
-  constructor(initial: Partial<WorldState> = {}) {
+  constructor(initial: Partial<WorldState> = {}, public threeD = false) {
     this.s = { ...DEFAULT_WORLD, ...initial };
+  }
+
+  has3d(): boolean {
+    return this.threeD;
   }
 
   get(): WorldState {

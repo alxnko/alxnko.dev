@@ -397,9 +397,13 @@ describe('toys', () => {
   it('cmatrix under reduced motion shows one still frame of rain already falling', async () => {
     vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduce'), media: q }));
     try {
-      const { run, store } = setup();
+      const { run, store, shell } = setup();
       const frames: string[] = [];
-      store.subscribe((s) => void (s.overlay && frames.push(s.overlay.map((row) => row.map((sp) => sp.text).join('')).join('\n'))));
+      store.subscribe((s) => {
+        if (!s.overlay) return;
+        frames.push(s.overlay.map((row) => row.map((sp) => sp.text).join('')).join('\n'));
+        queueMicrotask(() => shell.key('q')); // the still frame waits for a key, not a timer
+      });
       await run('cmatrix');
       expect(frames.length).toBe(1);
       // not the near-empty first step (every trail still above the top row)

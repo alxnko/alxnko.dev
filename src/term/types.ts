@@ -36,6 +36,8 @@ export interface WorldState {
 /** Everything the terminal may ask the world to do. Implemented by the 3D scene, or NullWorld. */
 export interface WorldPort {
   get(): WorldState;
+  /** True once the 3D desk is up (the page view has no camera to move). */
+  has3d(): boolean;
   fly(to: Landmark): void;
   /** Resolves when the desk has finished moving. */
   setDesk(h: number): Promise<void>;

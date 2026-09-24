@@ -79,6 +79,8 @@ export class Shell {
   private keyFn: ((key: string) => void) | null = null;
   /** The line being run is one simple command (not-found then gets a friendly next step). */
   private solo = false;
+  /** The running line counts as the visitor's (history, `last`); see run(). */
+  private record = true;
   /** Last line run and its status (the suggestion chips follow it). */
   last: { line: string; status: number } | null = null;
 
@@ -125,13 +127,18 @@ export class Shell {
   }
 
   /** Echoes prompt+line, pushes history, executes. Ignored while busy. Input is clamped to 256 chars. */
-  async run(line: string): Promise<void> {
+  /**
+   * `record: false` is for lines the system types (the autologin's fastfetch): they run
+   * like any other, but stay out of the history and leave `last` (the chips) untouched.
+   */
+  async run(line: string, { record = true }: { record?: boolean } = {}): Promise<void> {
     if (this.store.state.busy || this.ac) return;
     const src = line.slice(0, MAX_INPUT);
     this.store.print([...this.store.prompt(), { text: src }]);
     this.store.setInput('');
     if (!src.trim()) return;
-    this.store.pushHistory(src);
+    this.record = record;
+    if (record) this.store.pushHistory(src);
 
     // Catspeak: a line that isn't a command but is all cat sounds / faces gets a cat reply
     // (and the cat reacts) instead of "command not found". Then plain-language lines
@@ -183,14 +190,14 @@ export class Shell {
       this.ac = null;
       this.keyFn = null;
       this.env.tty = true;
-      this.last = { line: src, status: this.status };
+      if (this.record) this.last = { line: src, status: this.status };
       this.store.setBusy(false);
     }
   }
 
   private done(line: string, status: number): void {
     this.status = status;
-    this.last = { line, status };
+    if (this.record) this.last = { line, status };
     this.store.setBusy(false); // one commit so the chips follow
   }
 

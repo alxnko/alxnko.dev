@@ -77,7 +77,6 @@ test.describe('3D desk', () => {
     await expect(page.locator('#contacts-rain')).toBeHidden(); // the page's copy stays off in 3D
     await page.locator('#nav [data-landmark="monitor"]').click();
     await page.waitForTimeout(1500);
-    await page.screenshot({ path: test.info().outputPath('monitor-rain.png') });
     await page.keyboard.press('Control+c');
     await expect(page.locator('body')).not.toHaveAttribute('data-rain', '');
     await expect.poll(holes).toEqual(open);

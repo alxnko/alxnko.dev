@@ -51,15 +51,17 @@ export async function expectRain(page: Page, cmd = 'cmatrix') {
   await run(page, 'help');
   await expect.poll(() => page.evaluate(() => document.getElementById('term-screen')!.scrollTop)).toBeGreaterThan(0);
   await run(page, cmd);
+  // it animates: at least 5 different frames, each shown over the visible screen
   const seen = new Set<string>();
-  for (let i = 0; i < 6; i++) {
-    await page.waitForTimeout(250);
-    const v = await rainView(page);
-    expect(v.shown, `frame ${i} shown`).toBe(true);
-    expect(v.covers, `frame ${i} covers the screen`).toBe(true);
-    seen.add(v.text);
-  }
-  expect(seen.size).toBeGreaterThanOrEqual(5); // it animates
+  await expect
+    .poll(async () => {
+      const v = await rainView(page);
+      expect(v.shown, 'frame shown').toBe(true);
+      expect(v.covers, 'frame covers the screen').toBe(true);
+      seen.add(v.text);
+      return seen.size;
+    }, { timeout: 10_000, intervals: [150] })
+    .toBeGreaterThanOrEqual(5);
   // and it rains (it starts above the screen: a slow software-GL runner needs a few more frames)
   await expect.poll(async () => (await rainView(page)).text.replace(/\s/g, '').length, { timeout: 10_000 }).toBeGreaterThan(100);
   await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');

@@ -5,7 +5,12 @@ import type { WorldState } from './types';
 const FIRST = ['help', 'fastfetch', 'contacts', 'tour', 'cmatrix'];
 
 /** Up to five command lines to offer after `last` (null: nothing run yet). */
-export function suggest(last: { line: string; status: number } | null, world: Pick<WorldState, 'desk' | 'ring' | 'fan' | 'theme'>): string[] {
+export function suggest(last: { line: string; status: number } | null, world: Pick<WorldState, 'desk' | 'ring' | 'fan' | 'theme'>, has3d = true): string[] {
+  // the tour needs the 3D desk: never offered on the page view
+  return pick(last, world).filter((c) => has3d || c !== 'tour').slice(0, 5);
+}
+
+function pick(last: { line: string; status: number } | null, world: Pick<WorldState, 'desk' | 'ring' | 'fan' | 'theme'>): string[] {
   if (!last) return FIRST;
   const [cmd = '', arg = ''] = last.line.trim().split(/\s+/);
   const theme = world.theme === 'light' ? 'theme night' : 'theme day';
@@ -50,5 +55,5 @@ export function suggest(last: { line: string; status: number } | null, world: Pi
       default:
         next = ['help', 'contacts', 'tour', 'cmatrix', 'fastfetch'];
     }
-  return next.filter((c) => c !== last.line.trim()).slice(0, 5);
+  return next.filter((c) => c !== last.line.trim());
 }

@@ -39,6 +39,9 @@ class AppWorld implements WorldPort {
   get(): WorldState {
     return { ...this.s, theme: currentTheme(), landmark: this.scene?.landmark() ?? this.s.landmark };
   }
+  has3d(): boolean {
+    return this.scene !== null;
+  }
   fly(to: Landmark): void {
     this.s.landmark = to;
     this.scene?.fly(to);
@@ -102,7 +105,8 @@ async function boot(first: boolean) {
     }
     booting = null;
   }
-  await shell.run(first && !narrow() ? 'fastfetch' : 'fastfetch --compact');
+  // the autologin's own command: not the visitor's history, and the first chips stay put
+  await shell.run(first && !narrow() ? 'fastfetch' : 'fastfetch --compact', { record: false });
 }
 
 /** Answered once in <head> (Base.astro); probe only if that script did not run. */
@@ -375,6 +379,7 @@ if (soundLevel() !== 'off') {
 // toy's screen makes it stand out.
 const intr = $('intr') as HTMLButtonElement | null;
 intr?.addEventListener('click', () => (booting ? booting.abort() : shell.interrupt()));
+intr?.addEventListener('animationend', () => intr.classList.remove('nudge'));
 const nudge = () => {
   if (!intr || intr.hidden) return;
   intr.classList.remove('nudge');
@@ -385,12 +390,18 @@ const nudge = () => {
 // on the monitor itself and the pinned panels step aside (scene.css, [data-rain])
 const wallEl = $('contacts-rain');
 const wall = wallEl ? new FrameView(wallEl) : null;
+const contactList = document.querySelector<HTMLElement>('#contacts ul');
 store.subscribe((s) => {
-  if (intr && intr.hidden === s.busy) intr.hidden = !s.busy;
+  if (intr && intr.hidden === s.busy) {
+    intr.hidden = !s.busy;
+    if (!s.busy) intr.classList.remove('nudge'); // the next job's ^C starts calm
+  }
   const raining = s.monitor !== null;
   if (raining !== (document.body.dataset.rain !== undefined)) {
     if (raining) document.body.dataset.rain = '';
     else delete document.body.dataset.rain;
+    // links under the rain are out of reach for the keyboard too
+    if (contactList) contactList.inert = raining;
   }
   wall?.show(document.body.dataset.mode === 'scene' ? null : s.monitor);
 });
@@ -405,7 +416,7 @@ start({
     interrupt: () => (booting ? booting.abort() : shell.interrupt()),
     complete: (line, cursor) => complete(line, cursor, store.state.cwd, shell.registry, fs),
     key: (k) => shell.key(k),
-    chips: () => suggest(shell.last, world.get()),
+    chips: () => suggest(shell.last, world.get(), world.has3d()),
     onToyTap: nudge,
     clear: () => store.clear(),
     onActivity: () => {

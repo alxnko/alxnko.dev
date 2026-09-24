@@ -131,6 +131,12 @@ export function worldCommands(env: ShellEnv): Command[] {
     group: 'world',
     async run(ctx) {
       const w = ctx.world;
+      if (!w.has3d()) {
+        // the page view has no desk to walk around: say so briefly instead of 13 s of text
+        ctx.out('tour: the tour walks around the 3d desk, and this view has none.');
+        ctx.out([{ text: 'open alxnko.dev/?3d for it, or try ' }, { text: 'contacts', fg: 'green', run: 'contacts' }, { text: ' and ' }, { text: 'fastfetch', fg: 'green', run: 'fastfetch' }, { text: '.' }]);
+        return;
+      }
       const was = w.get();
       const say = (n: number, what: string, cmd: string) =>
         ctx.out([fg('muted', `${n}/5 `), { text: what + ' ' }, fg('muted', 'try: '), { text: cmd, fg: 'green', run: cmd }]);

@@ -106,7 +106,7 @@ const CMATRIX_HELP = [
   ` -C color    rain color: ${Object.keys(MATRIX_COLORS).join(', ')}`,
   ' --both      rain on the monitor too',
   ' -h          print this help',
-  'quit with q or ctrl+c. esc steps back to the desk and the rain keeps falling.',
+  'quit with q or ctrl+c. esc leaves it running (in 3d it steps back to the desk).',
 ];
 
 // pacman
@@ -179,9 +179,28 @@ export function toyCommands(env: ShellEnv): Command[] {
       // the toy owns the tty: q quits like the real one, a screensaver quits on any key, and
       // everything else is swallowed (ctrl+c and esc never reach here: they stay the shell's)
       let quit = false;
+      let wake = () => {};
       ctx.onKey((k) => {
-        if (saver || k === 'q' || k === 'Q') quit = true;
+        if (saver || k === 'q' || k === 'Q') {
+          quit = true;
+          wake();
+        }
       });
+      /** Resolves on quit, abort, or (with `visible`) when the page is shown again. */
+      const until = (visible: boolean) =>
+        new Promise<void>((res) => {
+          const done = () => {
+            ctx.signal.removeEventListener('abort', done);
+            if (visible) document.removeEventListener('visibilitychange', onVis);
+            res();
+          };
+          const onVis = () => void (!document.hidden && done());
+          wake = done;
+          ctx.signal.addEventListener('abort', done, { once: true });
+          if (visible) document.addEventListener('visibilitychange', onVis);
+          if (quit || ctx.signal.aborted) done();
+        });
+      const hidden = () => typeof document !== 'undefined' && document.hidden;
       // said once, through the log (the rain itself is aria-hidden)
       ctx.out([fg('muted', `cmatrix running, press ${saver ? 'any key' : 'ctrl+c'} to stop`)]);
 
@@ -192,17 +211,20 @@ export function toyCommands(env: ShellEnv): Command[] {
       const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (still) for (let i = 0; i < MATRIX_ROWS; i++) m.step(), wall?.step();
       const frameMs = Math.round(1000 / MATRIX_FPS);
-      let drawn = false;
       try {
         // no time limit: it rains until q or ctrl+c, like the real one
         while (!ctx.signal.aborted && !quit) {
-          if (!still || !drawn) {
-            m.step();
-            wall?.step();
-            env.store.setFrames(m.render(), wall?.render() ?? null);
-            drawn = true;
+          // a hidden tab draws nothing (no store commits, no monitor canvas): wait to be seen
+          if (hidden()) {
+            await until(true);
+            continue;
           }
-          await ctx.sleep(still ? 100 : frameMs);
+          m.step();
+          wall?.step();
+          env.store.setFrames(m.render(), wall?.render() ?? null);
+          // the still frame just waits for q or ctrl+c; nothing wakes up meanwhile
+          if (still) await until(false);
+          else await ctx.sleep(frameMs);
         }
       } finally {
         env.store.setFrames(null, null);

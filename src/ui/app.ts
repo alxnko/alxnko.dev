@@ -138,6 +138,13 @@ export function start(app: AppDeps): App {
     // the prompt; a focused control keeps its own Enter/Space
     const activates = (e.key === 'Enter' || e.key === ' ') && active?.closest(ACTIVATES_ON_SPACE);
     if (!active?.closest(EDITABLE) && !activates && term.toyKey(e)) return;
+    // ctrl+c anywhere on the page stops the running job (tour, pacman…), unless it copies
+    const ctrlC = e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'c';
+    if (ctrlC && deps.store.state.busy && !active?.closest(EDITABLE) && (document.getSelection()?.toString() ?? '') === '') {
+      e.preventDefault();
+      deps.interrupt();
+      return;
+    }
     if (!isTypingKey(e)) return;
     if (active?.closest(EDITABLE)) return;
     if (e.key === ' ' && active?.closest(ACTIVATES_ON_SPACE)) return;

@@ -1,5 +1,5 @@
 // The shell's command_not_found_handle for people, not typos: a few plain-language lines a
-// visitor may type ("hi", "who are you", "contact") answer with the real command that does
+// visitor may type ("hi", "who are you", "how can i contact you") answer with the real command that does
 // it. A line that means a command runs that command, shown first as a `#` comment so the
 // visitor learns it; a greeting just answers. Cat sounds are catspeak's (checked before this).
 import type { Line } from './types';
@@ -17,11 +17,11 @@ const comment = (cmd: string): Line => [{ text: `# ${cmd}`, fg: 'muted' }];
 const MEANS: [RegExp, string][] = [
   [/^(who are you|who is this|who r u|whoareyou|who am i talking to|who made this|whose site is this)$/, 'whoami -v'],
   [/^(about|about me|about you|tell me about (yourself|you|him)|what do you do)$/, 'cat ~/about.md'],
-  [/^(contact|contact me|contact info|contacts please|how (do i|can i|to) (contact|reach|message|write to) (you|him|alex)|get in touch|email|e-mail|mail|socials|links)$/, 'contacts'],
-  [/^(what is this|whats this|what can i do( here)?|what do i do|how does this work|commands|menu|start|help me|i need help|\?)$/, 'help'],
-  [/^(show me around|take me on a tour|tour please|demo|show me)$/, 'tour'],
+  [/^(how (do i|can i|to) (contact|reach|message|write to) (you|him|alex)|get in touch|email|e-mail|mail|socials|links)$/, 'contacts'],
+  [/^(what is this|whats this|what can i do( here)?|what do i do|how does this work|commands|menu|start|i need help|\?)$/, 'help'],
+  [/^(show me around|take me on a tour|demo|show me)$/, 'tour'],
   [/^(quit|bye|goodbye|log ?out)$/, 'exit'],
-  [/^(cls|clear screen)$/, 'clear'],
+  [/^cls$/, 'clear'],
 ];
 
 const HELLO = /^(hi|hii+|hello|hey|hey there|hello there|hi there|yo|sup|good (morning|evening|afternoon)|привет|салам|салют|hola|salut|ciao)$/;

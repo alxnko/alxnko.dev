@@ -407,8 +407,9 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
   const toyMode = () => store.state.busy && store.state.overlay !== null;
   function toyKey(e: KeyboardEvent): boolean {
     if (!toyMode() || e.isComposing) return false;
-    // Esc is the page's (back to the desk, out of view mode); Tab never traps focus
-    if (['Escape', 'Tab', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return false;
+    // Esc is the page's (back to the desk, out of view mode); Tab never traps focus; F-keys
+    // (reload, fullscreen) are the browser's
+    if (['Escape', 'Tab', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key) || /^F\d+$/.test(e.key)) return false;
     const ctrl = e.ctrlKey && !e.altKey && !e.metaKey;
     if (ctrl && e.key.toLowerCase() === 'c') {
       if (hasSelection()) return false; // copy wins
@@ -417,6 +418,9 @@ export function mountTerminal(root: HTMLElement, deps: TermDeps): TermHandle {
       return true;
     }
     if (e.ctrlKey || e.metaKey || e.altKey) return false; // browser shortcuts stay the browser's
+    // from the page (prompt not focused) only typing keys are the toy's: space, arrows,
+    // PageUp/Down, Home/End and / keep scrolling and finding
+    if (doc.activeElement !== input && !((e.key.length === 1 && e.key !== ' ' && e.key !== '/') || e.key === 'Enter' || e.key === 'Backspace')) return false;
     e.preventDefault(); // the toy owns the tty: nothing reaches the prompt
     deps.key?.(e.key);
     return true;

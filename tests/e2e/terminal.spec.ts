@@ -68,9 +68,29 @@ test.describe('terminal', () => {
     expect(Math.abs(c!.height - r!.height)).toBeLessThan(2);
     await expect.poll(async () => ((await rain.textContent()) ?? '').replace(/\s/g, '').length).toBeGreaterThan(50);
     expect(await rain.locator('.c-cyan').count()).toBeGreaterThan(0);
+    expect(await page.locator('#contacts ul').evaluate((e) => (e as HTMLElement).inert)).toBe(true); // no tabbing to hidden links
     await page.keyboard.press('Control+c');
     await expect(rain).toBeHidden();
     await expect(page.locator('#term-overlay')).toBeHidden();
+    expect(await page.locator('#contacts ul').evaluate((e) => (e as HTMLElement).inert)).toBe(false);
+  });
+
+  test('page view: no tour chip, a short tour, and ctrl+c from anywhere stops a job', async ({ page }) => {
+    await expect(page.locator('#term-chips .chip')).toHaveText(['help', 'fastfetch', 'contacts', 'cmatrix']);
+    await run(page, 'tour');
+    await expect(lines(page)).toContainText('alxnko.dev/?3d');
+    await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+    await run(page, 'pacman -Syu');
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press('Control+c');
+    await expect(lines(page)).toContainText('^C');
+    await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+    await expect(lines(page)).not.toContainText('there is nothing to do');
+  });
+
+  test('the autologin fastfetch is not in the history', async ({ page }) => {
+    await run(page, 'history');
+    await expect(lines(page).locator('.ln').last()).toHaveText(/^\s+1\s+history$/);
   });
 
   test('the ^C key stops a running command with a tap or click', async ({ page }) => {

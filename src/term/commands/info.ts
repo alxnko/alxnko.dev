@@ -70,7 +70,7 @@ const MAN: Record<string, string> = {
   fan: 'Sets the desk fan speed 0 to 3. Without an argument, cycles.',
   sound: 'Sets the sound level. All sounds are synthesized; off by default.',
   meow: `Meows, and the cat on the fan reacts. Also answers to: ${MEOW_ALIASES.join(', ')}.`,
-  cmatrix: 'Shows falling characters until you quit with q or ctrl+c (on a phone, tap ^C). Esc steps back to the desk and the rain keeps falling. -s is screensaver mode: any key quits. -C color picks the rain color: green, red, blue, white, yellow, cyan or magenta. --both rains on the monitor too; on the page without 3D it covers the contacts.',
+  cmatrix: 'Shows falling characters until you quit with q or ctrl+c (on a phone, tap ^C). Esc leaves it running (in 3D it steps back to the desk). -s is screensaver mode: any key quits. -C color picks the rain color: green, red, blue, white, yellow, cyan or magenta. --both rains on the monitor too; on the page without 3D it covers the contacts.',
   pacman: 'Package manager. -Syu synchronizes and upgrades the system.',
   grep: 'Prints lines matching a fixed-string pattern. -i ignores case, -v inverts the match.',
   history: 'Shows the last commands, numbered. Kept for this browser only. history -c forgets them.',

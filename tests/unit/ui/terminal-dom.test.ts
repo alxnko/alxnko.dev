@@ -446,6 +446,16 @@ describe('terminal-dom keyboard', () => {
     expect(handle.toyKey(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))).toBe(false);
     expect(handle.toyKey(new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, cancelable: true }))).toBe(true);
     expect(f.deps.interrupt).toHaveBeenCalledTimes(1);
+    // from the page (prompt not focused), scrolling, finding and F-keys stay the browser's
+    (document.activeElement as HTMLElement | null)?.blur();
+    for (const k of [' ', '/', 'PageDown', 'ArrowDown', 'Home', 'End', 'F5', 'F11'])
+      expect(handle.toyKey(new KeyboardEvent('keydown', { key: k, cancelable: true })), k).toBe(false);
+    for (const k of ['x', 'Enter', 'Backspace'])
+      expect(handle.toyKey(new KeyboardEvent('keydown', { key: k, cancelable: true })), k).toBe(true);
+    // with the prompt focused the toy owns the tty (arrows too), F-keys still pass
+    input.focus();
+    expect(key(input, 'ArrowUp').defaultPrevented).toBe(true);
+    expect(key(input, 'F5').defaultPrevented).toBe(false);
   });
 
   it('Esc never interrupts a running command (ctrl+c does)', () => {
