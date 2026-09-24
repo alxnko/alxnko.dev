@@ -191,12 +191,11 @@ test.describe('3D desk', () => {
       await page.waitForTimeout(2000);
       for (const l of ['wide', 'desk', 'laptop', 'monitor']) {
         await page.evaluate((l) => (window as any).__scene.world().fly(l), l);
-        await page.waitForTimeout(2200);
-        const gap = await page.evaluate((l) => {
+        // wait for the flight to land (not a fixed time: a loaded machine renders slower)
+        await expect.poll(() => page.evaluate((l) => {
           const s = (window as any).__scene; const want = s.rail.pose(l).pos;
           return Math.hypot(...s.camera.position.toArray().map((v: number, i: number) => v - want[i]));
-        }, l);
-        expect(gap, `${l} at ${h}`).toBeLessThan(1e-3);
+        }, l), { message: `${l} at ${h}`, timeout: 10_000 }).toBeLessThan(1e-3);
       }
     }
   });
