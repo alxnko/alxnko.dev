@@ -62,6 +62,11 @@ export class MonitorScreen {
     this.texture.needsUpdate = true;
   }
 
+  /** True when update() would redraw: the minute shown is not the current one (and no rain). */
+  stale(now = Date.now()): boolean {
+    return !this.raining && Math.floor(now / 60000) !== this.minute;
+  }
+
   /** Returns true when redrawn. */
   update(now = Date.now()): boolean {
     if (this.raining) return false;

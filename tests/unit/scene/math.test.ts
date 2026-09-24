@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decide3D } from '../../../src/scene/gate';
+import { decide3D, isSoftwareRenderer } from '../../../src/scene/gate';
 import { Rail, Spring, type Pose } from '../../../src/scene/rail';
 import { homography, applyH, toMatrix3d } from '../../../src/scene/homography';
 
@@ -108,5 +108,12 @@ describe('homography', () => {
   });
   it('rejects degenerate quads', () => {
     expect(() => homography(unit, [[0, 0], [0, 0], [0, 0], [0, 0]])).toThrow();
+  });
+});
+
+describe('isSoftwareRenderer', () => {
+  it('knows the CPU renderers (the desk then boots in its CPU-friendly mode, R66)', () => {
+    for (const r of ['ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)', 'llvmpipe (LLVM 17.0.6, 256 bits)', 'Microsoft Basic Render Driver', 'softpipe']) expect(isSoftwareRenderer(r)).toBe(true);
+    for (const r of ['ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 5050 Laptop GPU/PCIe/SSE2, OpenGL ES 3.2)', 'Apple GPU', 'Mali-G78', 'Adreno (TM) 740']) expect(isSoftwareRenderer(r)).toBe(false);
   });
 });

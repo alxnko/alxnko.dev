@@ -17,6 +17,9 @@ export function currentTheme(): Theme {
 
 /** Swap poster sources that carry data-theme-src='{"day":…,"night":…}'. */
 function swapPosters(t: Theme) {
+  // the desk is up (it never hands back to the page): the poster is hidden for good, so a
+  // theme change must not fetch another one nobody sees
+  if (document.body?.dataset.scene === 'ready') return;
   const key = t === 'light' ? 'day' : 'night';
   for (const el of document.querySelectorAll<HTMLSourceElement | HTMLImageElement>('#poster [data-theme-src]')) {
     try {

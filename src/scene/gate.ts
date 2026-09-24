@@ -21,3 +21,6 @@ export function decide3D(e: GateEnv): Gate {
   if ((e.cores !== undefined && e.cores < 4) || (e.memory !== undefined && e.memory < 4)) return 'offer';
   return 'auto';
 }
+
+/** A WebGL renderer string that means the CPU draws (no GPU): the desk's softwareGL mode. */
+export const isSoftwareRenderer = (name: string) => /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);

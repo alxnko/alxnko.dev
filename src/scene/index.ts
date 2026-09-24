@@ -16,6 +16,8 @@ import { catStep, constrainGaze, clamp, easeOut, frameInterval, nextFlickIn, SPI
 import { attachInput } from './input';
 import { Dock } from './dock';
 import { resolveTarget, type Named } from './pick';
+import { unsupportedExtensions, watchMonitor, yieldToMain } from './phases';
+import { isSoftwareRenderer } from './gate';
 import type { Line, TermState } from '../term/types';
 
 export interface SceneStore {
@@ -34,8 +36,14 @@ export interface SceneOptions {
    * WebGL runs on the CPU (no GPU: SwiftShader, llvmpipe). The desk renders the same scene
    * at a lighter internal resolution while anything moves and at a steadier pace, then
    * redraws at full resolution once the view settles, so a still view keeps every detail.
+   * Left out, it is read from the context's renderer string (after first paint, not in <head>).
    */
   softwareGL?: boolean;
+  /**
+   * The <head> gate's probe canvas (Base.astro). Its WebGL2 context is the one the desk renders
+   * with when its attributes are what the renderer wants, so the GPU context starts once.
+   */
+  probe?: HTMLCanvasElement;
   termEl: HTMLElement;
   contactsEl: HTMLElement;
   /** The monitor's right pane (role, location, rank link), pinned like the contacts. */
@@ -105,6 +113,34 @@ const DEG = Math.PI / 180;
 // a loaf cat turns its head, it doesn't crane: wider than this lifts the head out of its chest
 const GAZE = { yaw: 40 * DEG, up: 6 * DEG, down: 14 * DEG };
 
+/** Reads the renderer string (a blocking call on a cold GPU: made here, after first paint, not
+ *  in <head>). Without a live context it probes a throwaway one. */
+function isSoftwareGL(gl: WebGL2RenderingContext | null): boolean {
+  try {
+    const c = gl ?? document.createElement('canvas').getContext('webgl2');
+    if (!c) return false;
+    const dbg = c.getExtension('WEBGL_debug_renderer_info');
+    const name = String(c.getParameter(dbg ? dbg.UNMASKED_RENDERER_WEBGL : c.RENDERER));
+    if (!gl) c.getExtension('WEBGL_lose_context')?.loseContext();
+    return isSoftwareRenderer(name);
+  } catch {
+    return false;
+  }
+}
+
+/** Resolves once the GL process has run everything submitted so far (polled between tasks,
+ *  never a blocking wait; gives up after 3 s). */
+async function gpuDone(gl: WebGL2RenderingContext): Promise<void> {
+  const sync = gl.fenceSync?.(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  if (!sync) return;
+  gl.flush();
+  const t0 = performance.now();
+  while (gl.getSyncParameter(sync, gl.SYNC_STATUS) !== gl.SIGNALED && !gl.isContextLost() && performance.now() - t0 < 3000) {
+    await new Promise((r) => setTimeout(r, 8));
+  }
+  gl.deleteSync(sync);
+}
+
 /**
  * Load and start the desk. If anything fails partway, whatever was already created (GL
  * context, canvas, subscriptions, listeners, pinned-screen transforms) is torn down before
@@ -131,15 +167,26 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   o.onProgress?.(0.1);
 
   // ---------- renderer ----------
-  const canvas = document.createElement('canvas');
+  // one GL context: the <head> probe's, when it is alive and made the way the renderer needs
+  const probed = o.probe?.getContext('webgl2') ?? null;
+  const live = probed && !probed.isContextLost() ? probed : null;
+  const softwareGL = o.softwareGL ?? isSoftwareGL(live);
+  o = { ...o, softwareGL };
+  const dprCap = RECORDING ? 4 : o.mobile ? 1.5 : 2;
+  const antialias = RECORDING || (!o.softwareGL && devicePixelRatio < 2); // MSAA on the CPU costs more than it shows
+  const powerPreference = o.mobile ? 'default' : 'high-performance';
+  const got = live?.getContextAttributes();
+  const reuse = !!(live && o.probe && got && got.antialias === antialias && got.alpha && got.depth && !got.stencil && !got.preserveDrawingBuffer && got.premultipliedAlpha);
+  if (live && !reuse) live.getExtension('WEBGL_lose_context')?.loseContext();
+  const canvas = reuse ? o.probe! : document.createElement('canvas');
   canvas.className = 'stage-canvas';
   canvas.setAttribute('aria-hidden', 'true');
-  const dprCap = RECORDING ? 4 : o.mobile ? 1.5 : 2;
   const renderer = new WebGLRenderer({
     canvas,
-    antialias: RECORDING || (!o.softwareGL && devicePixelRatio < 2), // MSAA on the CPU costs more than it shows
+    context: reuse ? live! : undefined,
+    antialias,
     alpha: true, // screen regions are transparent windows onto the pinned DOM beneath
-    powerPreference: o.mobile ? 'default' : 'high-performance',
+    powerPreference,
   });
   undo.push(() => { renderer.dispose(); renderer.forceContextLoss(); canvas.remove(); });
   renderer.outputColorSpace = SRGBColorSpace;
@@ -196,8 +243,14 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     }).then((g) => { step('geometry', 'ok'); return g; }),
     atlas(themeKey(o.initial.theme)).then((t) => { step('lighting', 'ok'); return t; }),
   ]);
+  // the loader is slimmed to the extensions the desk uses: a glb needing more would load half
+  // parsed, so refuse it (the boot then falls back to the page)
+  const unsupported = unsupportedExtensions(gltf.parser.json as { extensionsUsed?: string[] });
+  if (unsupported.length) throw new Error(`glb needs unsupported glTF extensions: ${unsupported.join(', ')}`);
   o.onProgress?.(0.8);
   step('screens', 'run');
+  // the mount runs as a few short tasks, not one long one: input and paint get in between
+  await yieldToMain();
 
   // ---------- scene graph ----------
   const scene = new Scene();
@@ -227,17 +280,17 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const monitorMat = windowMaterial(monitor.texture, o.infoEl ? [[...MON_CONTACTS_UV], [...MON_INFO_UV]] : [[...MON_CONTACTS_UV]]);
   meshesOf(laptopScreen).forEach((m) => (m.material = laptopMat));
   meshesOf(monitorScreen).forEach((m) => (m.material = monitorMat));
-  // the terminal typed into is the DOM one pinned on this screen; any output re-renders the
-  // frame. cmatrix --both rains on the whole monitor: drawn into its canvas, windows closed
+  // the terminal typed into is the DOM one pinned on this screen, seen through a transparent
+  // window: its output changes no pixel of the canvas, so it never redraws the frame.
+  // cmatrix --both rains on the whole monitor: drawn into its canvas, windows closed, and each
+  // rain frame (a new texture) is the one terminal change that does redraw
   const holes: Vector4[] = monitorMat.uniforms.uRects.value, open = holes.map((h) => h.clone());
   let rain: TermState['monitor'] = null;
-  const unsubStore = o.store.subscribe((s) => {
-    if (s.monitor !== rain) {
-      if (!rain !== !s.monitor) holes.forEach((h, i) => (s.monitor ? h.setScalar(2) : h.copy(open[i])));
-      monitor.rain((rain = s.monitor));
-    }
+  const unsubStore = o.store.subscribe(watchMonitor((frame) => {
+    if (!rain !== !frame) holes.forEach((h, i) => (frame ? h.setScalar(2) : h.copy(open[i])));
+    monitor.rain((rain = frame));
     invalidate();
-  });
+  }));
   undo.push(unsubStore);
 
   const ringMat = emissiveMaterial(RING[o.initial.ring]);
@@ -329,6 +382,8 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const head = node('cat_head'), tail = node('cat_tail');
   const headQ0 = head.quaternion.clone(), tailQ0 = tail.quaternion.clone();
 
+  await yieldToMain();
+
   // ---------- camera + landmarks ----------
   const camera = new PerspectiveCamera(45, 16 / 10, 0.05, 30);
   const camPose = (name: string): { pose: Pose; refAspect: number } => {
@@ -401,23 +456,63 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   // Things that can stand between the viewer and a screen (the cat, the fan, the laptop lid).
   const occluders: Object3D[] = ['static', 'desk_baked', 'cat_body', 'fan_blades'].map(node);
   const occlusionRay = new Raycaster();
-  /** True if nothing solid sits between `eye` and the screen (centre + inset corners). */
-  const clearView = (eye: Vector3, corners: Vector3[]) => {
+  /** The points of a screen a view must see: its centre and slightly inset corners. */
+  const samplesOf = (corners: Vector3[]) => {
     const c = corners.reduce((acc, q) => acc.add(q), new Vector3()).multiplyScalar(0.25);
-    const samples = [c, ...corners.map((q) => q.clone().lerp(c, 0.12))];
-    return samples.every((p) => {
-      const dir = p.clone().sub(eye);
-      const dist = dir.length();
-      occlusionRay.set(eye, dir.normalize());
-      occlusionRay.far = dist - 0.01;
-      return occlusionRay.intersectObjects(occluders, true).length === 0;
-    });
+    return [c, ...corners.map((q) => q.clone().lerp(c, 0.12))];
   };
+  /** True if nothing solid sits between `eye` and `p`. */
+  const rayClear = (eye: Vector3, p: Vector3) => {
+    const dir = p.clone().sub(eye);
+    const dist = dir.length();
+    occlusionRay.set(eye, dir.normalize());
+    occlusionRay.far = dist - 0.01;
+    return occlusionRay.intersectObjects(occluders, true).length === 0;
+  };
+  /** True if nothing solid sits between `eye` and the screen (centre + inset corners). */
+  const clearView = (eye: Vector3, corners: Vector3[]) => samplesOf(corners).every((p) => rayClear(eye, p));
   // The first unobstructed view around the screen's normal, in order of how little it tilts:
   // straight on, then slightly raised or turned. Chosen once per screen and aspect (resize),
   // then reused while the desk moves.
   const ANGLES: [number, number][] = [[0, 0], [0, 10], [12, 0], [-12, 0], [12, 10], [-12, 10], [0, 20], [20, 12], [-20, 12], [0, 30], [25, 25], [-25, 25]];
   const viewChoice = new Map<string, [number, number]>();
+  // The line-of-sight rays are the costly part of a screen pose, and the desk view needs none:
+  // a screen's are cast all at once on the first flight to it, or else one ray at a time in
+  // idle slots after the first frame (`views`). Until then its pose is the straight-on one,
+  // which nothing shows.
+  const exact = new Set<string>();
+  type ViewJob = { eyeFor: (a: [number, number]) => Vector3; samples: Vector3[]; i: number; s: number };
+  const views = new Map<string, ViewJob>();
+  /** One ray of the oldest pending view choice; true while more remain. */
+  const viewStep = () => {
+    const next = views.entries().next();
+    if (next.done) return false;
+    const [ck, j] = next.value;
+    if (viewChoice.has(ck)) { views.delete(ck); return views.size > 0; }
+    const clear = rayClear(j.eyeFor(ANGLES[j.i]), j.samples[j.s]);
+    if (clear && ++j.s < j.samples.length) return true;
+    if (!clear && ++j.i < ANGLES.length) { j.s = 0; return true; }
+    viewChoice.set(ck, clear ? ANGLES[j.i] : [0, 0]);
+    views.delete(ck);
+    rebuildPoses(); // (cached now: no rays)
+    return views.size > 0;
+  };
+  const idleViews = () => {
+    if (disposed || !views.size) return;
+    const idle = window.requestIdleCallback ?? ((f: IdleRequestCallback) => setTimeout(() => f({ didTimeout: true, timeRemaining: () => 8 }), 50));
+    idle((dl) => {
+      const t0 = performance.now();
+      // a few ms at a time, so no idle slot grows into a long task
+      while (!disposed && viewStep() && performance.now() - t0 < 8 && (dl.didTimeout || dl.timeRemaining() > 4));
+      idleViews();
+    }, { timeout: 1000 });
+  };
+  const needViews = (...keys: string[]) => {
+    const add = keys.filter((k) => !exact.has(k));
+    if (!add.length) return;
+    add.forEach((k) => exact.add(k));
+    rebuildPoses();
+  };
   /** `band` = [top, bottom] fractions of the view the screen should occupy (phones: below the
    *  name block and above the on-screen keyboard); the default is the whole view. */
   const fitScreen = (key: string, corners: Vector3[], margin: number, fov: number, band: [number, number] = [0, 1]): Pose => {
@@ -441,7 +536,11 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     // the line-of-sight test uses the final eye (after the band shift)
     const ck = `${key}:${camera.aspect.toFixed(3)}:${band.join(',')}`;
     let choice = viewChoice.get(ck);
-    if (!choice) {
+    if (!choice && !exact.has(key)) {
+      // not needed yet (see needViews): worked out in idle time
+      if (!views.has(ck)) views.set(ck, { eyeFor, samples: samplesOf(corners), i: 0, s: 0 });
+      choice = [0, 0];
+    } else if (!choice) {
       choice = ANGLES.find((ang) => clearView(eyeFor(ang), corners)) ?? [0, 0];
       viewChoice.set(ck, choice);
     }
@@ -539,13 +638,26 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
 
   // ---------- render loop ----------
   let raf = 0, timer = 0, last = performance.now();
-  undo.push(() => { disposed = true; cancelAnimationFrame(raf); clearTimeout(timer); });
+  // the monitor clock: when no frames run (reduced motion, or a GPU-less still view), a timer
+  // wakes at each minute boundary and redraws only if the shown minute is really out of date
+  let clockTimer = 0;
+  const tickClock = () => {
+    clockTimer = window.setTimeout(() => {
+      if (disposed) return;
+      if (monitor.stale()) invalidate();
+      tickClock();
+    }, 60_000 - (Date.now() % 60_000) + 50);
+  };
+  undo.push(() => { disposed = true; cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(clockTimer); });
   const frameTimes: number[] = [];
   let slept = -1; // ms this frame was deliberately delayed by (-1: it was not scheduled as a paced frame)
   const hidden = () => document.visibilityState === 'hidden';
+  // no frame is drawn (or scheduled) until the mount's last phase draws the first one: a frame
+  // in one of its gaps would compile the shaders and upload the textures all at once
+  let drawing = false;
   function invalidate() {
     dirty = true;
-    if (disposed || raf) return;
+    if (disposed || !drawing || raf) return;
     clearTimeout(timer);
     timer = 0;
     raf = requestAnimationFrame(frame);
@@ -576,7 +688,11 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const upWorld = new Vector3(0, 1, 0);
 
   function frame(now: number) {
-    raf = 0;
+    // one chain of frames only, however this one was started (rAF, the pacing timer, or the
+    // mount's direct first frame)
+    if (raf) cancelAnimationFrame(raf);
+    clearTimeout(timer);
+    raf = timer = 0;
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     let animating = false;
@@ -842,6 +958,8 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const world: SceneWorld = {
     fly(to) {
       lastInput = performance.now();
+      if (to === 'laptop') needViews('laptop');
+      else if (to === 'monitor') needViews('monitor', 'contacts');
       if (to === dest && settled()) return; // already there: nothing to animate
       // start from the camera exactly as it is, then fold the free-look offsets into the flight
       from = currentPose();
@@ -1020,17 +1138,75 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     document.removeEventListener('visibilitychange', onVis);
   });
 
-  o.stage.after(canvas); // above the pinned screens (they show through its windows)
-  if (new URLSearchParams(location.search).has('test')) (window as any).__scene = { scene, camera, renderer, rail, flight, dest: () => dest, orbit, invalidate, world: () => world, hold: () => hold, pan };
+  if (new URLSearchParams(location.search).has('test')) (window as any).__scene = { scene, camera, renderer, rail, flight, dest: () => dest, orbit, invalidate, world: () => world, hold: () => hold, pan, views: () => [...exact] };
   sizeOverlays();
   applySize();
-  // first frame, then reveal (the app fades the poster out)
+  // the monitor's canvas is drawn in the site font (before its first upload below)
   await document.fonts?.load('400 24px "JetBrains Mono"').catch(() => {});
-  // drawn directly, not in a rAF: a covered or background window gets no animation frames,
-  // and the desk must still finish loading there (it simply paints once shown)
+  monitor.update();
+  // the loader's bar keeps moving through the tail: 0.8 → 0.98, then 1 with the first frame
+  const tailStep = (k: number) => o.onProgress?.(0.8 + 0.18 * k);
+  await yieldToMain();
+  // shaders: linked in parallel where the driver can (KHR_parallel_shader_compile), then each
+  // program's link status and uniforms read in a task of its own. The invisible hit targets
+  // are never drawn, so they must not cost a program: they borrow the desk's for the compile.
+  const hitMeshes = hits.flatMap(meshesOf), hitMats = hitMeshes.map((m) => m.material);
+  hitMeshes.forEach((m) => (m.material = baked));
+  // (starts every link synchronously; without the extension there is nothing to poll)
+  const compiled = renderer.extensions.has('KHR_parallel_shader_compile') ? renderer.compileAsync(scene, camera) : renderer.compile(scene, camera);
+  hitMeshes.forEach((m, i) => (m.material = hitMats[i]));
+  await compiled;
+  tailStep(0.3);
+  await yieldToMain();
+  const programs = new Set<{ getUniforms(): unknown }>();
+  scene.traverse((c) => {
+    const m = (c as Mesh).material;
+    const p = m && !Array.isArray(m) ? (renderer.properties.get(m) as { currentProgram?: { getUniforms(): unknown } }).currentProgram : undefined;
+    if (p) programs.add(p);
+  });
+  let pi = 0;
+  for (const p of programs) {
+    p.getUniforms();
+    tailStep(0.3 + (0.25 * ++pi) / programs.size);
+    await yieldToMain();
+  }
+  // texture uploads, one per task (the atlas, then the 2048×858 monitor canvas)
+  const uploads = [firstAtlas, monitor.texture, fanReadout?.texture].filter((t): t is Texture => !!t);
+  for (const [i, t] of uploads.entries()) {
+    renderer.initTexture(t);
+    tailStep(0.55 + (0.25 * (i + 1)) / uploads.length);
+    await yieldToMain();
+  }
+  // Warm-up while the canvas is still off the page: one draw of the whole view clipped to a
+  // single pixel, so the GL process builds every pipeline (a CPU renderer compiles them at
+  // first draw) and finishes the uploads now. The page waits for none of it: the fence is
+  // polled between tasks, and the page's own frames never wait on a canvas it does not show.
+  {
+    const p0 = basePose();
+    camera.position.set(...p0.pos);
+    camera.fov = p0.fov;
+    camera.aspect = (o.stage.clientWidth || innerWidth) / (o.stage.clientHeight || innerHeight);
+    camera.updateProjectionMatrix();
+    camera.lookAt(...p0.target);
+    camera.updateMatrixWorld();
+    renderer.setScissor(0, 0, 1, 1);
+    renderer.setScissorTest(true);
+    renderer.render(scene, camera);
+    renderer.setScissorTest(false);
+    tailStep(0.9);
+    await gpuDone(renderer.getContext() as WebGL2RenderingContext);
+    tailStep(1);
+  }
+  // first frame, then reveal (the app fades the poster out). Drawn directly, not in a rAF: a
+  // covered or background window gets no animation frames, and the desk must still finish
+  // loading there (it simply paints once shown)
+  o.stage.after(canvas); // above the pinned screens (they show through its windows)
+  drawing = true;
   frame(performance.now());
+  tickClock();
   step('screens', 'ok');
   o.onProgress?.(1);
+  idleViews();
   // warm the other theme's atlas in idle time so toggling is instant
   const warm = () =>
     atlas(o.initial.theme === 'light' ? 'night' : 'day').then((tx) => {
@@ -1045,6 +1221,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       disposed = true;
       cancelAnimationFrame(raf);
       clearTimeout(timer);
+      clearTimeout(clockTimer);
       detachInput();
       dock.destroy();
       removeEventListener('resize', onResize);

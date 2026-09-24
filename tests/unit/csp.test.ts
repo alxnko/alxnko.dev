@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { buildCsp, inlineBlocks, styleAttrs } from '../../scripts/postbuild-csp';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { buildCsp, inlineBlocks, run, styleAttrs } from '../../scripts/postbuild-csp';
 
 const sha = (s: string) => `'sha256-${createHash('sha256').update(s, 'utf8').digest('base64')}'`;
 const directive = (csp: string, name: string) =>
@@ -39,6 +42,33 @@ describe('postbuild CSP', () => {
     expect(directive(csp, 'worker-src')).toBe("worker-src 'self' blob:");
     for (const d of ["base-uri 'none'", "form-action 'none'", "frame-ancestors 'none'", 'upgrade-insecure-requests']) {
       expect(csp).toContain(d);
+    }
+  });
+
+  it('requires Trusted Types for every script sink, with no policy allowed (R78)', () => {
+    expect(csp).toContain("require-trusted-types-for 'script'");
+    expect(csp).toContain("trusted-types 'none'");
+    expect(buildCsp([html], { trustedTypes: false })).not.toMatch(/trusted-types/);
+  });
+
+  it('ships Trusted Types report-only by default; CSP_TT=enforce enforces them (R83)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'csp-'));
+    try {
+      const put = () => {
+        writeFileSync(join(dir, 'index.html'), html);
+        writeFileSync(join(dir, '_headers'), '/*\n  Content-Security-Policy: __CSP__\n');
+      };
+      put();
+      const enforced = run(dir, 'enforce');
+      expect(readFileSync(join(dir, '_headers'), 'utf8')).not.toContain('Report-Only');
+      put();
+      const staged = run(dir);
+      const h = readFileSync(join(dir, '_headers'), 'utf8');
+      expect(staged).toBe(buildCsp([html], { trustedTypes: false }));
+      expect(enforced).toBe(csp);
+      expect(h).toContain("Content-Security-Policy-Report-Only: require-trusted-types-for 'script'; trusted-types 'none'");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 
