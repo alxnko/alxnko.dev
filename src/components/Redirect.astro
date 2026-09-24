@@ -6,6 +6,7 @@ interface Props {
   title: string;
 }
 const { target, title } = Astro.props;
+// noindex and no canonical: the two together are mixed signals, and a mailto: canonical is invalid.
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -15,7 +16,6 @@ const { target, title } = Astro.props;
   <title>{title} · alxnko</title>
   <meta name="robots" content="noindex" />
   <meta http-equiv="refresh" content={`0; url=${target}`} />
-  <link rel="canonical" href={target} />
   <!-- Icons only: this page redirects immediately, so no manifest/touch-icon fetch. -->
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
