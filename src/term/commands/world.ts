@@ -1,4 +1,4 @@
-// theme, desk, ring, fan, sound, meow: commands with a physical effect (spec §3.5).
+// theme, desk, rgb, fan, sound, meow: commands with a physical effect (spec §3.5).
 
 /** meow in other languages (all hidden from help; see `man meow`). */
 export const MEOW_ALIASES: readonly string[] = [
@@ -8,7 +8,8 @@ export const MEOW_ALIASES: readonly string[] = [
 import { fail, untilAborted, type ShellEnv } from '../registry';
 import { themeName } from '../vfs';
 import { fg } from '../format';
-import type { Command, FanSpeed, Ring, SoundLevel } from '../types';
+import { parseRgb, PRESET_NAMES, PRESETS, type Preset } from '../../lib/rgb';
+import type { Command, FanSpeed, Line, SoundLevel } from '../types';
 
 export const DESK_PRESETS: Record<string, number> = { '1': 0.74, '2': 0.95, '3': 1.12 };
 export const DESK_MIN = 0.7;
@@ -60,20 +61,38 @@ export function worldCommands(env: ShellEnv): Command[] {
     },
   };
 
-  const ring: Command = {
-    name: 'ring',
-    summary: 'monitor ring light color',
-    usage: 'ring [green|purple|off]',
+  // rgb: one colour for the whole site (R86): the accent, the terminal, the desk's lights,
+  // the accent keys and the cat. `color`, `colour` and the old `ring` are the same command.
+  const chip = (spec: string): Line[number] => ({ text: spec, fg: 'accent', run: `rgb ${spec}` });
+  const shown = (s: string) => (s.length > 16 ? `${s.slice(0, 16)}…` : s);
+  const rgb: Command = {
+    name: 'rgb',
+    summary: 'one color for the lights, keys, cat and accent',
+    usage: 'rgb [preset|#hex|off|on]',
     group: 'world',
-    complete: () => ['green', 'purple', 'off'],
+    complete: () => [...PRESET_NAMES, 'off', 'on'],
     run(ctx) {
+      const w = ctx.world.get();
+      if (ctx.args.length > 1) fail(ctx, 'rgb: too many arguments (one color: rgb cyan, rgb #ff8800)', 2);
       const a = ctx.args[0];
-      if (a === undefined) return ctx.out(`ring: ${ctx.world.get().ring}`);
-      if (a !== 'green' && a !== 'purple' && a !== 'off') fail(ctx, `ring: invalid color '${a}' (green|purple|off)`, 2);
-      ctx.world.setRing(a as Ring);
-      ctx.out(`ring: ${a}`);
+      if (a === undefined) {
+        ctx.out(w.rgb === 'off' ? `rgb: off (the lights are off; the accent stays ${w.accent})` : `rgb: ${w.rgb}`);
+        const line: Line = [fg('muted', 'presets: ')];
+        // each preset in its own colour (its dark shade: made for the terminal's dark screen)
+        PRESET_NAMES.forEach((n, i) => line.push(...(i ? [{ text: ' ' }] : []), { ...chip(n), swatch: PRESETS[n as Preset].dark }));
+        ctx.out(line);
+        return ctx.out([fg('muted', 'or any hex: '), chip('#ff8800'), fg('muted', ', and '), chip(w.rgb === 'off' ? 'on' : 'off')]);
+      }
+      const spec = a.trim().toLowerCase() === 'on' ? w.accent : parseRgb(a);
+      if (spec === null) {
+        if (a.trim().startsWith('#')) fail(ctx, `rgb: invalid hex color '${shown(a)}' (use #rgb or #rrggbb, like #ff8800)`, 2);
+        fail(ctx, `rgb: unknown color '${shown(a)}' (${PRESET_NAMES.join(', ')}, off, or a #hex)`, 2);
+      }
+      ctx.world.setRgb(spec);
+      ctx.out(spec === 'off' ? `rgb: off (the lights are off; the accent stays ${ctx.world.get().accent})` : `rgb: ${spec}`);
     },
   };
+  const rgbAliases = ['color', 'colour', 'ring'].map((name): Command => ({ ...rgb, name, hidden: true, aliasOf: 'rgb' }));
 
   const fan: Command = {
     name: 'fan',
@@ -134,12 +153,12 @@ export function worldCommands(env: ShellEnv): Command[] {
       if (!w.has3d()) {
         // the page view has no desk to walk around: say so briefly instead of 13 s of text
         ctx.out('tour: the tour walks around the 3d desk, and this view has none.');
-        ctx.out([{ text: 'open alxnko.dev/?3d for it, or try ' }, { text: 'contacts', fg: 'green', run: 'contacts' }, { text: ' and ' }, { text: 'fastfetch', fg: 'green', run: 'fastfetch' }, { text: '.' }]);
+        ctx.out([{ text: 'open alxnko.dev/?3d for it, or try ' }, { text: 'contacts', fg: 'accent', run: 'contacts' }, { text: ' and ' }, { text: 'fastfetch', fg: 'accent', run: 'fastfetch' }, { text: '.' }]);
         return;
       }
       const was = w.get();
       const say = (n: number, what: string, cmd: string) =>
-        ctx.out([fg('muted', `${n}/5 `), { text: what + ' ' }, fg('muted', 'try: '), { text: cmd, fg: 'green', run: cmd }]);
+        ctx.out([fg('muted', `${n}/5 `), { text: what + ' ' }, fg('muted', 'try: '), { text: cmd, fg: 'accent', run: cmd }]);
       const pause = () => ctx.sleep(2600);
       ctx.out([fg('muted', 'tour: five stops, about fifteen seconds. ctrl+c ends it.')]);
       try {
@@ -153,21 +172,26 @@ export function worldCommands(env: ShellEnv): Command[] {
         say(3, 'the desk is sit-stand. up it goes.', 'desk 2');
         await untilAborted(w.setDesk(DESK_PRESETS['2']), ctx.signal);
         await pause();
-        say(4, 'the ring light behind the monitor.', 'ring purple');
-        w.setRing(was.ring === 'purple' ? 'green' : 'purple');
+        const hue = was.rgb === 'purple' ? 'cyan' : 'purple';
+        say(4, 'one color runs the ring light, the keys, the cat and this terminal.', `rgb ${hue}`);
+        w.setRgb(hue);
         await pause();
         say(5, 'and the cat on the fan.', 'meow');
         w.meow();
         await pause();
       } finally {
         // put the desk back as it was, even after ctrl+c
-        if (w.get().ring !== was.ring) w.setRing(was.ring);
+        const now = w.get();
+        if (now.rgb !== was.rgb || now.accent !== was.accent) {
+          w.setRgb(was.accent); // the accent comes back too when the lights were off
+          if (was.rgb === 'off') w.setRgb('off');
+        }
         if (Math.abs(w.get().desk - was.desk) > 0.005) void w.setDesk(was.desk);
         w.fly('desk');
       }
-      ctx.out([{ text: 'that was the tour. everything else: ' }, { text: 'help', fg: 'green', run: 'help' }]);
+      ctx.out([{ text: 'that was the tour. everything else: ' }, { text: 'help', fg: 'accent', run: 'help' }]);
     },
   };
 
-  return [theme, desk, ring, fan, sound, tour, ...meows];
+  return [theme, desk, rgb, ...rgbAliases, fan, sound, tour, ...meows];
 }

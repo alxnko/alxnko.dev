@@ -23,7 +23,8 @@ import common as C  # noqa: E402
 import dims as D  # noqa: E402
 
 A = C.args()
-BAKED = ["static", "desk_baked", "fan_blades", "cat_body", "cat_head", "cat_tail"]
+TINTED = ["kbd_accent", "paddle_glyphs", "cat_body", "cat_head", "cat_tail"]   # baked neutral, runtime tint (R86)
+BAKED = ["static", "desk_baked", "kbd_accent", "paddle_glyphs", "fan_blades", "cat_body", "cat_head", "cat_tail"]
 SHADOWS = ["shadow_floor", "shadow_wall"]          # atlas-mapped multiply decals
 PADDLE_HITS = [f"hit_paddle_{k}" for k in ("1", "2", "3", "up", "down")]   # left -> right
 OVERLAYS = ["fan_ring", "fan_display", "kbd_glow", "laptop_kbd_glow"]
@@ -153,6 +154,11 @@ def collect(objs):
     info["ringGlow"] = {"center": g(rig_local(glow, Vector())), "size": 0.9,
                         "note": "quad on the wall, parented to desk_rig; additive radial glow from UV"}
     info.update(collect_overlays(objs))
+    info["tint"] = {"nodes": TINTED, "base": C.SC["tintBase"],
+                    "own": {"kbd_accent": C.SC["keyLime"], "paddle_glyphs": C.SC["legend"], "cat": C.SC["cat"]},
+                    "note": "baked with a neutral grey albedo (`base`, edge wear lighter grey): runtime colour = "
+                            "atlas (linear) x tint / base (linear), day and night alike. `rgb` drives the tint; "
+                            "`rgb off` shows each part's own colour (`own`)"}
     for n, key in (("shadow_floor", "shadowFloor"), ("shadow_wall", "shadowWall")):
         ob = objs[n]
         a0, a1, b0, b1 = ob["decal_rect"]

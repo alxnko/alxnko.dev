@@ -11,6 +11,7 @@ import markFont from '../assets/fonts/vt323-mark.woff2?url';
 import { SITE } from '../content/site';
 import { structuredData } from '../lib/structured-data';
 import { TOKENS } from '../lib/tokens';
+import { cssOf, PRESETS } from '../lib/rgb';
 import Toggles from '../components/Toggles.astro';
 
 interface Props {
@@ -26,6 +27,9 @@ const url = new URL(path, SITE.url).href;
 const og = new URL('/og.png', SITE.url).href;
 const dark = TOKENS.semantic.dark.bg;
 const light = TOKENS.semantic.light.bg;
+// a visitor who picked `ring purple` before `rgb` existed: their first visit since is purple
+// from the first paint too (entry.ts migrates the pref and writes the cached palette)
+const rp = cssOf(PRESETS.purple);
 const ld = structuredData(url, title);
 ---
 <!doctype html>
@@ -39,7 +43,7 @@ const ld = structuredData(url, title);
     <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content={dark} media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content={light} media="(prefers-color-scheme: light)" />
-    <script is:inline define:vars={{ dark, light }}>
+    <script is:inline define:vars={{ dark, light, rp }}>
       var d = document.documentElement, t = null;
       try {
         t = localStorage.getItem('alxnko:theme');
@@ -49,6 +53,10 @@ const ld = structuredData(url, title);
       if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
       d.dataset.theme = t;
       d.classList.add('js');
+      try {
+        var c = localStorage.getItem('alxnko:rgb-css') || (localStorage.getItem('alxnko:ring') == 'purple' && !localStorage.getItem('alxnko:rgb') ? rp : '');
+        if (/^#[0-9a-f]{6}(,#[0-9a-f]{6}){3}$/.test(c)) ['dark', 'light', 'fill', 'on'].forEach(function (k, i) { d.style.setProperty('--rgb-' + k, c.split(',')[i]); });
+      } catch (e) {}
       document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = t === 'light' ? light : dark; });
     </script>
     {/*

@@ -242,7 +242,7 @@
 }
 
 [data-mode="scene"] .contacts a .c-key {
-  color: var(--ansi-green);
+  color: var(--ansi-accent);
 }
 
 /* touch: the links share out the panel's whole height, so each row is as tall a tap target
@@ -489,7 +489,7 @@
 }
 
 .loader-steps li[data-state="ok"] .st {
-  color: var(--ansi-green);
+  color: var(--ansi-accent);
 }
 
 .loader-bar {
@@ -503,7 +503,7 @@
   display: block;
   width: 100%;
   height: 100%;
-  background: var(--ansi-green);
+  background: var(--ansi-accent);
   transform: scaleX(var(--p, 0));
   transform-origin: 0 50%;
   transition: transform var(--d-base) var(--ease);

@@ -387,14 +387,14 @@
 }
 
 .nf-term a:hover {
-  text-decoration-color: var(--ansi-green);
+  text-decoration-color: var(--ansi-accent);
 }
 
 .nf-term .caret {
   display: inline-block;
   width: 1ch;
   margin-left: 1ch;
-  background: var(--ansi-green);
+  background: var(--ansi-accent);
 }
 
 .nf-note {

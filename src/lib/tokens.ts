@@ -19,6 +19,12 @@ const ANSI: Record<Color, string> = {
   blue: tokens.ansi.blue,
   magenta: tokens.ansi.magenta,
   cyan: tokens.ansi.cyan,
+  accent: tokens.ansi.green,
+};
+
+/** The terminal's accent follows `rgb` (its dark-theme shade: the screens are always dark). */
+export const setAnsiAccent = (hex: string): void => {
+  ANSI.accent = hex;
 };
 
 /** Terminal palette (screens are always dark). */

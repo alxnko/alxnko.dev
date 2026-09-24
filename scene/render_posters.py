@@ -25,6 +25,11 @@ import common as C  # noqa: E402
 A = C.args()
 SIZE = A.get("size", "4096")
 GREEN = C.PRIM["green"]
+# the neutral-baked parts in the default `rgb` (R86), as src/scene/index.ts tints them: the keys
+# and the cat take the palette's tint, the paddle legends (lit labels) its fill
+TINTED = {"kbd_accent": C.RGB["green"]["tint"], "cat_body": C.RGB["green"]["tint"],
+          "cat_head": C.RGB["green"]["tint"], "cat_tail": C.RGB["green"]["tint"],
+          "paddle_glyphs": C.RGB["green"]["fill"]}
 POSTER = (1600, 1000)
 PORTRAIT = (800, 1000)
 RING = {"day": 0.9, "night": 1.0}          # ring emissive (display-referred)
@@ -69,6 +74,23 @@ def image_emission(name, path, flip_v=False, strength=1.0, uv="UVMap"):
     em.inputs["Strength"].default_value = strength
     nt.links.new(tex.outputs["Color"], em.inputs["Color"])
     nt.links.new(em.outputs["Emission"], out.inputs["Surface"])
+    return m
+
+
+def tinted_emission(name, path, tint_hex, uv="UVMap"):
+    """The atlas times tint / base (linear), what the runtime's tinted material does."""
+    m = image_emission(name, path, uv=uv)
+    nt = m.node_tree
+    tex = next(n for n in nt.nodes if n.type == "TEX_IMAGE")
+    em = next(n for n in nt.nodes if n.type == "EMISSION")
+    t, b = C.hex_lin(tint_hex), C.hex_lin(C.SC["tintBase"])
+    mul = nt.nodes.new("ShaderNodeMix")
+    mul.data_type = "RGBA"
+    mul.blend_type = "MULTIPLY"
+    mul.inputs["Factor"].default_value = 1.0
+    mul.inputs["B"].default_value = (t[0] / b[0], t[1] / b[1], t[2] / b[2], 1.0)
+    nt.links.new(tex.outputs["Color"], mul.inputs["A"])
+    nt.links.new(mul.outputs["Result"], em.inputs["Color"])
     return m
 
 
@@ -224,9 +246,12 @@ def setup(rig, atlas_path, objects=None, window_fade=0.25, screens=True, uv="UVM
     sc = bpy.context.scene
     objs = objects if isinstance(objects, dict) else {o.name: o for o in (objects or bpy.data.objects)}
     atlas = image_emission(f"atlas_{rig}", atlas_path, uv=uv)
-    for name in ("static", "desk_baked", "fan_blades", "cat_body", "cat_head", "cat_tail"):
+    for name in ("static", "desk_baked", "fan_blades"):
         if name in objs:
             assign(objs[name], atlas)
+    for name, tint in TINTED.items():
+        if name in objs:
+            assign(objs[name], tinted_emission(f"atlas_{tint[1:]}_{rig}", atlas_path, tint, uv=uv))
     for name in ("shadow_floor", "shadow_wall"):
         if name in objs:
             objs[name].hide_render = False

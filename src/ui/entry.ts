@@ -1,6 +1,6 @@
 // Page entry: wires the real terminal core to the DOM, composes the world the terminal
 // talks to (page theme + sound + the lazy 3D desk), and runs the 3D gate after load.
-import type { FanSpeed, Landmark, Ring, SoundLevel, Theme, WorldPort, WorldState } from '../term/types';
+import type { FanSpeed, Landmark, SoundLevel, Theme, WorldPort, WorldState } from '../term/types';
 import { TermStore } from '../term/store';
 import { Shell } from '../term/exec';
 import { complete } from '../term/complete';
@@ -12,13 +12,15 @@ import { createSound } from '../audio/sound';
 import { decide3D } from '../scene/gate';
 import type { SceneWorld } from '../scene/index';
 import * as prefs from '../lib/prefs';
+import { parseRgb } from '../lib/rgb';
+import { loadRgb, saveRgb } from './accent';
 import { SOUND_EVENT, soundLevel, start } from './app';
 import { currentTheme, setTheme, THEME_EVENT } from './theme';
 import { FrameView } from './terminal-dom';
+import { prefetchText } from '../term/lazy';
 
 const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const narrow = () => innerWidth < 640;
-const RINGS: readonly Ring[] = ['green', 'purple', 'off'];
 
 /** The world the terminal talks to. Works without 3D; the scene attaches when it loads. */
 class AppWorld implements WorldPort {
@@ -27,13 +29,9 @@ class AppWorld implements WorldPort {
   private s: WorldState;
 
   constructor() {
-    const ring = prefs.get('ring');
-    this.s = {
-      ...DEFAULT_WORLD,
-      theme: currentTheme(),
-      sound: soundLevel(),
-      ring: RINGS.includes(ring as Ring) ? (ring as Ring) : 'green',
-    };
+    const { rgb, accent } = loadRgb();
+    saveRgb(rgb, accent); // what the <head> script applied, now validated (or corrected)
+    this.s = { ...DEFAULT_WORLD, theme: currentTheme(), sound: soundLevel(), rgb, accent };
   }
 
   get(): WorldState {
@@ -58,10 +56,14 @@ class AppWorld implements WorldPort {
   setTheme(t: Theme): void {
     setTheme(t); // page tokens + persistence; the THEME_EVENT listener updates the scene
   }
-  setRing(r: Ring): void {
-    this.s.ring = r;
-    prefs.set('ring', r);
-    this.scene?.setRing(r);
+  setRgb(spec: string): void {
+    const rgb = parseRgb(spec);
+    if (rgb === null) return;
+    const accent = rgb === 'off' ? this.s.accent : rgb;
+    this.s.rgb = rgb;
+    this.s.accent = accent;
+    saveRgb(rgb, accent);
+    this.scene?.setRgb(rgb, accent);
   }
   setFan(f: FanSpeed): void {
     this.s.fan = f;
@@ -110,6 +112,19 @@ async function boot(first: boolean) {
   }
   // the autologin's own command: not the visitor's history, and the first chips stay put
   await shell.run(first && !narrow() ? 'fastfetch' : 'fastfetch --compact', { record: false });
+}
+
+/**
+ * The terminal's long text (man pages, phrases) warms in idle time once nothing else is loading:
+ * after the desk is up, or when there is no desk to wait for (R90). Once per visit.
+ */
+let warmed = false;
+function warmText() {
+  if (warmed) return;
+  warmed = true;
+  const ric = (globalThis as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+  if (ric) ric(prefetchText, { timeout: 4000 });
+  else setTimeout(prefetchText, 1500);
 }
 
 /** Answered once in <head> (Base.astro); probe only if that script did not run. */
@@ -219,17 +234,18 @@ function enter3d() {
     .then((handle) => {
       handle3d = handle;
       world.scene = handle.world;
-      // anything changed while the desk was loading (theme, desk height, ring, fan) was only
+      // anything changed while the desk was loading (theme, desk height, rgb, fan) was only
       // applied to the page: bring the scene up to date now that it is listening
       const now = world.get(), was = initial;
       if (now.theme !== was.theme) handle.world.setTheme(now.theme);
-      if (now.ring !== was.ring) handle.world.setRing(now.ring);
+      if (now.rgb !== was.rgb || now.accent !== was.accent) handle.world.setRgb(now.rgb, now.accent);
       if (now.fan !== was.fan) handle.world.setFan(now.fan);
       if (now.desk !== was.desk) void handle.world.setDesk(now.desk);
       document.body.dataset.mode = 'scene';
       document.body.dataset.scene = 'ready';
       syncMonitorLinks();
       if (btn) btn.hidden = true;
+      warmText();
       // the live desk covers the poster for good: a download still under way is dropped
       const img = document.querySelector<HTMLImageElement>('#poster img');
       if (img && !img.complete) { img.parentElement?.querySelectorAll('source').forEach((s) => s.remove()); img.removeAttribute('src'); }
@@ -253,6 +269,7 @@ function leave3d() {
   delete document.body.dataset.scene;
   syncMonitorLinks();
   delete document.documentElement.dataset.boot; // reveal the page (no loader, no 3D)
+  warmText();
   const btn = $('enter3d') as HTMLButtonElement | null;
   if (btn && hasWebGL2()) { btn.hidden = false; btn.disabled = false; btn.textContent = 'enter 3d'; }
 }
@@ -282,6 +299,7 @@ function afterIdle() {
   btn?.addEventListener('click', enter3d);
   if (gate === 'auto' && !booting3d) enter3d();
   else if (gate === 'offer' && btn) btn.hidden = false;
+  if (gate !== 'auto' && !booting3d) warmText(); // no desk loading: nothing to compete with
 }
 
 // A pinned screen seen from afar is one big button: the first click flies you there (links

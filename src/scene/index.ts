@@ -6,10 +6,11 @@ import {
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import type { FanSpeed, Landmark, Ring, Theme, WorldState } from '../term/types';
+import type { FanSpeed, Landmark, Theme, WorldState } from '../term/types';
 import { parseManifest, type Manifest } from './manifest';
-import { TERM_BG } from '../lib/tokens';
-import { shadowMaterial, windowMaterial, bakedMaterial, ghostMaterial, emissiveMaterial, glowMaterial, screenMaterial, skyMaterial } from './materials';
+import { setAnsiAccent, TERM_BG, TOKENS } from '../lib/tokens';
+import { linear, palette } from '../lib/rgb';
+import { shadowMaterial, windowMaterial, bakedMaterial, ghostMaterial, tintedMaterial, emissiveMaterial, glowMaterial, screenMaterial, skyMaterial } from './materials';
 import { lerpPose, Rail, Spring, type Pose, type Vec3 } from './rail';
 import { FanDisplay, MonitorScreen } from './monitor-screen';
 import { catStep, constrainGaze, clamp, easeOut, frameInterval, nextFlickIn, SPIN_FRAME_MS, Tween, type CatState } from './anim';
@@ -64,7 +65,9 @@ export interface SceneWorld {
   fly(to: Landmark): void;
   setDesk(h: number): Promise<void>;
   setTheme(t: Theme): void;
-  setRing(r: Ring): void;
+  /** `rgb`: the lights (ring, glow, fan ring, backlights) and the tinted parts; `accent` is
+   * the colour in use (the last one while `rgb` is off: the server LED and screens keep it). */
+  setRgb(rgb: string, accent: string): void;
   setFan(s: FanSpeed): void;
   meow(): void;
   stare(): void;
@@ -78,7 +81,28 @@ export type LoadStep = 'manifest' | 'geometry' | 'lighting' | 'screens';
 
 export interface SceneHandle { world: SceneWorld; destroy(): void }
 
-const RING: Record<Ring, string> = { green: '#00ff82', purple: '#b061ff', off: '#161618' };
+const RING_OFF = '#161618';
+// `rgb off`: the tinted parts show their own colours (the lime caps, white legends, green cat)
+const OWN = { keys: TOKENS.primitive.scene.keyLime, legend: TOKENS.primitive.scene.legend, cat: TOKENS.primitive.scene.cat };
+const TINT_BASE = linear(TOKENS.primitive.scene.tintBase)[0];
+/** A tint uniform: tint / base, linear (the parts were baked neutral grey). */
+const tintOf = (hex: string, out = new Color()) => {
+  const [r, g, b] = linear(hex);
+  return out.setRGB(r / TINT_BASE, g / TINT_BASE, b / TINT_BASE);
+};
+/** Target colours of everything `rgb` drives in the scene (linear Colors, tween targets). */
+function rgbTargets(rgb: string, accent: string) {
+  const p = palette(accent), on = rgb !== 'off';
+  return {
+    ring: new Color(on ? p.fill : RING_OFF),
+    keys: tintOf(on ? p.tint : OWN.keys),
+    cat: tintOf(on ? p.tint : OWN.cat),
+    // the legends are lit labels: the bright fill, not the deeper tint
+    legend: tintOf(on ? p.fill : OWN.legend),
+    led: new Color(p.fill),
+    screen: p.dark,
+  };
+}
 // `astro build --mode recording`: the video pipeline's build (video/). It renders frame by frame
 // on a GPU, so it takes full resolution, MSAA and the sharp atlases, and never steps
 // resolution down. MODE is a build-time constant: in the site's own builds this is
@@ -270,7 +294,17 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const opt = (n: string) => gltf.scene.getObjectByName(n) ?? null;
   let mix = o.initial.theme === 'light' ? 0 : 1;
   const baked = bakedMaterial(firstAtlas, firstAtlas, mix);
-  for (const n of ['static', 'desk_baked', 'cat_body', 'cat_head', 'cat_tail', 'fan_blades']) meshesOf(node(n)).forEach((m) => (m.material = baked));
+  for (const n of ['static', 'desk_baked', 'fan_blades']) meshesOf(node(n)).forEach((m) => (m.material = baked));
+  // the accent parts, baked neutral and tinted by `rgb` (R86)
+  let rgbNow = rgbTargets(o.initial.rgb, o.initial.accent);
+  setAnsiAccent(rgbNow.screen);
+  const keysMat = tintedMaterial(baked, rgbNow.keys.clone());
+  const catMat = tintedMaterial(baked, rgbNow.cat.clone());
+  const legendMat = tintedMaterial(baked, rgbNow.legend.clone());
+  for (const [n, mat] of [['kbd_accent', keysMat], ['paddle_glyphs', legendMat], ['cat_body', catMat], ['cat_head', catMat], ['cat_tail', catMat]] as const) {
+    const g = opt(n);
+    if (g) meshesOf(g).forEach((m) => (m.material = mat));
+  }
 
   const monitor = new MonitorScreen(o.mobile);
   undo.push(() => monitor.dispose());
@@ -293,7 +327,8 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   }));
   undo.push(unsubStore);
 
-  const ringMat = emissiveMaterial(RING[o.initial.ring]);
+  const ringMat = emissiveMaterial(RING_OFF);
+  (ringMat.uniforms.uColor.value as Color).copy(rgbNow.ring);
   meshesOf(node('ring')).forEach((m) => (m.material = ringMat));
   const glow = glowMaterial();
   meshesOf(node('ring_glow')).forEach((m) => { m.material = glow; m.renderOrder = 2; });
@@ -308,7 +343,9 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const LED_OFF = '#1d1d20';
   const ledPaddle = led('led_paddle', LED_OFF);
   led('led_kbd', '#c9d4ff');
-  const srvLeds = [0, 1, 2, 3, 4, 5].map((i) => led(`led_srv_${i}`, i === 0 ? '#00ff82' : LED_OFF));
+  // led_srv_0: the server's status LED, in the accent (it stays lit while `rgb` is off)
+  const srvLeds = [0, 1, 2, 3, 4, 5].map((i) => led(`led_srv_${i}`, LED_OFF));
+  srvLeds[0].copy(rgbNow.led);
   // optional nodes (older scene builds lack them): the fan's glowing bezel and speed display,
   // and the keyboard backlights. All follow the ring colour, like the real RGB does.
   // movable baked shadows (newer builds): the floor one softens/spreads as the desk rises,
@@ -609,8 +646,9 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const YAW = () => lim.yaw * DEG, PITCH_UP = () => lim.up * DEG, PITCH_DOWN = () => lim.down * DEG;
   let deskTween: Tween | null = null, deskDone: (() => void) | null = null;
   let mixTween: Tween | null = null, themeReq = 0;
-  let ringTween: { from: Color; to: Color; start: number } | null = null;
-  let ringKind: Ring = o.initial.ring;
+  // one 300 ms tween moves every `rgb` colour: [uniform, from, to]
+  let ringTween: { pairs: [Color, Color, Color][]; start: number } | null = null;
+  let ringKind = o.initial.rgb;
   let fanSpeed = FAN_SPEED[o.initial.fan], fanTarget = fanSpeed, fanAngle = 0;
   let pulse = 0, pulseStart = 0;
   let cat: CatState = { mode: 'idle', since: 0, lastActivity: 0 };
@@ -746,8 +784,8 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     // ring colour + breathe + meow pulse
     const ringCol = ringMat.uniforms.uColor.value as Color;
     if (ringTween) {
-      const t = clamp((now - ringTween.start) / 300, 0, 1);
-      ringCol.copy(ringTween.from).lerp(ringTween.to, easeOut(t));
+      const t = clamp((now - ringTween.start) / 300, 0, 1), k = easeOut(t);
+      for (const [u, from, to] of ringTween.pairs) u.copy(from).lerp(to, k);
       animating = true;
       if (t >= 1) ringTween = null;
     }
@@ -997,9 +1035,22 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
         console.warn('3d: lighting atlas unavailable, keeping current lighting', e);
       });
     },
-    setRing(r) {
-      ringKind = r;
-      ringTween = { from: (ringMat.uniforms.uColor.value as Color).clone(), to: new Color(RING[r]), start: performance.now() };
+    setRgb(rgb, accent) {
+      ringKind = rgb;
+      const to = rgbTargets(rgb, accent);
+      const screen = to.screen !== rgbNow.screen;
+      rgbNow = to;
+      const u = (m: { uniforms: Record<string, { value: unknown }> }, name: string) => m.uniforms[name].value as Color;
+      const pairs: [Color, Color][] = [
+        [u(ringMat, 'uColor'), to.ring], [u(keysMat, 'uTint'), to.keys], [u(catMat, 'uTint'), to.cat],
+        [u(legendMat, 'uTint'), to.legend], [srvLeds[0], to.led],
+      ];
+      ringTween = { pairs: pairs.map(([c, t]) => [c, c.clone(), t]), start: performance.now() };
+      if (screen) {
+        // the monitor's cat mark and bar underline are the terminal accent: redraw once
+        setAnsiAccent(to.screen);
+        monitor.invalidate();
+      }
       invalidate();
     },
     setFan(s) {

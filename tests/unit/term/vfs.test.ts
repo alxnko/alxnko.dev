@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createFs, HOME, lookup, pretty, resolve } from '../../../src/term/vfs';
 import type { WorldState } from '../../../src/term/types';
 
-const W: WorldState = { theme: 'dark', desk: 0.74, ring: 'green', fan: 2, sound: 'off', landmark: 'desk' };
+const W: WorldState = { theme: 'dark', desk: 0.74, rgb: 'cyan', accent: 'cyan', fan: 2, sound: 'off', landmark: 'desk' };
 
 describe('vfs', () => {
   const root = createFs();
@@ -50,7 +50,7 @@ describe('vfs', () => {
   it('desk files reflect live world state', () => {
     expect(lookup(root, HOME + '/desk/height')!.read!(W)).toBe('74 cm');
     expect(lookup(root, HOME + '/desk/fan')!.read!(W)).toBe('2');
-    expect(lookup(root, HOME + '/desk/ring')!.read!(W)).toBe('green');
+    expect(lookup(root, HOME + '/desk/rgb')!.read!(W)).toBe('cyan');
     expect(lookup(root, HOME + '/.config/theme')!.read!(W)).toBe('night');
     expect(lookup(root, HOME + '/.config/theme')!.read!({ ...W, theme: 'light' })).toBe('day');
   });

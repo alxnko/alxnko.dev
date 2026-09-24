@@ -20,6 +20,7 @@ ROOT = SCENE_DIR.parent
 WORK = Path(os.environ.get("ALXNKO_SCENE_WORK", "/var/tmp/alxnko-scene"))
 PUBLIC = ROOT / "public" / "scene"
 TOKENS = json.loads((ROOT / "design" / "tokens.json").read_text())
+RGB = json.loads((ROOT / "design" / "rgb.json").read_text())   # `rgb` presets (R86)
 PRIM = TOKENS["primitive"]
 G = PRIM["graphite"]
 SC = PRIM["scene"]

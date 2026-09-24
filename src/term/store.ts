@@ -106,7 +106,7 @@ export class TermStore {
       { text: '[' },
       { text: `${SITE.handle}@${SITE.host}`, bold: true },
       { text: ' ' },
-      fg('green', pretty(this.s.cwd)),
+      fg('accent', pretty(this.s.cwd)),
       { text: ']$ ' },
     ];
   }

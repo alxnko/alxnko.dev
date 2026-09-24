@@ -73,7 +73,7 @@ export function createFs(): VNode {
               [
                 file('fan', (w) => String(w.fan)),
                 file('height', (w) => (w.desk * 100).toFixed(0) + ' cm'),
-                file('ring', (w) => w.ring),
+                file('rgb', (w) => w.rgb),
               ],
             ),
             dir('laptop', [file('readme.txt', () => "you're typing on it.")], { landmark: 'laptop' }),

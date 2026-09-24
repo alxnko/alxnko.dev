@@ -11,7 +11,7 @@ export interface Phrase {
   run?: string;
 }
 
-const tip = (cmd: string): Line => [{ text: cmd, fg: 'green', run: cmd }];
+const tip = (cmd: string): Line => [{ text: cmd, fg: 'accent', run: cmd }];
 const comment = (cmd: string): Line => [{ text: `# ${cmd}`, fg: 'muted' }];
 
 const MEANS: [RegExp, string][] = [

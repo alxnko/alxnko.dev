@@ -1,0 +1,12 @@
+{
+  "green": { "fill": "#00ff82", "dark": "#00ff82", "light": "#0a6e3c", "onFill": "#06170d", "tint": "#14995a" },
+  "purple": { "fill": "#b061ff", "dark": "#bd85ff", "light": "#7a2fd0", "onFill": "#15051f", "tint": "#7f45c9" },
+  "red": { "fill": "#ff4747", "dark": "#ff6b63", "light": "#b3261e", "onFill": "#1f0504", "tint": "#c23a36" },
+  "orange": { "fill": "#ff8a1f", "dark": "#ff9a3d", "light": "#a14700", "onFill": "#1f0e00", "tint": "#d06a1c" },
+  "amber": { "fill": "#ffb454", "dark": "#ffb454", "light": "#8a5200", "onFill": "#1f1300", "tint": "#c98a1f" },
+  "yellow": { "fill": "#ffe14d", "dark": "#ffe14d", "light": "#6b5b00", "onFill": "#1d1900", "tint": "#c9ae1c" },
+  "cyan": { "fill": "#22e5ff", "dark": "#22e5ff", "light": "#006a7c", "onFill": "#001a1f", "tint": "#159fb0" },
+  "blue": { "fill": "#4d8dff", "dark": "#6ea5ff", "light": "#1d56b8", "onFill": "#020c22", "tint": "#2f63c9" },
+  "pink": { "fill": "#ff5ec8", "dark": "#ff7dd3", "light": "#a8127a", "onFill": "#210418", "tint": "#c43d93" },
+  "white": { "fill": "#f2f2f0", "dark": "#f2f2f0", "light": "#46464a", "onFill": "#0a0a0b", "tint": "#cfcfcc" }
+}

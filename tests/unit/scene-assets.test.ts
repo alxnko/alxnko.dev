@@ -4,6 +4,8 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import tokens from '../../design/tokens.json';
+import rgbPresets from '../../design/rgb.json';
 
 const dir = fileURLToPath(new URL('../../public/scene/', import.meta.url));
 const manifest = JSON.parse(readFileSync(dir + 'manifest.json', 'utf8'));
@@ -17,6 +19,7 @@ const NODES = [
   'window_sky', 'hit_laptop', 'hit_monitor', 'cam_wide', 'cam_desk',
   'fan_ring', 'fan_display', 'kbd_glow', 'laptop_kbd_glow',
   'hit_paddle_1', 'hit_paddle_2', 'hit_paddle_3', 'hit_paddle_up', 'hit_paddle_down',
+  'kbd_accent', 'paddle_glyphs', // baked neutral, tinted by `rgb` (R86)
 ];
 
 function glbJson(path: string) {
@@ -70,6 +73,14 @@ describe('scene assets', () => {
     expect(gltf.extensionsUsed).toContain('KHR_materials_unlit');
     const rig = gltf.nodes.find((n: any) => n.name === 'desk_rig');
     expect(rig.translation[1]).toBeCloseTo(0.74, 5);
+  });
+
+  it('names the rgb-tinted parts and their own colours (R86)', () => {
+    const t = manifest.nodes.tint;
+    expect(t.nodes).toEqual(['kbd_accent', 'paddle_glyphs', 'cat_body', 'cat_head', 'cat_tail']);
+    expect(t.base).toBe(tokens.primitive.scene.tintBase);
+    expect(t.own).toEqual({ kbd_accent: tokens.primitive.scene.keyLime, paddle_glyphs: tokens.primitive.scene.legend, cat: tokens.primitive.scene.cat });
+    expect(manifest.posters.tint).toBe(rgbPresets.green.tint);
   });
 
   it('og image is 1200x630', () => {

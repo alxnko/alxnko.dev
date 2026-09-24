@@ -104,7 +104,7 @@ describe('TermStore', () => {
     expect(text(s.prompt())).toBe('[alxnko@nitro /etc]$ ');
     s.setCwd(HOME + '/monitor');
     expect(text(s.prompt())).toBe('[alxnko@nitro ~/monitor]$ ');
-    expect(s.prompt().some((sp) => sp.fg === 'green')).toBe(true);
+    expect(s.prompt().some((sp) => sp.fg === 'accent')).toBe(true);
   });
 
   it('setOverlay sets and clears the overlay frame', () => {

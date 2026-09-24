@@ -33,7 +33,12 @@ FLOOR = C.SC["floor"]
 PAD = C.SC["pad"]
 KEY_DARK = C.SC["keyDark"]
 KEY_GREY = C.SC["keyGrey"]
-KEY_LIME = C.SC["keyLime"]
+KEY_LIME = C.SC["keyLime"]     # the accent caps' own colour: runtime `rgb off` (baked neutral, R86)
+# Recolourable parts (`rgb`, R86): the accent keycaps, the paddle legends and the cat bake with a
+# NEUTRAL grey albedo (light only, no colour bleed onto neighbours); the runtime multiplies the
+# baked texel by tint / TINT_BASE (linear), day and night alike.
+TINT_BASE = C.SC["tintBase"]
+TINT_EDGE = C.SC["tintEdge"]
 STAND_GREY = C.SC["monitorStand"]
 GREEN = C.PRIM["green"]
 
@@ -82,7 +87,7 @@ def build_materials():
     m["pad"] = C.mat("pad", PAD, edge=0.25, edge_hex=C.G["600"], bevel=0.0015, noise=0.04)
     m["key_dark"] = C.mat("key_dark", KEY_DARK, edge=0.45, edge_hex=C.G["600"], bevel=0.0008)
     m["key_grey"] = C.mat("key_grey", KEY_GREY, edge=0.35, edge_hex=C.G["300"], bevel=0.0008)
-    m["key_lime"] = C.mat("key_lime", KEY_LIME, edge=0.3, edge_hex="#d6f36a", bevel=0.0008)
+    m["key_lime"] = C.mat("key_tint", TINT_BASE, edge=0.3, edge_hex=TINT_EDGE, bevel=0.0008)
     m["kbd_case"] = C.mat("kbd_case", "#141416", edge=0.5, edge_hex=C.G["600"], bevel=0.002)
     m["alu"] = C.mat("alu", C.G["400"], edge=0.3, edge_hex=C.G["200"], bevel=0.0008)
     # laptop stand: matte black powder-coated steel, rubber pads/feet
@@ -126,11 +131,13 @@ def build_materials():
     m["teeth"] = C.mat("teeth", "#f1f1ea", rough=0.6, bevel=0.0)
     m["shark_eye"] = C.mat("shark_eye", "#17191e", rough=0.5, bevel=0.0)
     m["shark_fin"] = C.mat("shark_fin", "#d7e59f", rough=0.7, bevel=0.0)   # pale yellow-green, as the head top
-    m["cat"] = C.mat("cat", "#14995a", rough=0.4, edge=0.25, edge_hex="#63d396", bevel=0.0)
+    # (its own colour, runtime `rgb off`: tokens scene.cat; baked neutral like the accent caps)
+    m["cat"] = C.mat("cat", TINT_BASE, rough=0.4, edge=0.25, edge_hex=TINT_EDGE, bevel=0.0)
     m["server"] = C.mat("server", C.G["850"], edge=0.4, edge_hex=C.G["500"], bevel=0.003)
     m["server_front"] = C.mat("server_front", C.G["800"], edge=0.35, edge_hex=C.G["500"], bevel=0.002)
     m["legend"] = C.mat("legend", C.G["300"], bevel=0.0)
     m["legend_hi"] = C.mat("legend_hi", "#f2f2f4", bevel=0.0)
+    m["legend_tint"] = C.mat("legend_tint", TINT_BASE, bevel=0.0)   # paddle legends: runtime tint
     m["pbtn"] = C.mat("pbtn", "#1e1e22", edge=0.4, edge_hex=C.G["500"], bevel=0.0008)
     m["white"] = C.mat("white", C.G["100"], edge=0.1, edge_hex="#ffffff", bevel=0.002)
     m["pvc"] = C.mat("pvc", "#e4e2dc", edge=0.1, edge_hex="#ffffff", bevel=0.003)
@@ -372,6 +379,7 @@ def build_paddle(m):
     fy = -pd / 2
     xs = [-0.022, -0.004, 0.014, 0.032, 0.050]
     labels = ["1", "2", "3", "up", "down"]
+    glyphs = []
     for x, lab in zip(xs, labels):
         parts.append(C.box(f"pbtn_{lab}", (0.0135, 0.003, 0.0125), (x, fy - 0.0012, 0), bevel=0.0012,
                            mat_=m["pbtn"]))
@@ -386,13 +394,18 @@ def build_paddle(m):
             bmesh.ops.translate(bm, vec=(0, 0.0004, 0),
                                 verts=[e for e in r["geom"] if isinstance(e, bmesh.types.BMVert)])
             bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-            parts.append(obj_from_bm(f"plab_{lab}", bm, m["legend_hi"]))
+            glyphs.append(obj_from_bm(f"plab_{lab}", bm, m["legend_tint"]))
         else:
-            parts.append(C.text_mesh(f"plab_{lab}", lab, 0.0085, (x, ly, 0), rot=(90, 0, 0),
-                                     extrude=0.0002, mat_=m["legend_hi"]))
+            glyphs.append(C.text_mesh(f"plab_{lab}", lab, 0.0085, (x, ly, 0), rot=(90, 0, 0),
+                                      extrude=0.0002, mat_=m["legend_tint"]))
     for p in parts:
         xform(p, M)
-        Rg(p, 6.0 if p.name.startswith(("plab", "pbtn")) else 1.2)
+        Rg(p, 6.0 if p.name.startswith("pbtn") else 1.2)
+    # the legends are their own baked node (runtime tint, R86)
+    for p in glyphs:
+        xform(p, M)
+        tag(p, 6.0)
+    legends = C.join(glyphs, "paddle_glyphs")
     led = C.box("led_paddle", (0.004, 0.002, 0.004), (-0.042, fy - 0.001, 0.0), bevel=0.0005,
                 mat_=m["led"])
     xform(led, M)
@@ -403,7 +416,7 @@ def build_paddle(m):
         hb = C.box(f"hit_paddle_{lab}", (0.016, 0.015, 0.016), (0, 0, 0), bevel=0.0, mat_=m["hit"])
         hb.matrix_world = M @ Matrix.Translation((x, fy - 0.0045, 0))
         hits.append(hb)
-    return led, hits
+    return led, hits, legends
 
 
 # ------------------------------------------------------------------ laptop
@@ -968,6 +981,7 @@ def build_keyboard(m):
         parts.append(C.box(nm, (b - a, d_ - c, rh), ((a + b) / 2, (c + d_) / 2, kh + rh / 2 - 0.001), bevel=0.0015,
                            mat_=m["kbd_case"], drop_bottom=True))
     colours = {"d": m["key_dark"], "g": m["key_grey"], "l": m["key_lime"]}
+    accent = []   # the lime caps: their own baked node `kbd_accent` (runtime tint, R86)
     slots = []
     n = 0
     for ri, row in enumerate(KBD_ROWS):
@@ -976,7 +990,7 @@ def build_keyboard(m):
             bm = bm_keycap(wu * u, u, h + RNG.uniform(-0.0002, 0.0002), tilt)
             cx, cyy = x0 + (xu + wu / 2) * u, row_y(ri)
             bmesh.ops.translate(bm, vec=(cx, cyy, kh - 0.0005), verts=bm.verts)
-            parts.append(obj_from_bm(f"cap{ri}_{n}", bm, colours[col]))
+            (accent if col == "l" else parts).append(obj_from_bm(f"cap{ri}_{n}", bm, colours[col]))
             slots.append((cx, cyy, wu * u, u))
             n += 1
     for ri, xu, col in KBD_TALL:
@@ -984,7 +998,7 @@ def build_keyboard(m):
         bm = bm_keycap(u, 2 * u, h, 0.0)
         cx, cyy = x0 + (xu + 0.5) * u, (row_y(ri) + row_y(ri + 1)) / 2
         bmesh.ops.translate(bm, vec=(cx, cyy, kh - 0.0005), verts=bm.verts)
-        parts.append(obj_from_bm(f"capt{ri}", bm, colours[col]))
+        (accent if col == "l" else parts).append(obj_from_bm(f"capt{ri}", bm, colours[col]))
         slots.append((cx, cyy, u, 2 * u))
     # control panel over the numpad columns of the F row: alu plate, 3 small knobs + a big one
     knob_x = x0 + 16 * u
@@ -1001,6 +1015,10 @@ def build_keyboard(m):
     for p in parts:
         xform(p, M)
         Rg(p, 1.3 if p.name == "kbd_case" else 1.1)
+    for p in accent:
+        xform(p, M)
+        tag(p, 1.1)
+    kbd_accent = C.join(accent, "kbd_accent")
     led = C.box("led_kbd", (0.003, 0.003, 0.0015), (knob_x + 0.0035, top_row_y - u / 2 + 0.0035, kh + 0.0045),
                 bevel=0.0004, mat_=m["led_green"])
     xform(led, M)
@@ -1010,7 +1028,7 @@ def build_keyboard(m):
     glow = glow_tiles("kbd_glow", slots, zg, m["backlight"])
     glow.matrix_world = M
     C.set_origin(glow, M @ Vector((0.0, (iy0 + iy1) / 2, zg)))
-    return led, M, glow
+    return led, M, glow, kbd_accent
 
 
 # ------------------------------------------------------------------ pad, mouse, gamepad
@@ -2125,11 +2143,11 @@ def main():
     bake_rig.objects.link(rig)
 
     build_desk(m)
-    led_paddle, hit_paddle = build_paddle(m)
+    led_paddle, hit_paddle, paddle_glyphs = build_paddle(m)
     scr_l, hit_l, lap_glow = build_laptop(m)
     build_laptop_stand(m)
     scr_m, hit_m, ring, glow = build_monitor(m)
-    led_kbd, _kbd_M, kbd_glow = build_keyboard(m)
+    led_kbd, _kbd_M, kbd_glow, kbd_accent = build_keyboard(m)
     build_pad(m)
     build_mouse(m)
     build_gamepad(m)
@@ -2150,6 +2168,11 @@ def main():
     C.set_origin(desk_baked, (0, 0, D.DESK_H))
     C.link(desk_baked, bake_rig)
     C.parent_keep(desk_baked, rig)
+    # the runtime-tinted baked parts (R86): own nodes under the rig, same atlas
+    for ob in (kbd_accent, paddle_glyphs):
+        C.set_origin(ob, (0, 0, D.DESK_H))
+        C.link(ob, bake_rig)
+        C.parent_keep(ob, rig)
 
     for ob in [scr_l, scr_m, hit_l, hit_m, ring, glow, led_paddle, led_kbd, blades, cat_body,
                fan_ring, fan_disp, kbd_glow, lap_glow] + hit_paddle:
@@ -2167,7 +2190,7 @@ def main():
         C.link(ref, helpers)
 
     # bake membership + runtime-only flags
-    for ob in (static, desk_baked, blades, cat_body, cat_head, cat_tail):
+    for ob in (static, desk_baked, kbd_accent, paddle_glyphs, blades, cat_body, cat_head, cat_tail):
         ob["bake"] = True
     # not in the bake (no occlusion, no light): runtime-only emissive overlays
     for ob in [sky, glow, hit_l, hit_m, fan_ring, fan_disp, kbd_glow, lap_glow] + hit_paddle:
@@ -2184,7 +2207,7 @@ def main():
     rig["pivot_at"] = "desk_top"
     cat_head["forward"] = list(head_fwd)
 
-    for ob in (static, desk_baked, blades, ring, scr_m):
+    for ob in (static, desk_baked, kbd_accent, paddle_glyphs, blades, ring, scr_m):
         smooth(ob)
     build_rigs()
     camera("cam_desk", D.CAM_DESK, parent=rig)
