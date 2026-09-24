@@ -9,7 +9,8 @@ import '../styles/scene.css';
 import jbRegular from '@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2?url';
 import markFont from '../assets/fonts/vt323-mark.woff2?url';
 import symbolsFont from '../assets/fonts/jetbrains-mono-symbols-400.woff2?url';
-import { CONTACTS, SITE } from '../content/site';
+import { SITE } from '../content/site';
+import { structuredData } from '../lib/structured-data';
 import { TOKENS } from '../lib/tokens';
 import Toggles from '../components/Toggles.astro';
 
@@ -26,17 +27,7 @@ const url = new URL(path, SITE.url).href;
 const og = new URL('/og.png', SITE.url).href;
 const dark = TOKENS.semantic.dark.bg;
 const light = TOKENS.semantic.light.bg;
-const person = {
-  '@context': 'https://schema.org',
-  '@type': 'Person',
-  name: SITE.name,
-  alternateName: SITE.handle,
-  jobTitle: 'Tech Lead',
-  address: { '@type': 'PostalAddress', addressCountry: SITE.countryCode },
-  url: `${SITE.url}/`,
-  sameAs: CONTACTS.filter((c) => c.href.startsWith('https:')).map((c) => c.href),
-};
-const ld = JSON.stringify(person).replace(/</g, '\\u003c');
+const ld = structuredData(url, title);
 ---
 <!doctype html>
 <html lang="en">
@@ -123,7 +114,7 @@ const ld = JSON.stringify(person).replace(/</g, '\\u003c');
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={og} />
-    <script type="application/ld+json" set:html={ld} />
+    {index && <script type="application/ld+json" set:html={ld} />}
   </head>
   <body id="app" data-mode="page">
     {desk && (
