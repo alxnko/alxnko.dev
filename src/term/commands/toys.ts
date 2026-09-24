@@ -50,7 +50,7 @@ export const MATRIX_COLORS: Readonly<Record<string, Color>> = {
   green: 'green', red: 'red', blue: 'blue', white: 'white', yellow: 'amber', cyan: 'cyan', magenta: 'magenta',
 };
 
-export function matrix(random: () => number, cols = MATRIX_COLS, rows = MATRIX_ROWS, color: Color = 'green') {
+export function matrix(random: () => number, cols = MATRIX_COLS, rows = MATRIX_ROWS, color: Color = 'accent') {
   const glyph = () => GLYPHS[Math.floor(random() * GLYPHS.length) % GLYPHS.length];
   const grid: string[][] = Array.from({ length: rows }, () => Array.from({ length: cols }, glyph));
   // Per column: head row (can be negative = not yet on screen), trail length, active flag.
@@ -100,14 +100,6 @@ export function matrix(random: () => number, cols = MATRIX_COLS, rows = MATRIX_R
   return { step, render };
 }
 
-const CMATRIX_HELP = [
-  'usage: cmatrix [-s] [-C color] [--both]',
-  ' -s          screensaver mode: any key quits',
-  ` -C color    rain color: ${Object.keys(MATRIX_COLORS).join(', ')}`,
-  ' --both      rain on the monitor too',
-  ' -h          print this help',
-  'quit with q or ctrl+c. esc leaves it running (in 3d it steps back to the desk).',
-];
 
 // pacman
 const REPOS: [string, string, string][] = [
@@ -117,10 +109,14 @@ const REPOS: [string, string, string][] = [
 ];
 const bar = (name: string, size: string, rate: string): Line => [
   { text: ` ${pad(name, 18)} ${size.padStart(10)} ${rate.padStart(11)} 00:00 [` },
-  fg('green', '#'.repeat(22)),
+  fg('accent', '#'.repeat(22)),
   { text: '] 100%' },
 ];
 const colons = (t: string): Line => [fg('blue', '::'), { text: ` ${t}`, bold: true }];
+
+// the --help texts load with the rest of the long text, on first use (R75)
+const cmatrixHelp = () => import('../text').then((t) => t.CMATRIX_HELP, () => [`usage: cmatrix [-s] [-C color] [--both]`]);
+const pacmanHelp = () => import('../text').then((t) => t.PACMAN_HELP, () => ['usage:  pacman <operation> [...]']);
 
 export function toyCommands(env: ShellEnv): Command[] {
   const catsay: Command = {
@@ -141,21 +137,21 @@ export function toyCommands(env: ShellEnv): Command[] {
     summary: 'the rain. q or ctrl+c stops it',
     usage: 'cmatrix [-s] [-C color] [--both]',
     group: 'fun',
-    help: CMATRIX_HELP,
+    help: cmatrixHelp,
     complete: (args) => (args[args.length - 2] === '-C' ? Object.keys(MATRIX_COLORS) : ['--both', '-C', '-s']),
     async run(ctx) {
-      let color: Color = 'green';
+      let color: Color = 'accent'; // the rain is the site accent unless -C picks one
       let saver = false;
       let both = false;
       const a = ctx.args;
       for (let i = 0; i < a.length; i++) {
         const w = a[i];
         if (w === '--both') both = true;
-        else if (w === '--help') return CMATRIX_HELP.forEach((l) => ctx.out(l));
+        else if (w === '--help') return (await cmatrixHelp()).forEach((l) => ctx.out(l));
         else if (/^-[a-zA-Z]+$/.test(w)) {
           for (let j = 1; j < w.length; j++) {
             const ch = w[j];
-            if (ch === 'h') return CMATRIX_HELP.forEach((l) => ctx.out(l));
+            if (ch === 'h') return (await cmatrixHelp()).forEach((l) => ctx.out(l));
             if (ch === 's') saver = true;
             else if (ch === 'C') {
               const v = w.slice(j + 1) || a[++i];
@@ -247,26 +243,17 @@ export function toyCommands(env: ShellEnv): Command[] {
     ctx.out(' there is nothing to do');
   }
 
-  const PACMAN_HELP = [
-    'usage:  pacman <operation> [...]',
-    'operations:',
-    '    pacman {-h --help}',
-    '    pacman {-V --version}',
-    '    pacman {-S --sync}    [options] [package(s)]',
-    '',
-    "try 'pacman -Syu': it synchronizes and upgrades the system.",
-  ];
   const pacman: Command = {
     name: 'pacman',
     summary: 'package manager',
     usage: 'pacman -Syu',
     group: 'fun',
-    help: PACMAN_HELP,
+    help: pacmanHelp,
     complete: () => ['-Syu', '-h', '-V'],
     async run(ctx) {
       const op = ctx.args[0];
       if (!op || !op.startsWith('-')) fail(ctx, 'error: no operation specified (use -h for help)');
-      if (op === '-h' || op === '--help') return PACMAN_HELP.forEach((l) => ctx.out(l));
+      if (op === '-h' || op === '--help') return (await pacmanHelp()).forEach((l) => ctx.out(l));
       if (op === '-V' || op === '--version') {
         ctx.out(' .--.                  Pacman v7.0.0 - libalpm v15.0.0');
         ctx.out("/ _.-' .-.  .-.  .-.   meow meow meow meow");

@@ -95,7 +95,7 @@ export class MonitorScreen {
       const x = 44 + i * 40;
       ctx.fillStyle = i === 1 ? ansi('white') : ansi('dim');
       ctx.fillText(n, x, by);
-      if (i === 1) { ctx.fillStyle = ansi('green'); ctx.fillRect(x - 3, TOP * 0.62 - 4, 20, 4); }
+      if (i === 1) { ctx.fillStyle = ansi('accent'); ctx.fillRect(x - 3, TOP * 0.62 - 4, 20, 4); }
     });
     ctx.fillStyle = ansi('muted');
     ctx.textAlign = 'center';
@@ -114,7 +114,7 @@ export class MonitorScreen {
 
     // left pane: the mark, drawn as the half-block cells it is made of (18×38 px, a 30 px mono
     // cell) rather than as text, so it is exact whatever fonts the device has or has loaded
-    ctx.fillStyle = ansi('green');
+    ctx.fillStyle = ansi('accent');
     // (y0: where the text rows used to sit with the 'middle' baseline; one path, filled once,
     // so neighbouring cells meet without anti-aliased seams)
     const CW = 18, CH = 38, x0 = (LEFT - CAT_MARK[0].length * CW) / 2, y0 = TOP + 150 - 22;
@@ -140,7 +140,7 @@ export class MonitorScreen {
   }
 }
 
-/** The desk fan's little speed readout (a seven-segment look in the mark green). */
+/** The desk fan's little speed readout (a seven-segment look). */
 export class FanDisplay {
   readonly texture: CanvasTexture;
   private ctx: CanvasRenderingContext2D;

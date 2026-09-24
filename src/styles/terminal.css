@@ -162,6 +162,7 @@
 .c-dim { color: var(--ansi-dim); }
 .c-white { color: var(--ansi-white); }
 .c-green { color: var(--ansi-green); }
+.c-accent { color: var(--ansi-accent); }
 .c-amber { color: var(--ansi-amber); }
 .c-red { color: var(--ansi-red); }
 .c-blue { color: var(--ansi-blue); }
@@ -226,7 +227,7 @@
 }
 
 .chip:focus-visible {
-  outline-color: var(--ansi-green);
+  outline-color: var(--ansi-accent);
 }
 
 /* input line -------------------------------------------------------------------------- */
@@ -288,7 +289,7 @@
 }
 
 .term-field input::selection {
-  background: color-mix(in srgb, var(--ansi-green) 35%, transparent);
+  background: color-mix(in srgb, var(--ansi-accent) 35%, transparent);
   color: transparent;
 }
 
@@ -297,7 +298,7 @@
   display: inline-block;
   min-width: 1ch;
   color: var(--ansi-bg);
-  background: var(--ansi-green);
+  background: var(--ansi-accent);
   animation: caret 1s steps(1, end) infinite;
 }
 

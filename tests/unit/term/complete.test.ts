@@ -64,7 +64,8 @@ describe('complete', () => {
     expect(c('theme d').insert).toBe('day ');
     expect(c('theme ').candidates).toEqual(['day', 'night', 'toggle']);
     expect(c('desk ').candidates).toEqual(['1', '2', '3', 'up', 'down']);
-    expect(c('ring p').insert).toBe('purple ');
+    expect(c('rgb pu').insert).toBe('purple ');
+    expect(c('ring pi').insert).toBe('pink '); // the old name completes the same
     expect(c('fan ').candidates).toEqual(['0', '1', '2', '3']);
     expect(c('sound l').insert).toBe('low ');
     expect(c('man fas').insert).toBe('fastfetch ');

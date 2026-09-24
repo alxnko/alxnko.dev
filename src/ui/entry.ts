@@ -1,6 +1,6 @@
 // Page entry: wires the real terminal core to the DOM, composes the world the terminal
 // talks to (page theme + sound + the lazy 3D desk), and runs the 3D gate after load.
-import type { FanSpeed, Landmark, Ring, SoundLevel, Theme, WorldPort, WorldState } from '../term/types';
+import type { FanSpeed, Landmark, SoundLevel, Theme, WorldPort, WorldState } from '../term/types';
 import { TermStore } from '../term/store';
 import { Shell } from '../term/exec';
 import { complete } from '../term/complete';
@@ -12,13 +12,14 @@ import { createSound } from '../audio/sound';
 import { decide3D } from '../scene/gate';
 import type { SceneWorld } from '../scene/index';
 import * as prefs from '../lib/prefs';
+import { parseRgb } from '../lib/rgb';
+import { loadRgb, saveRgb } from './accent';
 import { SOUND_EVENT, soundLevel, start } from './app';
 import { currentTheme, setTheme, THEME_EVENT } from './theme';
 import { FrameView } from './terminal-dom';
 
 const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const narrow = () => innerWidth < 640;
-const RINGS: readonly Ring[] = ['green', 'purple', 'off'];
 
 /** The world the terminal talks to. Works without 3D; the scene attaches when it loads. */
 class AppWorld implements WorldPort {
@@ -27,13 +28,9 @@ class AppWorld implements WorldPort {
   private s: WorldState;
 
   constructor() {
-    const ring = prefs.get('ring');
-    this.s = {
-      ...DEFAULT_WORLD,
-      theme: currentTheme(),
-      sound: soundLevel(),
-      ring: RINGS.includes(ring as Ring) ? (ring as Ring) : 'green',
-    };
+    const { rgb, accent } = loadRgb();
+    saveRgb(rgb, accent); // what the <head> script applied, now validated (or corrected)
+    this.s = { ...DEFAULT_WORLD, theme: currentTheme(), sound: soundLevel(), rgb, accent };
   }
 
   get(): WorldState {
@@ -58,10 +55,14 @@ class AppWorld implements WorldPort {
   setTheme(t: Theme): void {
     setTheme(t); // page tokens + persistence; the THEME_EVENT listener updates the scene
   }
-  setRing(r: Ring): void {
-    this.s.ring = r;
-    prefs.set('ring', r);
-    this.scene?.setRing(r);
+  setRgb(spec: string): void {
+    const rgb = parseRgb(spec);
+    if (rgb === null) return;
+    const accent = rgb === 'off' ? this.s.accent : rgb;
+    this.s.rgb = rgb;
+    this.s.accent = accent;
+    saveRgb(rgb, accent);
+    this.scene?.setRgb(rgb, accent);
   }
   setFan(f: FanSpeed): void {
     this.s.fan = f;
@@ -219,11 +220,11 @@ function enter3d() {
     .then((handle) => {
       handle3d = handle;
       world.scene = handle.world;
-      // anything changed while the desk was loading (theme, desk height, ring, fan) was only
+      // anything changed while the desk was loading (theme, desk height, rgb, fan) was only
       // applied to the page: bring the scene up to date now that it is listening
       const now = world.get(), was = initial;
       if (now.theme !== was.theme) handle.world.setTheme(now.theme);
-      if (now.ring !== was.ring) handle.world.setRing(now.ring);
+      if (now.rgb !== was.rgb || now.accent !== was.accent) handle.world.setRgb(now.rgb, now.accent);
       if (now.fan !== was.fan) handle.world.setFan(now.fan);
       if (now.desk !== was.desk) void handle.world.setDesk(now.desk);
       document.body.dataset.mode = 'scene';

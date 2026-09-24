@@ -38,7 +38,7 @@ export interface TermHandle {
 }
 
 const COLORS: ReadonlySet<Color> = new Set<Color>([
-  'fg', 'muted', 'dim', 'white', 'green', 'amber', 'red', 'blue', 'magenta', 'cyan',
+  'fg', 'muted', 'dim', 'white', 'green', 'amber', 'red', 'blue', 'magenta', 'cyan', 'accent',
 ]);
 
 function spans(line: Line, into: HTMLElement): HTMLElement {

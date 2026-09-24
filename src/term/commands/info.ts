@@ -1,6 +1,5 @@
 // help, man, whoami, fastfetch, uname, uptime, date, echo, hostname.
 import { CONTACTS, SITE } from '../../content/site';
-import { MEOW_ALIASES } from './world';
 import { CAT_MARK } from '../../content/mark';
 import { b, fg, link, pad, PALETTE } from '../format';
 import { fail, flags, type ShellEnv } from '../registry';
@@ -53,38 +52,20 @@ function shortUptime(env: ShellEnv): string {
 const CAT_W = Math.max(...CAT_MARK.map((l) => l.length));
 const CAT = CAT_MARK.map((l) => l.padEnd(CAT_W, ' '));
 
-const MAN: Record<string, string> = {
-  help: 'Lists the commands on this machine, the most fun first; click one to run it. help name shows how to use one.',
-  contacts: 'Lists the ways to reach alxnko, as links. open name opens one (open github). Short links work too: alxnko.dev/gh, /tg, /in, /ig and /mail.',
-  tour: 'A short walk around the desk: the laptop, the monitor, the desk motor, the ring light and the cat. Everything is put back afterwards. ctrl+c ends it early.',
-  alias: "Without arguments, lists the aliases (ll and la are there from the start). alias name='command' defines one for this visit, unalias name removes it.",
-  man: 'Formats and displays these manual pages. Pages are short on purpose.',
-  fastfetch: 'Prints system information beside the cat mark. --compact skips contacts and colors.',
-  ls: 'Lists directory contents. -a includes dotfiles, -l uses a long listing format. Directories end in /.',
-  cd: 'Changes the working directory. Directories bound to a place on the desk (~, laptop, monitor, /) move the camera there. cd - goes back.',
-  cat: 'Concatenates files to standard output. Files under ~/desk reflect the live state of the desk.',
-  open: 'Opens a contact in a new tab. Only the five contacts and the committers.top rank are allowed.',
-  desk: 'Moves the sit-stand desk. Presets 1, 2, 3 are 74, 95 and 112 cm; up and down step 5 cm within 70 to 120 cm.',
-  theme: 'Switches between day and night lighting. Without an argument, toggles.',
-  ring: 'Sets the ring light behind the monitor: green, purple or off.',
-  fan: 'Sets the desk fan speed 0 to 3. Without an argument, cycles.',
-  sound: 'Sets the sound level. All sounds are synthesized; off by default.',
-  meow: `Meows, and the cat on the fan reacts. Also answers to: ${MEOW_ALIASES.join(', ')}.`,
-  cmatrix: 'Shows falling characters until you quit with q or ctrl+c (on a phone, tap ^C). Esc leaves it running (in 3D it steps back to the desk). -s is screensaver mode: any key quits. -C color picks the rain color: green, red, blue, white, yellow, cyan or magenta. --both rains on the monitor too; on the page without 3D it covers the contacts.',
-  pacman: 'Package manager. -Syu synchronizes and upgrades the system.',
-  grep: 'Prints lines matching a fixed-string pattern. -i ignores case, -v inverts the match.',
-  history: 'Shows the last commands, numbered. Kept for this browser only. history -c forgets them.',
-  exit: 'Logs out, which here means stepping back from the desk.',
-};
 
 export function infoCommands(env: ShellEnv): Command[] {
   // `help`: the most fun or useful first, then the rest by group. Names are buttons: a click
   // runs the command, or starts the line when it needs an argument.
-  const START = ['fastfetch', 'contacts', 'tour', 'cmatrix', 'desk', 'theme', 'meow'];
+  const START = ['fastfetch', 'contacts', 'tour', 'cmatrix', 'rgb', 'desk', 'theme', 'meow'];
   const NEEDS_ARG = new Set(['man', 'open', 'grep', 'head', 'tail', 'wc', 'cat', 'echo']);
   const row = (c: Command): Line => {
     const run = NEEDS_ARG.has(c.name) ? c.name + ' ' : c.name;
     return [{ text: '  ' }, { text: c.name, bold: true, run }, { text: ' '.repeat(Math.max(1, 11 - c.name.length)) + c.summary }];
+  };
+  // a built-in alias (color, ring) has its command's help and manual page
+  const real = (name: string) => {
+    const c = env.registry.get(name);
+    return c?.aliasOf ? env.registry.get(c.aliasOf) : c;
   };
   const help: Command = {
     name: 'help',
@@ -95,11 +76,11 @@ export function infoCommands(env: ShellEnv): Command[] {
     run(ctx) {
       const name = ctx.args[0];
       if (name !== undefined) {
-        const c = env.registry.get(name);
+        const c = real(name);
         if (!c || c.hidden) fail(ctx, `bash: help: no help topics match \`${name}'.  Try \`help' or \`man ${name}'.`);
         ctx.out(`${c.name}: ${c.usage}`);
         ctx.out(`    ${c.summary}`);
-        return ctx.out([{ text: '    more: ', fg: 'muted' }, { text: `man ${c.name}`, fg: 'green', run: `man ${c.name}` }]);
+        return ctx.out([{ text: '    more: ', fg: 'muted' }, { text: `man ${c.name}`, fg: 'accent', run: `man ${c.name}` }]);
       }
       ctx.out(`${SITE.os}, bash 5.3. these commands work here: type one and press enter, or click it.`);
       ctx.out('man name explains one. tab completes, up/down walks history, ctrl+c stops things.');
@@ -126,13 +107,13 @@ export function infoCommands(env: ShellEnv): Command[] {
     usage: 'man <command>',
     group: 'info',
     complete: () => env.registry.names(),
-    run(ctx) {
+    async run(ctx) {
       const name = ctx.args[0];
       if (!name) {
         ctx.err('What manual page do you want?');
         fail(ctx, "For example, try 'man man'.");
       }
-      const c = env.registry.get(name);
+      const c = real(name);
       if (!c || c.hidden) fail(ctx, `No manual entry for ${name}`, 16);
       const title = `${c.name.toUpperCase()}(1)`;
       const mid = `${SITE.os} Manual`;
@@ -147,6 +128,7 @@ export function infoCommands(env: ShellEnv): Command[] {
       ctx.out(`       ${c.usage}`);
       ctx.out('');
       ctx.out([b('DESCRIPTION')]);
+      const MAN = (await import('../text').catch(() => null))?.MAN ?? {};
       const desc = MAN[c.name] ?? c.summary[0].toUpperCase() + c.summary.slice(1) + '.';
       for (const l of wrapWords(desc, 57)) ctx.out(`       ${l}`);
     },
@@ -178,7 +160,7 @@ export function infoCommands(env: ShellEnv): Command[] {
       const compact = ctx.args.length > 0;
       const kv = (k: string, v: Line | string): Line => [b(pad(k, 7), 'blue'), ...(typeof v === 'string' ? [{ text: v }] : v)];
       const rows: Line[] = [
-        [b(SITE.handle, 'green'), { text: '@' }, b(SITE.host, 'green')],
+        [b(SITE.handle, 'accent'), { text: '@' }, b(SITE.host, 'accent')],
         [{ text: '-'.repeat(SITE.handle.length + SITE.host.length + 1) }],
         kv('os', `${SITE.os} x86_64`),
         kv('host', SITE.host),
@@ -195,7 +177,7 @@ export function infoCommands(env: ShellEnv): Command[] {
       const width = CAT[0].length;
       const n = Math.max(CAT.length, rows.length);
       for (let i = 0; i < n; i++) {
-        const art: Line = i < CAT.length ? [{ ...fg('green', CAT[i]), art: true }] : [{ text: ' '.repeat(width), art: true }];
+        const art: Line = i < CAT.length ? [{ ...fg('accent', CAT[i]), art: true }] : [{ text: ' '.repeat(width), art: true }];
         ctx.out([...art, { text: '   ' }, ...(rows[i] ?? [])]);
       }
     },
@@ -282,7 +264,7 @@ export function infoCommands(env: ShellEnv): Command[] {
       ctx.out('');
       ctx.out([
         fg('muted', 'click one, or '),
-        { text: 'open github', fg: 'green', run: 'open github' },
+        { text: 'open github', fg: 'accent', run: 'open github' },
         fg('muted', `. short links: ${SITE.url.replace('https://', '')}/${CONTACTS.map((c) => c.short).join(' /')}`),
       ]);
     },

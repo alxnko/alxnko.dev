@@ -13,7 +13,7 @@ export const isAllowed = (href: string | undefined): href is string => !!href &&
 
 /** A link span. `href` is set only for exact LINK_ALLOWLIST members; anything else is plain text. */
 export const link = (text: string, href: string): Span =>
-  isAllowed(href) ? { text, fg: 'green', href } : { text };
+  isAllowed(href) ? { text, fg: 'accent', href } : { text };
 
 /** Plain text of a line. */
 export const text = (line: Line): string => line.map((s) => s.text).join('');

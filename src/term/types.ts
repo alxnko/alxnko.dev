@@ -2,7 +2,9 @@
 
 export type Color =
   | 'fg' | 'muted' | 'dim' | 'white'
-  | 'green' | 'amber' | 'red' | 'blue' | 'magenta' | 'cyan';
+  | 'green' | 'amber' | 'red' | 'blue' | 'magenta' | 'cyan'
+  /** The site accent (`rgb`): green by default; `green` itself is the fixed ANSI green. */
+  | 'accent';
 
 export interface Span {
   text: string;
@@ -19,7 +21,6 @@ export type Line = Span[];
 
 export type Landmark = 'wide' | 'desk' | 'laptop' | 'monitor';
 export type Theme = 'dark' | 'light';
-export type Ring = 'green' | 'purple' | 'off';
 export type SoundLevel = 'off' | 'low' | 'on';
 export type FanSpeed = 0 | 1 | 2 | 3;
 
@@ -27,7 +28,10 @@ export interface WorldState {
   theme: Theme;
   /** Desk top height in meters. */
   desk: number;
-  ring: Ring;
+  /** `rgb`: a preset name, `#rrggbb` or `off` (normalised by lib/rgb parseRgb). */
+  rgb: string;
+  /** The accent in use: `rgb` unless that is `off`, then the last colour (never `off`). */
+  accent: string;
   fan: FanSpeed;
   sound: SoundLevel;
   landmark: Landmark;
@@ -42,7 +46,8 @@ export interface WorldPort {
   /** Resolves when the desk has finished moving. */
   setDesk(h: number): Promise<void>;
   setTheme(t: Theme): void;
-  setRing(r: Ring): void;
+  /** A normalised spec (lib/rgb parseRgb): the accent everywhere, the desk's RGB lights. */
+  setRgb(spec: string): void;
   setFan(s: FanSpeed): void;
   setSound(l: SoundLevel): void;
   meow(): void;
@@ -92,8 +97,10 @@ export interface Command {
   usage: string;
   group: 'info' | 'files' | 'world' | 'fun' | 'text';
   hidden?: boolean;
+  /** A built-in alias (hidden): help and man show this command's page instead. */
+  aliasOf?: string;
   /** What `--help` prints (default: usage, summary and a pointer to man). */
-  help?: string[];
+  help?: () => string[] | Promise<string[]>;
   complete?(args: string[], cwd: string): string[];
   /** Non-zero exit: throw ExitError. */
   run(ctx: CommandCtx): void | Promise<void>;

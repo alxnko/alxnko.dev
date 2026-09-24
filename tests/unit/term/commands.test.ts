@@ -8,6 +8,7 @@ import { bootLines } from '../../../src/term/boot';
 import { PALETTE, text } from '../../../src/term/format';
 import { HOME } from '../../../src/term/vfs';
 import { setup } from './harness';
+import { PRESET_NAMES } from '../../../src/lib/rgb';
 
 beforeEach(() => localStorage.clear());
 
@@ -20,9 +21,10 @@ describe('info commands', () => {
     expect(h.indexOf('start here')).toBeLessThan(h.indexOf('\ninfo\n'));
     expect(h.split('\n').filter((l) => l.startsWith('  ')).slice(0, 3).map((l) => l.trim().split(' ')[0])).toEqual(['fastfetch', 'contacts', 'tour']);
     for (const g of ['start here', 'info', 'files', 'world', 'fun', 'text']) expect(h).toMatch(new RegExp(`^${g}$`, 'm'));
-    for (const cmd of ['help', 'man', 'fastfetch', 'ls', 'cd', 'open', 'desk', 'theme', 'ring', 'fan', 'sound', 'meow', 'catsay', 'cmatrix', 'pacman', 'grep'])
+    for (const cmd of ['help', 'man', 'fastfetch', 'ls', 'cd', 'open', 'desk', 'theme', 'rgb', 'fan', 'sound', 'meow', 'catsay', 'cmatrix', 'pacman', 'grep'])
       expect(h).toMatch(new RegExp(`^  ${cmd} `, 'm'));
     expect(h).not.toMatch(/^ {2}sudo/m);
+    expect(h).not.toMatch(/^ {2}(color|colour|ring) /m); // rgb's aliases work but are not listed
     expect(h).not.toMatch(/project/i);
   });
 
@@ -55,7 +57,7 @@ describe('info commands', () => {
     tick(3 * 60_000 + 5000);
     const lines = await run('fastfetch');
     const t = lines.map(text);
-    for (let i = 0; i < CAT_MARK.length; i++) expect(lines[i][0].fg).toBe('green');
+    for (let i = 0; i < CAT_MARK.length; i++) expect(lines[i][0].fg).toBe('accent'); // the rgb accent
     const all = t.join('\n');
     expect(all).toContain('alxnko@nitro');
     for (const re of [
@@ -313,13 +315,44 @@ describe('world commands', () => {
     expect(await out('desk 9; echo $?')).toBe("desk: invalid position '9' (1|2|3|up|down)\n2");
   });
 
-  it('ring', async () => {
+  it('rgb: presets, hex, off/on, and the aliases', async () => {
+    const { out, run, world } = setup();
+    const shown = await run('rgb');
+    expect(shown.map(text)).toEqual([
+      'rgb: green',
+      'presets: green purple red orange amber yellow cyan blue pink white',
+      'or any hex: #ff8800, and off',
+    ]);
+    // every preset is a chip that runs it
+    expect(shown[1].filter((s) => s.run).map((s) => s.run)).toEqual(PRESET_NAMES.map((n) => `rgb ${n}`));
+    expect(await out('rgb purple')).toBe('rgb: purple');
+    expect(world.get()).toMatchObject({ rgb: 'purple', accent: 'purple' });
+    expect(await out('rgb #F0A')).toBe('rgb: #ff00aa');
+    expect(await out('rgb #00FF82')).toBe('rgb: green'); // a preset's own fill is the preset
+    expect(await out('rgb #ff00ff')).toBe('rgb: #ff00ff');
+    expect(await out('rgb off')).toBe('rgb: off (the lights are off; the accent stays #ff00ff)');
+    expect(world.get()).toMatchObject({ rgb: 'off', accent: '#ff00ff' });
+    expect(await out('rgb')).toContain('and on');
+    expect(await out('rgb on')).toBe('rgb: #ff00ff');
+    for (const alias of ['color', 'colour', 'ring']) expect(await out(`${alias} cyan`)).toBe('rgb: cyan');
+    expect(world.get().rgb).toBe('cyan');
+    // the aliases have rgb's help and manual page
+    expect(await out('man colour')).toContain('rgb - one color for the lights, keys, cat and accent');
+    expect(await out('man rgb')).toMatch(/Presets: green, purple, red,[\s\S]*pink, white\./);
+    expect(await out('help ring')).toContain('rgb: rgb [preset|#hex|off|on]');
+  });
+
+  it('rgb rejects anything that is not a preset or a strict #hex', async () => {
     const { out, world } = setup();
-    expect(await out('ring')).toBe('ring: green');
-    expect(await out('ring purple')).toBe('ring: purple');
-    expect(world.get().ring).toBe('purple');
-    expect(await out('ring off')).toBe('ring: off');
-    expect(await out('ring red')).toBe("ring: invalid color 'red' (green|purple|off)");
+    expect(await out('rgb javascript:; echo $?')).toBe(`rgb: unknown color 'javascript:' (${PRESET_NAMES.join(', ')}, off, or a #hex)\n2`);
+    expect(await out('rgb #12; echo $?')).toBe("rgb: invalid hex color '#12' (use #rgb or #rrggbb, like #ff8800)\n2");
+    expect(await out('rgb #12345g')).toBe("rgb: invalid hex color '#12345g' (use #rgb or #rrggbb, like #ff8800)");
+    expect(await out(`rgb ${'#'.repeat(200)}`)).toBe("rgb: invalid hex color '################…' (use #rgb or #rrggbb, like #ff8800)");
+    expect(await out(`rgb ${'x'.repeat(200)}`)).toContain("rgb: unknown color 'xxxxxxxxxxxxxxxx…'");
+    for (const bad of ['rgb(1,2,3)', 'red;', 'url(x)', '#ff00ff00', '#fff\u0000', 'transparent', 'ff00ff', '"#ff00ff"'])
+      expect(await out(`rgb '${bad}'`)).toMatch(/^rgb: (unknown color|invalid hex color) /);
+    expect(await out('rgb red blue')).toBe('rgb: too many arguments (one color: rgb cyan, rgb #ff8800)');
+    expect(world.get().rgb).toBe('green'); // nothing changed
   });
 
   it('fan cycles or sets', async () => {
@@ -512,7 +545,7 @@ describe('bootLines', () => {
     expect(ok.length).toBeGreaterThanOrEqual(12);
     expect(ok.length).toBeLessThanOrEqual(16);
     expect(ok.every((l) => /^\[ {2}OK {2}\] (Started|Reached target|Mounted|Finished) .+\.$/.test(l))).toBe(true);
-    for (const l of lines.filter((l) => text(l).startsWith('[  OK  ]'))) expect(l.find((s) => s.text.includes('OK'))?.fg).toBe('green');
+    for (const l of lines.filter((l) => text(l).startsWith('[  OK  ]'))) expect(l.find((s) => s.text.includes('OK'))?.fg).toBe('accent');
     expect(t).toContain('meowOS rolling (tty1)');
     expect(t.at(-1)).toBe('nitro login: alxnko (automatic login)');
   });
@@ -524,7 +557,7 @@ describe('never names the upstream distro', () => {
     const all = [
       'help', 'man ls', 'man man', 'man desk', 'man pacman', 'man fastfetch', 'whoami', 'whoami -v', 'fastfetch', 'fastfetch --compact',
       'uname -a', 'uname -o', 'uptime', 'date', 'echo $SHELL $PATH', 'hostname', 'ls -la ~', 'ls -la /', 'ls -la /etc', 'tree -a /',
-      'cat /etc/os-release /etc/motd /etc/hostname about.md laptop/readme.txt', 'cat desk/height desk/fan desk/ring .config/theme',
+      'cat /etc/os-release /etc/motd /etc/hostname about.md laptop/readme.txt', 'cat desk/height desk/fan desk/rgb .config/theme',
       'open gh', 'open evil', 'history', 'theme', 'desk 2', 'desk up', 'ring', 'fan', 'sound', 'meow', 'catsay hello',
       'pacman -Syu', 'yay', 'pacman -S x', 'pacman', 'rm -rf /', 'rm -rf / --no-preserve-root', 'sudo ls', 'sudo', 'foo', 'claer',
       'ls | grep o', 'ls | wc', 'man', 'exit', 'cmatrix',

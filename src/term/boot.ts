@@ -22,7 +22,7 @@ const UNITS: [string, string][] = [
 
 export function bootLines(): Line[] {
   return [
-    ...UNITS.map(([verb, unit]): Line => [{ text: '[' }, fg('green', '  OK  '), { text: `] ${verb} ` }, b(unit, 'white'), { text: '.' }]),
+    ...UNITS.map(([verb, unit]): Line => [{ text: '[' }, fg('accent', '  OK  '), { text: `] ${verb} ` }, b(unit, 'white'), { text: '.' }]),
     [{ text: '' }],
     [{ text: `${SITE.os} rolling (tty1)` }],
     [{ text: '' }],

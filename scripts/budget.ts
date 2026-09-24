@@ -35,7 +35,13 @@ const initialJs = [...initial].reduce((n, f) => n + gz(f), 0) + gzipSync(inlineJ
 const cssBytes = css.reduce((n, f) => n + gz(join(DIST, f)), 0) + gzipSync(inlineCss).length;
 const astroDir = join(DIST, '_astro');
 const allJs = readdirSync(astroDir).filter((f) => f.endsWith('.js')).map((f) => join(astroDir, f));
-const lazyJs = allJs.filter((f) => !initial.has(f)).reduce((n, f) => n + gz(f), 0);
+// the lazy chunks: the 3D desk (scene.*.js and what only it imports), and the rest: the long
+// terminal text loaded on first use (R75, R86)
+const lazy = allJs.filter((f) => !initial.has(f));
+const scene3d = new Set([...staticClosure(lazy.filter((f) => /\/scene\.[^/]+\.js$/.test(f)).map((f) => f.slice(DIST.length + 1)))].filter((f) => !initial.has(f)));
+if (!scene3d.size) throw new Error('no scene.*.js chunk found');
+const lazyJs = [...scene3d].reduce((n, f) => n + gz(f), 0);
+const textJs = lazy.filter((f) => !scene3d.has(f)).reduce((n, f) => n + gz(f), 0);
 const fonts = readdirSync(astroDir).filter((f) => f.endsWith('.woff2')).reduce((n, f) => n + statSync(join(astroDir, f)).size, 0);
 
 const sceneDir = join(DIST, 'scene');
@@ -47,6 +53,7 @@ const checks: [string, number, number][] = [
   ['CSS (gz)', cssBytes, 10 * 1024],
   ['fonts (woff2 total)', fonts, 60 * 1024],
   ['lazy 3D JS (gz)', lazyJs, 170 * 1024],
+  ['lazy text JS (gz)', textJs, 6 * 1024],
   ['desk.glb', size(/^desk\..*\.glb$/), 250 * 1024],
   ['atlas 1024 (max)', size(/^atlas-.*-1024\..*\.webp$/), 120 * 1024],
   ['atlas 2048 (max)', size(/^atlas-.*-2048\..*\.webp$/), 450 * 1024],

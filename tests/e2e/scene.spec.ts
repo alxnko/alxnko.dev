@@ -307,7 +307,7 @@ test.describe('3D desk', () => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
     // the fan last, then off again: under software GL a spinning fan keeps every frame busy
-    for (const c of ['desk 3', 'theme day', 'ring purple', 'meow', 'sudo ls', 'theme night', 'ring off', 'desk 1', 'fan 3', 'fan 0']) {
+    for (const c of ['desk 3', 'theme day', 'rgb purple', 'meow', 'sudo ls', 'theme night', 'rgb #ff8800', 'ring off', 'rgb on', 'rgb green', 'desk 1', 'fan 3', 'fan 0']) {
       await run(page, c);
       await page.waitForTimeout(250);
     }

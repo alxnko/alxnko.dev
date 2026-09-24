@@ -22,6 +22,21 @@ export function bakedMaterial(day: Texture, night: Texture, mix: number): Shader
 }
 
 /**
+ * A baked part recoloured at runtime (`rgb`, R86): it was baked with a neutral grey albedo, so
+ * its texel is light times grey; times uTint (= tint / grey, linear) it is that light on the
+ * tint. Shares the source's atlas and day/night uniforms, like ghostMaterial.
+ */
+export function tintedMaterial(src: ShaderMaterial, tint: Color): ShaderMaterial {
+  return new ShaderMaterial({
+    uniforms: { ...src.uniforms, uTint: { value: tint } },
+    vertexShader: src.vertexShader,
+    fragmentShader: src.fragmentShader
+      .replace('uniform float uMix;', 'uniform float uMix; uniform vec3 uTint;')
+      .replace('gl_FragColor = vec4(c, 1.0);', 'gl_FragColor = vec4(c * uTint, 1.0);'),
+  });
+}
+
+/**
  * A see-through copy of a baked material for motion-blur trails (the spinning fan). It shares
  * the source's atlas and day/night uniforms, so theme and atlas changes reach it for free.
  */

@@ -1,7 +1,5 @@
 // Shell: runs a parsed line against the registry (pipes, &&, ||, ;), owns busy + Ctrl+C.
 import { SITE } from '../content/site';
-import { catspeak } from './catspeak';
-import { phrase } from './phrases';
 import { text } from './format';
 import { expand, parse, ParseError, type Chain, type Pipeline } from './parse';
 import { AbortedError, Registry, didYouMean, type ShellEnv } from './registry';
@@ -74,6 +72,7 @@ export class Shell {
   private readonly env: ShellEnv;
   private readonly sleepImpl: (ms: number, signal: AbortSignal) => Promise<void>;
   private ac: AbortController | null = null;
+  private loading = false;
   private status = 0;
   /** The running command's key handler (a full-screen toy owns the tty); null otherwise. */
   private keyFn: ((key: string) => void) | null = null;
@@ -132,7 +131,7 @@ export class Shell {
    * like any other, but stay out of the history and leave `last` (the chips) untouched.
    */
   async run(line: string, { record = true }: { record?: boolean } = {}): Promise<void> {
-    if (this.store.state.busy || this.ac) return;
+    if (this.store.state.busy || this.ac || this.loading) return;
     const src = line.slice(0, MAX_INPUT);
     this.store.print([...this.store.prompt(), { text: src }]);
     this.store.setInput('');
@@ -146,15 +145,19 @@ export class Shell {
     let cmdline = src;
     const first = src.trim().split(/\s+/)[0] ?? '';
     if (!this.known(first)) {
-      const cat = catspeak(src, this.env.random);
+      // the answers are long text, loaded on first use (R75); no second line starts meanwhile
+      this.loading = true;
+      const text = await import('./text').catch(() => null);
+      this.loading = false;
+      const cat = text?.catspeak(src, this.env.random);
       if (cat) {
-        this.store.print([{ text: '=^..^=  ', fg: 'green' }, { text: cat.text }]);
+        this.store.print([{ text: '=^..^=  ', fg: 'accent' }, { text: cat.text }]);
         this.world.meow();
         if (cat.excited) setTimeout(() => this.world.meow(), 450);
         this.done(src, 0);
         return;
       }
-      const p = phrase(src);
+      const p = text?.phrase(src);
       if (p) {
         this.store.print(p.say);
         if (!p.run) return this.done(src, 0);
@@ -260,15 +263,15 @@ export class Shell {
       const hint = lower !== name && this.known(lower) ? lower : sub?.startsWith('!') ? null : sub ?? didYouMean(name, [...this.registry.names(), ...this.env.aliases.keys()]);
       if (sub?.startsWith('!')) err([{ text: sub.slice(1), fg: 'muted' }]);
       else if (hint) err([{ text: 'did you mean \'' }, { text: hint, run: hint }, { text: "'?" }]);
-      else if (this.solo) err([{ text: 'type ', fg: 'muted' }, { text: 'help', fg: 'green', run: 'help' }, { text: " to see what's here.", fg: 'muted' }]);
+      else if (this.solo) err([{ text: 'type ', fg: 'muted' }, { text: 'help', fg: 'accent', run: 'help' }, { text: " to see what's here.", fg: 'muted' }]);
       return 127;
     }
     // GNU style: --help anywhere before `--` prints the usage (echo prints it, like bash)
     const dashes = args.indexOf('--');
     const helpAt = args.indexOf('--help');
     if (name !== 'echo' && helpAt >= 0 && (dashes < 0 || helpAt < dashes)) {
-      for (const l of cmd.help ?? [`usage: ${cmd.usage}`, `  ${cmd.summary}`]) write(l);
-      if (!cmd.help && !cmd.hidden) write([{ text: 'more: ', fg: 'muted' }, { text: `man ${cmd.name}`, fg: 'green', run: `man ${cmd.name}` }]);
+      for (const l of (await cmd.help?.()) ?? [`usage: ${cmd.usage}`, `  ${cmd.summary}`]) write(l);
+      if (!cmd.help && !cmd.hidden) write([{ text: 'more: ', fg: 'muted' }, { text: `man ${cmd.name}`, fg: 'accent', run: `man ${cmd.name}` }]);
       return 0;
     }
     const ctx: CommandCtx = {
