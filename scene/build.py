@@ -317,7 +317,7 @@ def ellipsoid(rx, ry, rz, segs=12, rings=8):
 def build_desk(m):
     H = D.DESK_H
     w, d, t = D.TOP
-    top = C.box("desk_top", (w, d, t), (0, 0, H - t / 2), bevel=D.TOP_BEVEL, segs=2,
+    top = C.box("desk_top", (w, d, t), (0, 0, H - t / 2), bevel=D.TOP_BEVEL, segs=3,
                 drop_bottom=True)
     top.data.materials.append(m["laminate"])
     top.data.materials.append(m["laminate_edge"])
@@ -793,9 +793,9 @@ def build_monitor(m):
     top_z = hz + 0.05
     base_z = D.DESK_H                                   # the base plate stands on the desk
     neck = C.box("stand_neck", (nw, nd, top_z - base_z), (cx, neck_y, base_z + (top_z - base_z) / 2),
-                 bevel=0.006, segs=2, mat_=m["stand"])
+                 bevel=0.006, segs=3, mat_=m["stand"])
     Rg(neck, 1.0)
-    Rg(C.box("stand_bracket", (0.085, 0.03, 0.10), (cx, back_y + 0.005, hz), bevel=0.006, segs=2,
+    Rg(C.box("stand_bracket", (0.085, 0.03, 0.10), (cx, back_y + 0.005, hz), bevel=0.006, segs=3,
              mat_=m["stand"]), 0.8)
     bw_, bd_, bt_ = S_["base"]
     bmb = bmesh.new()                                   # flat rectangular slab, square corners
@@ -1056,6 +1056,7 @@ def build_mouse(m):
         x *= 1.0 - 0.18 * k                                # shell is shorter at the top
         v.co = Vector((x, y, z))
     parts = [obj_from_bm("mouse_shell", bm, m["plastic"])]
+    parts[0]["smooth_angle"] = 55.0
     base = bm_oval(L / 2 + 0.003, W / 2 + 0.004, 0.005, 24)
     bmesh.ops.translate(base, vec=(0, 0, 0.0025), verts=base.verts)
     parts.append(obj_from_bm("mouse_base", base, m["plastic_mid"]))
@@ -1182,6 +1183,8 @@ def build_gamepad(m):
     for name, b_, mat_ in allbm:
         bmesh.ops.translate(b_, vec=(0, 0, -zmin), verts=b_.verts)
         ob = obj_from_bm(name, b_, mat_)
+        if name == "gp_body":
+            ob["smooth_angle"] = 55.0
         xform(ob, Mw)
         Rg(ob, 1.6 if name == "gp_body" else 1.2)
         objs.append(ob)
@@ -1517,7 +1520,7 @@ def build_headphones(m):
     c0, c1 = H["cushion"]
     cz = -0.072                                          # cup centres (band centre at 0)
     parts = []
-    arc = [(Rb * math.cos(R(a)), 0.0, Rb * math.sin(R(a))) for a in range(-14, 195, 12)]
+    arc = [(Rb * math.cos(R(a)), 0.0, Rb * math.sin(R(a))) for a in range(-14, 195, 8)]
     parts.append(C.sweep("hp_band", arc, rounded_rect(bt, bw, 0.004, seg=1), mat_=m["hp"], up=(0, 1, 0)))
     pad = [((Rb - bt / 2 - 0.004) * math.cos(R(a)), 0.0, (Rb - bt / 2 - 0.004) * math.sin(R(a)))
            for a in range(28, 153, 14)]
@@ -1531,9 +1534,9 @@ def build_headphones(m):
                              rounded_rect(0.008, 0.020, 0.003, seg=1), mat_=m["hp"], up=(0, 1, 0)))
         # cup shell: flat outer plate with a rounded rim, a little narrower at the plate
         shell = bm_lathe_oval([(s0, 1.0), (s0 + 0.55 * (s1 - s0), 1.0), (s1 - 0.004, 0.93), (s1, 0.80)],
-                              ry, rz, 16)
+                              ry, rz, 24)
         cush = bm_lathe_oval([(c0, 0.84), (c0 + 0.005, 0.97), ((c0 + c1) / 2, 1.02), (c1, 1.0)],
-                             ry * 0.97, rz * 0.97, 16)
+                             ry * 0.97, rz * 0.97, 24)
         for bm_, nm, mt in ((shell, "hp_cup", m["hp"]), (cush, "hp_cush", m["hp_soft"])):
             if sx < 0:
                 bmesh.ops.scale(bm_, vec=(-1, 1, 1), verts=bm_.verts)
@@ -1542,6 +1545,7 @@ def build_headphones(m):
             parts.append(obj_from_bm(f"{nm}{sx}", bm_, mt))
     M = rest_pose(parts, Vector(H["up"]), H["yaw"], (H["x"], H["y"], D.DESK_H))
     for p in parts:
+        p["smooth_angle"] = 60.0
         xform(p, M)
         Rg(p, 1.1)
     return parts
@@ -2160,6 +2164,12 @@ def main():
     sky = build_room(m)
     shadow_floor, shadow_wall = build_shadow_decals(m)
 
+    # Preserve each part's crease angle before joining the baked groups.
+    for ob in PARTS_STATIC + PARTS_RIG:
+        smooth(ob, ob.get("smooth_angle", 38.0))
+        if ob.name in {"desk_top", "stand_neck", "stand_bracket"}:
+            weighted_normals(ob)
+
     # merge the baked groups
     static = C.join(PARTS_STATIC, "static")
     C.set_origin(static, (0, 0, 0))
@@ -2207,7 +2217,7 @@ def main():
     rig["pivot_at"] = "desk_top"
     cat_head["forward"] = list(head_fwd)
 
-    for ob in (static, desk_baked, kbd_accent, paddle_glyphs, blades, ring, scr_m):
+    for ob in (kbd_accent, paddle_glyphs, blades, ring, scr_m):
         smooth(ob)
     build_rigs()
     camera("cam_desk", D.CAM_DESK, parent=rig)
@@ -2246,12 +2256,27 @@ def main():
 
 
 def smooth(ob, angle=38.0):
+    ob["smooth_angle"] = angle
     me = ob.data
     me.shade_smooth()
     try:
         me.set_sharp_from_angle(angle=math.radians(angle))
     except AttributeError:  # older API
         pass
+
+
+def weighted_normals(ob):
+    """Keep broad hero planes flat without changing their hard crease flags."""
+    bpy.ops.object.select_all(action="DESELECT")
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    mod = ob.modifiers.new("broad_plane_normals", "WEIGHTED_NORMAL")
+    mod.mode = "FACE_AREA"
+    # Metre-scale stand bevels need a tighter area threshold than Blender's default.
+    mod.weight = 100
+    mod.thresh = 0.0001
+    mod.keep_sharp = True
+    bpy.ops.object.modifier_apply(modifier=mod.name)
 
 
 def preview(samples, cams=("cam_desk", "cam_wide"), rigs=("night", "day")):
