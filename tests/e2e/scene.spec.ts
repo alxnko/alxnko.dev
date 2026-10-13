@@ -587,27 +587,16 @@ test.describe('3D desk: load and redraw cost', () => {
     expect(frames.length - new Set(frames).size).toBe(0);
   });
 
-  test('the desk poster is the loader backdrop while the 3D boots, then the live desk replaces it', async ({ page }) => {
+  test('loading shows the actual console on black and keeps the poster hidden', async ({ page }) => {
     let release!: () => void;
-    const held = new Promise<void>((r) => (release = r));
-    // (released well inside the head watchdog's 15 s)
-    await page.route('**/scene/manifest.json', async (route) => { await held; await route.continue(); });
+    const held = new Promise<void>(r => release = r);
+    await page.route('**/scene/manifest.json', async route => { await held; await route.continue(); });
     await page.goto('/?3d');
-    await expect(page.locator('#loader')).toBeVisible();
-    const img = page.locator('#poster img');
-    await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
-    const vp = page.viewportSize()!;
-    const box = (await img.boundingBox())!;
-    expect(Math.round(box.x)).toBe(0);
-    expect(Math.round(box.y)).toBe(0);
-    expect(Math.round(box.width)).toBe(vp.width);
-    expect(Math.round(box.height)).toBe(vp.height);
-    await expect(img).toBeVisible();
-    await expect(page.locator('.poster figcaption')).toBeHidden();
-    await expect(page.locator('#term')).toBeHidden(); // the page layout stays out of sight
-    await expect(page.locator('#loader-steps')).toBeVisible(); // the real progress, over the desk
+    await expect(page.locator('#term')).toBeVisible();
+    await expect(page.locator('#loader')).toHaveCount(0);
+    await expect(page.locator('.poster')).toBeHidden();
     release();
-    await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready', { timeout: 30_000 });
+    await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready', { timeout: 30000 });
     await expect(page.locator('.poster')).toBeHidden();
   });
 });

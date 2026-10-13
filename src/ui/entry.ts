@@ -11,7 +11,7 @@ import { DEFAULT_WORLD } from '../term/world';
 import { DESK_MAX, DESK_MIN, DESK_PRESETS } from '../term/commands/world';
 import { createSound } from '../audio/sound';
 import { decide3D } from '../scene/gate';
-import type { SceneWorld } from '../scene/index';
+import type { SceneWorld, SceneHandle } from '../scene/index';
 import * as prefs from '../lib/prefs';
 import { parseRgb } from '../lib/rgb';
 import { loadRgb, saveRgb } from './accent';
@@ -26,6 +26,7 @@ const narrow = () => innerWidth < 640;
 /** The world the terminal talks to. Works without 3D; the scene attaches when it loads. */
 class AppWorld implements WorldPort {
   scene: SceneWorld | null = null;
+  cameraRequest: Landmark | null = null;
   readonly sound = createSound();
   private s: WorldState;
 
@@ -42,6 +43,7 @@ class AppWorld implements WorldPort {
     return this.scene !== null;
   }
   fly(to: Landmark): void {
+    this.cameraRequest = to;
     this.s.landmark = to;
     this.scene?.fly(to);
   }
@@ -149,10 +151,6 @@ function takeProbe(): HTMLCanvasElement | undefined {
   return c;
 }
 
-// the same deadline as the head watchdog (Base.astro): once the page has been revealed the
-// desk never takes it over mid-read
-const MOUNT_TIMEOUT_MS = 15000;
-
 const $ = (id: string) => document.getElementById(id);
 
 function enter3d() {
@@ -160,13 +158,21 @@ function enter3d() {
   const btn = $('enter3d') as HTMLButtonElement | null;
   if (!stage || !termEl || !contactsEl) return;
   if (btn) { btn.disabled = true; btn.textContent = 'loading 3d'; }
+  if (mounting3d || handle3d) return;
+  const controller = mounting3d = new AbortController();
+  if (document.documentElement.dataset.boot !== '3d') {
+    document.documentElement.dataset.boot = '3d';
+    (window as typeof window & { __consoleIntro?: () => void; __sceneDeadline?: () => void }).__consoleIntro?.();
+    (window as typeof window & { __sceneDeadline?: () => void }).__sceneDeadline?.();
+  }
   document.body.dataset.scene = 'loading';
-  const initial = world.get();
-  const mounting = import('../scene/index').then((m) =>
-      m.mount({
+  const mounting = import('../scene/index').then((m) => {
+      return m.mount({
         stage,
+        signal: controller.signal,
+        onFailure: leave3d,
         store,
-        initial,
+        initial: world.get(),
         reducedMotion: reducedMotion(),
         probe: takeProbe(),
         mobile: matchMedia('(pointer: coarse)').matches || innerWidth < 720,
@@ -186,16 +192,6 @@ function enter3d() {
             if (b.dataset.landmark === l) b.setAttribute('aria-current', 'true');
             else b.removeAttribute('aria-current');
           }
-        },
-        onStep(stepName, state) {
-          const li = document.querySelector<HTMLElement>(`#loader-steps [data-step="${stepName}"]`);
-          if (!li) return;
-          li.dataset.state = state;
-          const st = li.querySelector('.st');
-          if (st) st.textContent = state === 'ok' ? '[  OK  ]' : '[  ..  ]';
-        },
-        onProgress(p) {
-          $('loader-fill')?.style.setProperty('--p', String(Math.min(1, Math.max(0, p))));
         },
         onHold(state, h) {
           if (state === 'start') { stopMotor = world.sound.motorHold(); return; }
@@ -221,52 +217,35 @@ function enter3d() {
           if (b) b.hidden = !away;
           syncAwayHistory(away);
         },
-      }));
-  let timedOut = false;
-  // the deadline only counts time the page is actually shown (a background tab loads slowly
-  // and that is fine; it must not fall back to the page for it)
-  const timeout = new Promise<never>((_, reject) => {
-    let left = MOUNT_TIMEOUT_MS, since = performance.now();
-    const tick = () => {
-      const now = performance.now();
-      if (!document.hidden) left -= now - since;
-      since = now;
-      if (left <= 0) { timedOut = true; reject(new Error('3d load timed out')); }
-      else setTimeout(tick, Math.min(1000, left));
-    };
-    setTimeout(tick, 1000);
+      });
   });
-  // a mount that finishes after the timeout cleans up after itself
-  mounting.then((h) => { if (timedOut) h.destroy(); }, () => {});
-  Promise.race([mounting, timeout])
-    .then((handle) => {
+  // The head deadline calls leave3d immediately; the signal disposes any late work.
+  mounting
+    .then(async (handle) => {
+      if (controller.signal.aborted) { handle.destroy(); return; }
       handle3d = handle;
       world.scene = handle.world;
-      // anything changed while the desk was loading (theme, desk height, rgb, fan) was only
-      // applied to the page: bring the scene up to date now that it is listening
-      const now = world.get(), was = initial;
-      if (now.theme !== was.theme) handle.world.setTheme(now.theme);
-      if (now.rgb !== was.rgb || now.accent !== was.accent) handle.world.setRgb(now.rgb, now.accent);
-      if (now.fan !== was.fan) handle.world.setFan(now.fan);
-      if (now.desk !== was.desk) void handle.world.setDesk(now.desk);
-      document.body.dataset.mode = 'scene';
+      await handle.prepare(() => world.get());
+      if (controller.signal.aborted) { handle.destroy(); return; }
       document.body.dataset.scene = 'ready';
+      if (world.cameraRequest) handle.world.fly(world.cameraRequest);
+      else handle.beginIntro();
       syncMonitorLinks();
       if (btn) btn.hidden = true;
       warmText();
-      // the live desk covers the poster for good: a download still under way is dropped
-      const img = document.querySelector<HTMLImageElement>('#poster img');
-      if (img && !img.complete) { img.parentElement?.querySelectorAll('source').forEach((s) => s.remove()); img.removeAttribute('src'); }
     })
     .catch((e) => {
       console.warn('3d unavailable:', e);
-      leave3d();
+      if (mounting3d === controller) leave3d();
     });
 }
 
-let handle3d: { destroy(): void } | null = null;
+let handle3d: SceneHandle | null = null;
+let mounting3d: AbortController | null = null;
 let stopMotor: (() => void) | null = null;
 function leave3d() {
+  mounting3d?.abort();
+  mounting3d = null;
   // a <head> probe context the desk never took (the chunk failed to load, or the boot timed
   // out first) is released now rather than whenever it is collected
   takeProbe()?.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
@@ -282,8 +261,12 @@ function leave3d() {
   if (btn && hasWebGL2()) { btn.hidden = false; btn.disabled = false; btn.textContent = 'enter 3d'; }
 }
 
+addEventListener('scene:failed', leave3d);
+addEventListener('pagehide', leave3d);
+
 // The <head> check already decided this visit boots into 3D: start now, not after idle.
-const booting3d = document.documentElement.dataset.boot === '3d';
+const bootState = document.documentElement.dataset.boot;
+const booting3d = bootState === '3d';
 // just after the first paint: the loader and hint show at once, and the desk's downloads
 // don't compete with the page's own first paint (a timer backs up rAF in covered windows)
 if (booting3d) {
@@ -295,9 +278,9 @@ if (booting3d) {
 
 function afterIdle() {
   const nav = navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string }; deviceMemory?: number };
-  const gate = decide3D({
+  const gate = bootState === 'failed' ? 'offer' : decide3D({
     url: location.href,
-    webgl2: hasWebGL2(),
+    webgl2: '__consoleIntro' in window && hasWebGL2(),
     saveData: nav.connection?.saveData,
     effectiveType: nav.connection?.effectiveType,
     cores: nav.hardwareConcurrency || undefined,
@@ -383,7 +366,7 @@ addEventListener('keydown', (e) => {
 });
 for (const b of document.querySelectorAll<HTMLButtonElement>('#nav [data-landmark]'))
   b.addEventListener('click', () => world.fly(b.dataset.landmark as Landmark));
-$('term')?.addEventListener('focusin', () => { if (world.scene) world.fly('laptop'); });
+$('term')?.addEventListener('focusin', () => { if (world.scene || mounting3d) world.fly('laptop'); });
 // Phones: "typing mode" follows the on-screen keyboard itself, not just focus (Android keeps
 // focus when the keyboard is dismissed with back/arrow). The keyboard shrinks the viewport
 // (interactive-widget=resizes-content): while it is up and the terminal has focus, the chrome

@@ -2,7 +2,7 @@
    pinned screens (#term on the laptop, #contacts + #mon-info on the monitor; mapped onto the
    3D screens every frame by src/scene/dock.ts via CSSOM matrix3d) < the WebGL canvas (whose
    screen regions are transparent windows, so 3D objects occlude the screens) < chrome.
-   Hooks: body[data-mode|data-scene|data-view], data-dock="screen|off" on each pinned panel.
+   Hooks: body[data-mode|data-scene|data-view|data-projecting], data-dock="screen|off" on each pinned panel.
    The laptop panel's logical grid is --screen-w/h (set by the runtime) at --screen-font. */
 
 :root {
@@ -40,7 +40,7 @@
   transition: opacity var(--d-slow) var(--ease);
 }
 
-[data-mode="scene"] .stage-canvas {
+:is([data-mode="scene"], [data-projecting]) .stage-canvas {
   opacity: 1;
 }
 
@@ -48,32 +48,32 @@
   touch-action: none;
 }
 
-[data-mode="scene"] {
+:is([data-mode="scene"], [data-projecting]) {
   height: 100dvh;
   overflow: hidden;
 }
 
-[data-mode="scene"] #stage {
+:is([data-mode="scene"], [data-projecting]) #stage {
   opacity: 1;
   pointer-events: auto;
 }
 
 /* chrome floats over the canvas */
-[data-mode="scene"] .bar {
+:is([data-mode="scene"], [data-projecting]) .bar {
   position: fixed;
   inset: 0 0 auto;
   border-bottom-color: transparent;
 }
 
-[data-mode="scene"] .toggles {
+:is([data-mode="scene"], [data-projecting]) .toggles {
   margin-left: auto;
 }
 
-[data-mode="scene"] .bar-home,
-[data-mode="scene"] .bar-meta,
-[data-mode="scene"] .foot,
-[data-mode="scene"] .poster figcaption,
-[data-mode="scene"] .contacts .label-path {
+:is([data-mode="scene"], [data-projecting]) .bar-home,
+:is([data-mode="scene"], [data-projecting]) .bar-meta,
+:is([data-mode="scene"], [data-projecting]) .foot,
+:is([data-mode="scene"], [data-projecting]) .poster figcaption,
+:is([data-mode="scene"], [data-projecting]) .contacts .label-path {
   display: none;
 }
 
@@ -85,7 +85,7 @@
   transition: opacity var(--d-slow) var(--ease), visibility 0s linear var(--d-slow);
 }
 
-[data-mode="scene"] .poster {
+:is([data-mode="scene"], [data-projecting]) .poster {
   position: fixed;
   inset: 0;
   z-index: calc(var(--z-stage) - 1);
@@ -93,12 +93,12 @@
 }
 
 /* (the picture is a block: it carries the full height down to the image) */
-[data-mode="scene"] .poster picture,
+:is([data-mode="scene"], [data-projecting]) .poster picture,
 [data-boot="3d"] body:not([data-scene="ready"]) .poster picture {
   height: 100%;
 }
 
-[data-mode="scene"] .poster img {
+:is([data-mode="scene"], [data-projecting]) .poster img {
   width: 100%;
   height: 100%;
   aspect-ratio: auto;
@@ -106,7 +106,7 @@
   border-radius: 0;
 }
 
-[data-mode="scene"] .sheet {
+:is([data-mode="scene"], [data-projecting]) .sheet {
   pointer-events: none; /* click-through: only real controls and the pinned screens take input */
   position: static;
   /* body is a flex container, where z-index applies even to static items: without this the
@@ -117,7 +117,7 @@
   padding: 0;
 }
 
-[data-mode="scene"] .identity {
+:is([data-mode="scene"], [data-projecting]) .identity {
   position: fixed;
   z-index: var(--z-chrome);
   top: calc(env(safe-area-inset-top) + var(--sp-3));
@@ -126,20 +126,20 @@
   pointer-events: none;
 }
 
-[data-mode="scene"] .identity a {
+:is([data-mode="scene"], [data-projecting]) .identity a {
   pointer-events: auto;
 }
 
-[data-mode="scene"] .identity .eyebrow,
-[data-mode="scene"] .identity .facts dt {
+:is([data-mode="scene"], [data-projecting]) .identity .eyebrow,
+:is([data-mode="scene"], [data-projecting]) .identity .facts dt {
   display: none;
 }
 
-[data-mode="scene"] .mark {
+:is([data-mode="scene"], [data-projecting]) .mark {
   font-size: var(--fs-7);
 }
 
-[data-mode="scene"] .facts {
+:is([data-mode="scene"], [data-projecting]) .facts {
   display: block;
   margin-top: var(--sp-2);
   padding: 0;
@@ -152,8 +152,8 @@
    show the real, interactive thing (no swapping, no popping). The runtime sets the logical
    size (--screen-w/h, --contacts-w/h) and the transform; data-dock="off" only when a screen
    faces away or is out of view. */
-[data-mode="scene"] .term,
-[data-mode="scene"] .contacts {
+:is([data-mode="scene"], [data-projecting], [data-boot="3d"] body) .term,
+:is([data-mode="scene"], [data-projecting]) .contacts {
   position: fixed;
   top: 0;
   left: 0;
@@ -166,14 +166,14 @@
      gives the screens their own compositor layer */
 }
 
-[data-mode="scene"] .term[data-dock="off"],
-[data-mode="scene"] .contacts[data-dock="off"],
-[data-mode="scene"] .term:not([data-dock]),
-[data-mode="scene"] .contacts:not([data-dock]) {
+:is([data-mode="scene"], [data-projecting], [data-boot="3d"] body) .term[data-dock="off"],
+:is([data-mode="scene"], [data-projecting]) .contacts[data-dock="off"],
+:is([data-mode="scene"], [data-projecting]) .term:not([data-dock]),
+:is([data-mode="scene"], [data-projecting]) .contacts:not([data-dock]) {
   visibility: hidden;
 }
 
-[data-mode="scene"] .term {
+:is([data-mode="scene"], [data-projecting], [data-boot="3d"] body) .term {
   width: var(--screen-w);
   height: var(--screen-h);
   border: 0;
@@ -183,25 +183,25 @@
   --term-lh: 1.25;
 }
 
-[data-mode="scene"] .term .term-head {
+:is([data-mode="scene"], [data-projecting], [data-boot="3d"] body) .term .term-head {
   height: var(--screen-bar);
   padding: 0 var(--screen-pad);
   font-size: 0.8em;
 }
 
-[data-mode="scene"] .term .term-view {
+:is([data-mode="scene"], [data-projecting], [data-boot="3d"] body) .term .term-view {
   display: flex;
   flex: 1;
   flex-direction: column;
 }
 
-[data-mode="scene"] .term .term-screen {
+:is([data-mode="scene"], [data-projecting], [data-boot="3d"] body) .term .term-screen {
   flex: 1;
   height: auto;
   padding: var(--screen-pad) var(--screen-pad) 0;
 }
 
-[data-mode="scene"] .term .term-form {
+:is([data-mode="scene"], [data-projecting], [data-boot="3d"] body) .term .term-form {
   padding: 0 var(--screen-pad) var(--screen-pad);
   border-top: 0;
   font-size: inherit;
@@ -209,15 +209,15 @@
 
 /* the screen is small from afar: the 16px phone input rule applies to the real input box,
    which is the pinned one here, so keep it legible via the logical size instead */
-[data-mode="scene"] .term .term-form input {
+:is([data-mode="scene"], [data-projecting], [data-boot="3d"] body) .term .term-form input {
   font-size: inherit;
 }
 
-[data-mode="scene"] .term .term-chips {
+:is([data-mode="scene"], [data-projecting], [data-boot="3d"] body) .term .term-chips {
   display: none;
 }
 
-[data-mode="scene"] .contacts {
+:is([data-mode="scene"], [data-projecting]) .contacts {
   width: var(--contacts-w);
   height: var(--contacts-h);
   padding: 44px 56px;
@@ -227,13 +227,13 @@
   line-height: 1.3;
 }
 
-[data-mode="scene"] .contacts .label {
+:is([data-mode="scene"], [data-projecting]) .contacts .label {
   color: var(--ansi-dim);
   font-size: 28px;
   padding-bottom: 12px;
 }
 
-[data-mode="scene"] .contacts a {
+:is([data-mode="scene"], [data-projecting]) .contacts a {
   min-height: 0;
   padding: 26px 0;
   grid-template-columns: 5ch minmax(0, 1fr) 24px;
@@ -241,31 +241,31 @@
   border-color: var(--term-rule, #232326);
 }
 
-[data-mode="scene"] .contacts a .c-key {
+:is([data-mode="scene"], [data-projecting]) .contacts a .c-key {
   color: var(--ansi-accent);
 }
 
 /* touch: the links share out the panel's whole height, so each row is as tall a tap target
    as the screen allows (≥ 44 px on a 412 px phone at the monitor view; never under 24 px) */
 @media (pointer: coarse) {
-  [data-mode="scene"] .contacts {
+  :is([data-mode="scene"], [data-projecting]) .contacts {
     display: flex;
     flex-direction: column;
     padding-block: 30px;
   }
 
-  [data-mode="scene"] .contacts ul {
+  :is([data-mode="scene"], [data-projecting]) .contacts ul {
     display: flex;
     flex: 1;
     flex-direction: column;
   }
 
-  [data-mode="scene"] .contacts li {
+  :is([data-mode="scene"], [data-projecting]) .contacts li {
     display: flex;
     flex: 1;
   }
 
-  [data-mode="scene"] .contacts a {
+  :is([data-mode="scene"], [data-projecting]) .contacts a {
     flex: 1;
   }
 }
@@ -273,7 +273,7 @@
 /* the monitor stays a dark screen in both themes: hover is a soft gray row, not the page's
    (light-theme) surface colour */
 @media (hover: hover) {
-  [data-mode="scene"] .contacts a:hover {
+  :is([data-mode="scene"], [data-projecting]) .contacts a:hover {
     background: color-mix(in srgb, var(--ansi-fg) 12%, var(--ansi-bg));
   }
 }
@@ -283,7 +283,7 @@
   display: none;
 }
 
-[data-mode="scene"] .back:not([hidden]) {
+:is([data-mode="scene"], [data-projecting]) .back:not([hidden]) {
   display: inline-flex;
   position: fixed;
   z-index: var(--z-chrome);
@@ -304,7 +304,7 @@
 /* a generous invisible margin: in a close view a live screen sits right under the button, and
    a slightly low tap must still mean "back", never open a contact link */
 @media (pointer: coarse) {
-  [data-mode="scene"] .back:not([hidden])::after {
+  :is([data-mode="scene"], [data-projecting]) .back:not([hidden])::after {
     content: "";
     position: absolute;
     inset: 0 0 -20px; /* below only: sideways it would cover the toggles on narrow phones */
@@ -325,7 +325,7 @@
 }
 
 /* landmark nav + hint */
-[data-mode="scene"] .nav {
+:is([data-mode="scene"], [data-projecting]) .nav {
   display: block;
   position: fixed;
   z-index: var(--z-chrome);
@@ -357,7 +357,7 @@
   border-bottom-color: var(--c-accent);
 }
 
-[data-mode="scene"] .hint {
+:is([data-mode="scene"], [data-projecting]) .hint {
   display: block;
   position: fixed;
   z-index: var(--z-chrome);
@@ -375,166 +375,40 @@
   opacity: 0;
 }
 
-/* ---- boot loader (3D-capable visits only; decided in <head> before first paint) -------- */
-.loader {
-  display: none;
-}
-
-[data-boot="3d"] .loader {
-  display: grid;
-  place-items: center;
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-skip) - 1);
-  padding: var(--gutter);
-  background: var(--c-bg);
-  transition: opacity var(--d-base) var(--ease), visibility 0s linear var(--d-base);
-}
-
-/* while the loader is up, the flat page underneath stays out of sight (and out of the tab order) */
-[data-boot="3d"] body:not([data-scene="ready"]) > :not(.loader):not(script) {
-  visibility: hidden;
-}
-
-/* the hint already shows under the loader: the visitor learns how to move while the desk
-   loads, and it stays put when the loader fades (it is the same line either way) */
-[data-boot="3d"] body:not([data-scene="ready"]) > #hint {
-  display: block;
-  position: fixed;
-  z-index: var(--z-skip);
-  left: 0;
-  right: 0;
-  bottom: calc(env(safe-area-inset-bottom) + var(--sp-5) + 52px);
+/* The baseline remains lite unless the first-paint bootstrap explicitly activates 3D. */
+[data-boot="3d"] body { background: #000; height: 100dvh; overflow: hidden; }
+[data-boot="3d"] body:not([data-scene="ready"]) > :not(.sheet):not(script),
+[data-boot="3d"] body:not([data-scene="ready"]) .sheet > :not(.term) { visibility: hidden; }
+[data-boot="3d"] body:not([data-scene="ready"]) .sheet { display: block; position: static; padding: 0; z-index: auto; }
+[data-boot="3d"] body:not([data-scene="ready"]) .term {
   visibility: visible;
-  color: var(--c-fg-subtle);
-  font-size: var(--fs-1);
-  text-align: center;
-  pointer-events: none;
+  transform: translate(var(--intro-x), var(--intro-y)) scale(var(--intro-scale));
 }
-
-/* the baked desk poster (fetched at high priority, the LCP image) is the loader's backdrop,
-   full-bleed as the desk view frames it: the first paint is the desk itself, the tty boot log
-   shows the real progress over it, and the live scene cross-fades in on top (the
-   [data-scene="ready"] .poster fade above). Only a failed boot shows the page (R17, R76). */
-[data-boot="3d"] body:not([data-scene="ready"]) .poster {
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-skip) - 2);
-  padding: 0;
-  visibility: visible;
-}
-
-[data-boot="3d"] body:not([data-scene="ready"]) .poster img {
-  width: 100%;
-  height: 100%;
-  aspect-ratio: auto;
-  border: 0;
-  border-radius: 0;
-}
-
-[data-boot="3d"] body:not([data-scene="ready"]) .poster figcaption {
-  display: none;
-}
-
-[data-boot="3d"] body:not([data-scene="ready"]) .loader {
-  background: transparent;
-}
-
-[data-boot="3d"] body[data-scene="ready"] .loader {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.loader-tty {
-  width: min(560px, 100%);
-  padding: var(--sp-4) var(--sp-5) var(--sp-5);
-  border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-m);
-  background: var(--ansi-bg);
-  color: var(--ansi-fg);
-  font-size: var(--fs-2);
-  line-height: 1.7;
-}
-
-.loader-head {
-  display: flex;
-  justify-content: space-between;
-  margin: 0 0 var(--sp-3);
-  padding-bottom: var(--sp-2);
-  border-bottom: 1px solid var(--c-line);
-  color: var(--ansi-dim);
-  font-size: var(--fs-1);
-}
-
-.loader-steps {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--ansi-dim);
-}
-
-.loader-steps li {
-  white-space: pre;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.loader-steps li[data-state="run"] {
-  color: var(--ansi-fg);
-}
-
-.loader-steps li[data-state="ok"] {
-  color: var(--ansi-fg);
-}
-
-.loader-steps li[data-state="ok"] .st {
-  color: var(--ansi-accent);
-}
-
-.loader-bar {
-  height: 2px;
-  margin-top: var(--sp-4);
-  background: var(--c-line);
-  overflow: hidden;
-}
-
-.loader-bar span {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background: var(--ansi-accent);
-  transform: scaleX(var(--p, 0));
-  transform-origin: 0 50%;
-  transition: transform var(--d-base) var(--ease);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-boot="3d"] .loader,
-  .loader-bar span {
-    transition: none;
-  }
-}
+[data-boot="3d"] body:not([data-scene="ready"]) .term[data-dock="screen"] { visibility: visible; }
+[data-boot="3d"] body:not([data-scene="ready"]) .term a { pointer-events: none; }
+[data-boot="3d"] body:not([data-scene="ready"]) .stage-canvas { opacity: 0; }
+[data-boot="3d"] body[data-scene="ready"] .poster { display: none; }
+[data-boot="3d"] .term .term-form { padding-top: 0; }
 
 /* selection follows attention: in 3D only the screen you have flown to is selectable (the
    terminal at the laptop, the contacts at the monitor); chrome and far-away screens are not.
    Inputs stay typeable regardless (user-select does not affect editing). */
-[data-mode="scene"] {
+:is([data-mode="scene"], [data-projecting]) {
   -webkit-user-select: none;
   user-select: none;
 }
 
-[data-mode="scene"][data-view="laptop"] .term,
-[data-mode="scene"][data-view="monitor"] .contacts {
+:is([data-mode="scene"], [data-projecting])[data-view="laptop"] .term,
+:is([data-mode="scene"], [data-projecting])[data-view="monitor"] .contacts {
   -webkit-user-select: text;
   user-select: text;
 }
 
 /* the pinned screens take input; every other part of the scene container lets clicks
    through to the canvas and the chrome */
-[data-mode="scene"] .term,
-[data-mode="scene"] .contacts,
-[data-mode="scene"] .mon-info {
+:is([data-mode="scene"], [data-projecting], [data-boot="3d"] body) .term,
+:is([data-mode="scene"], [data-projecting]) .contacts,
+:is([data-mode="scene"], [data-projecting]) .mon-info {
   pointer-events: auto;
 }
 
@@ -543,7 +417,7 @@
   display: none;
 }
 
-[data-mode="scene"] .mon-info {
+:is([data-mode="scene"], [data-projecting]) .mon-info {
   display: block;
   position: fixed;
   top: 0;
@@ -561,8 +435,8 @@
   line-height: 1.35;
 }
 
-[data-mode="scene"] .mon-info[data-dock="off"],
-[data-mode="scene"] .mon-info:not([data-dock]) {
+:is([data-mode="scene"], [data-projecting]) .mon-info[data-dock="off"],
+:is([data-mode="scene"], [data-projecting]) .mon-info:not([data-dock]) {
   visibility: hidden;
 }
 
@@ -582,7 +456,7 @@
   text-decoration-color: currentColor;
 }
 
-[data-mode="scene"][data-view="monitor"] .mon-info {
+:is([data-mode="scene"], [data-projecting])[data-view="monitor"] .mon-info {
   -webkit-user-select: text;
   user-select: text;
 }
@@ -603,28 +477,28 @@
    glyph and icon, so each letter separates from whatever is behind it (bright keyboard,
    dark monitor, lit wall) while staying invisible over empty wall. Per-glyph by nature,
    theme-aware, and never a glow. */
-[data-mode="scene"] {
+:is([data-mode="scene"], [data-projecting]) {
   --halo: color-mix(in srgb, var(--c-bg) 78%, transparent);
   --halo-soft: color-mix(in srgb, var(--c-bg) 45%, transparent);
 }
 
-[data-mode="scene"] .identity,
-[data-mode="scene"] .toggles,
-[data-mode="scene"] .nav,
-[data-mode="scene"] .hint,
-[data-mode="scene"] .back {
+:is([data-mode="scene"], [data-projecting]) .identity,
+:is([data-mode="scene"], [data-projecting]) .toggles,
+:is([data-mode="scene"], [data-projecting]) .nav,
+:is([data-mode="scene"], [data-projecting]) .hint,
+:is([data-mode="scene"], [data-projecting]) .back {
   text-shadow: 0 0 1px var(--halo), 0 0 3px var(--halo), 0 0 10px var(--halo-soft);
 }
 
 /* day: the hint sits over the dark floor under the desk, where no halo can separate small
    gray text (a pale halo there only makes a muddy smudge), so it gets a small frosted chip
    in the page colour with full-strength ink */
-:root[data-theme="light"] [data-mode="scene"] .hint {
+:root[data-theme="light"] :is([data-mode="scene"], [data-projecting]) .hint {
   color: var(--c-fg);
   text-shadow: none;
 }
 
-:root[data-theme="light"] [data-mode="scene"] .hint > span {
+:root[data-theme="light"] :is([data-mode="scene"], [data-projecting]) .hint > span {
   padding: 3px 10px;
   border-radius: var(--r-m);
   background: color-mix(in srgb, var(--c-bg) 82%, transparent);
@@ -632,50 +506,50 @@
   backdrop-filter: blur(6px);
 }
 
-[data-mode="scene"] .toggles .icon,
-[data-mode="scene"] .nav .icon {
+:is([data-mode="scene"], [data-projecting]) .toggles .icon,
+:is([data-mode="scene"], [data-projecting]) .nav .icon {
   filter: drop-shadow(0 0 1px var(--halo)) drop-shadow(0 0 4px var(--halo-soft));
 }
 
 /* the mark's blinking underscore and the active-tab rule keep their colour, just lifted */
-[data-mode="scene"] .nav button[aria-current="true"] {
+:is([data-mode="scene"], [data-projecting]) .nav button[aria-current="true"] {
   box-shadow: 0 1px 3px var(--halo-soft);
 }
 
 /* Pinned panels must never scroll as a whole: focusing a link inside a clipped box would
    otherwise scroll it and slide rows under the monitor bar. `clip` (unlike `hidden`) is not
    a scroll container. The terminal's own output area (.term-screen) still scrolls. */
-[data-mode="scene"] .term,
-[data-mode="scene"] .contacts,
-[data-mode="scene"] .mon-info {
+:is([data-mode="scene"], [data-projecting], [data-boot="3d"] body) .term,
+:is([data-mode="scene"], [data-projecting]) .contacts,
+:is([data-mode="scene"], [data-projecting]) .mon-info {
   overflow: clip;
 }
 
 /* portrait phones at a screen: the screen is the content; the identity keeps just the mark */
-[data-mode="scene"][data-view="laptop"] .identity :is(.name, .facts),
-[data-mode="scene"][data-view="monitor"] .identity :is(.name, .facts) {
+:is([data-mode="scene"], [data-projecting])[data-view="laptop"] .identity :is(.name, .facts),
+:is([data-mode="scene"], [data-projecting])[data-view="monitor"] .identity :is(.name, .facts) {
   display: none;
 }
 
 /* phone typing mode: nothing floats over the terminal while the keyboard is up */
-[data-mode="scene"][data-typing] :is(.identity, .back, .nav, .hint, .toggles) {
+:is([data-mode="scene"], [data-projecting])[data-typing] :is(.identity, .back, .nav, .hint, .toggles) {
   visibility: hidden;
 }
 
 /* transitions that follow the scene: chrome colours cross-fade with the 3D day/night mix
    (600 ms), the back button fades instead of popping, the active tab's rule slides */
-[data-mode="scene"] :is(.identity, .identity a, .toggle, .nav button, .hint, .back) {
+:is([data-mode="scene"], [data-projecting]) :is(.identity, .identity a, .toggle, .nav button, .hint, .back) {
   transition-property: color, border-color, background-color, text-shadow, opacity;
   transition-duration: var(--d-slow);
   transition-timing-function: var(--ease);
 }
 
-[data-mode="scene"] .back:not([hidden]) {
+:is([data-mode="scene"], [data-projecting]) .back:not([hidden]) {
   transition: opacity var(--d-base) var(--ease), color var(--d-slow) var(--ease);
 }
 
 @starting-style {
-  [data-mode="scene"] .back:not([hidden]) {
+  :is([data-mode="scene"], [data-projecting]) .back:not([hidden]) {
     opacity: 0;
   }
 }
@@ -686,9 +560,9 @@
 
 /* ---- view mode (no UI): the interface fades out, one quiet eye button brings it back ---- */
 .toggle-view { display: none; }
-[data-mode="scene"] .toggle-view { display: inline-flex; }
+:is([data-mode="scene"], [data-projecting]) .toggle-view { display: inline-flex; }
 
-[data-mode="scene"][data-noui] :is(.identity, .bar, .nav, .hint, .back) {
+:is([data-mode="scene"], [data-projecting])[data-noui] :is(.identity, .bar, .nav, .hint, .back) {
   opacity: 0;
   visibility: hidden;
   transition: opacity var(--d-base) var(--ease), visibility 0s linear var(--d-base);
@@ -696,7 +570,7 @@
 
 .noui-exit { display: none; }
 
-[data-mode="scene"] .noui-exit:not([hidden]) {
+:is([data-mode="scene"], [data-projecting]) .noui-exit:not([hidden]) {
   display: grid;
   place-items: center;
   position: fixed;
@@ -712,25 +586,25 @@
   filter: drop-shadow(0 0 1px var(--halo)) drop-shadow(0 0 4px var(--halo-soft));
 }
 
-[data-mode="scene"] .noui-exit:not([hidden]):is(:hover, :focus-visible) {
+:is([data-mode="scene"], [data-projecting]) .noui-exit:not([hidden]):is(:hover, :focus-visible) {
   opacity: 1;
   color: var(--c-fg);
 }
 
 @starting-style {
-  [data-mode="scene"] .noui-exit:not([hidden]) { opacity: 0; }
+  :is([data-mode="scene"], [data-projecting]) .noui-exit:not([hidden]) { opacity: 0; }
 }
 
 /* ---- top row (scene): one 44px row under the safe area, three aligned zones ----------------
    left: the mark · centre: ← desk · right: day / view / sound. Every control is a flat 44px
    target in the same type size; the identity details hang under the mark on the same left
    edge, on the 4/8 spacing grid. */
-[data-mode="scene"] {
+:is([data-mode="scene"], [data-projecting]) {
   --top-row: 44px;
   --top-y: max(env(safe-area-inset-top), var(--sp-2));
 }
 
-[data-mode="scene"] .bar {
+:is([data-mode="scene"], [data-projecting]) .bar {
   top: var(--top-y);
   height: var(--top-row);
   min-height: 0;
@@ -740,31 +614,31 @@
   border: 0;
 }
 
-[data-mode="scene"] .identity {
+:is([data-mode="scene"], [data-projecting]) .identity {
   top: var(--top-y);
   left: var(--gutter);
 }
 
-[data-mode="scene"] .identity .mark-h {
+:is([data-mode="scene"], [data-projecting]) .identity .mark-h {
   display: flex;
   align-items: center;
   height: var(--top-row);
   margin: 0;
 }
 
-[data-mode="scene"] .identity .mark {
+:is([data-mode="scene"], [data-projecting]) .identity .mark {
   font-size: 32px;
   line-height: 1;
   transform: none;
 }
 
-[data-mode="scene"] .identity .name {
+:is([data-mode="scene"], [data-projecting]) .identity .name {
   margin-top: var(--sp-1);
   font-size: var(--fs-3);
   line-height: 20px;
 }
 
-[data-mode="scene"] .identity .facts {
+:is([data-mode="scene"], [data-projecting]) .identity .facts {
   margin-top: var(--sp-2);
   display: grid;
   grid-template-columns: 1fr;
@@ -774,15 +648,15 @@
   line-height: 20px;
 }
 
-[data-mode="scene"] .identity .facts dd { padding: 0; }
+:is([data-mode="scene"], [data-projecting]) .identity .facts dd { padding: 0; }
 
-[data-mode="scene"] .toggles {
+:is([data-mode="scene"], [data-projecting]) .toggles {
   height: var(--top-row);
   align-items: center;
   gap: var(--sp-1);
 }
 
-[data-mode="scene"] .toggle {
+:is([data-mode="scene"], [data-projecting]) .toggle {
   height: var(--top-row);
   min-height: var(--top-row);
   padding: 0 var(--sp-2);
@@ -790,7 +664,7 @@
 }
 
 /* ← desk: centred in the same row, flat like the toggles (no box) */
-[data-mode="scene"] .back:not([hidden]) {
+:is([data-mode="scene"], [data-projecting]) .back:not([hidden]) {
   top: var(--top-y);
   height: var(--top-row);
   min-height: 0;
@@ -803,38 +677,42 @@
   gap: var(--sp-2);
 }
 
-[data-mode="scene"] .back:not([hidden]):hover {
+:is([data-mode="scene"], [data-projecting]) .back:not([hidden]):hover {
   color: var(--c-fg);
   background: color-mix(in srgb, var(--c-bg) 35%, transparent);
 }
 
 @media (max-width: 719px) {
-  [data-mode="scene"] .identity .mark { font-size: 26px; }
-  [data-mode="scene"] .toggle { padding: 0; min-width: 44px; justify-content: center; }
-  [data-mode="scene"] .toggle-label { display: none; }
+  :is([data-mode="scene"], [data-projecting]) .identity .mark { font-size: 26px; }
+  :is([data-mode="scene"], [data-projecting]) .toggle { padding: 0; min-width: 44px; justify-content: center; }
+  :is([data-mode="scene"], [data-projecting]) .toggle-label { display: none; }
 }
 
 /* desktop reads from further away: one step up for the whole chrome (phones keep theirs) */
 @media (min-width: 720px) and (pointer: fine) {
-  [data-mode="scene"] .identity .mark { font-size: 40px; }
-  [data-mode="scene"] .identity .name { font-size: var(--fs-5); line-height: 26px; }
-  [data-mode="scene"] .identity .facts { font-size: var(--fs-4); line-height: 24px; gap: var(--sp-1); }
-  [data-mode="scene"] :is(.toggle, .back:not([hidden]), .nav button) { font-size: 0.9375rem; }
-  [data-mode="scene"] .hint, [data-boot="3d"] body:not([data-scene="ready"]) > #hint { font-size: var(--fs-2); }
+  :is([data-mode="scene"], [data-projecting]) .identity .mark { font-size: 40px; }
+  :is([data-mode="scene"], [data-projecting]) .identity .name { font-size: var(--fs-5); line-height: 26px; }
+  :is([data-mode="scene"], [data-projecting]) .identity .facts { font-size: var(--fs-4); line-height: 24px; gap: var(--sp-1); }
+  :is([data-mode="scene"], [data-projecting]) :is(.toggle, .back:not([hidden]), .nav button) { font-size: 0.9375rem; }
+  :is([data-mode="scene"], [data-projecting]) .hint, [data-boot="3d"] body:not([data-scene="ready"]) > #hint { font-size: var(--fs-2); }
 }
 
 /* ^C sits where the hint is (clear of the nav); the hint steps aside while it shows */
-[data-mode="scene"] .intr:not([hidden]) {
+:is([data-mode="scene"], [data-projecting]) .intr:not([hidden]) {
   bottom: calc(env(safe-area-inset-bottom) + var(--sp-5) + 52px);
 }
 
-[data-mode="scene"] .intr:not([hidden]) ~ .hint {
+:is([data-mode="scene"], [data-projecting]) .intr:not([hidden]) ~ .hint {
   visibility: hidden;
 }
 
 /* cmatrix --both: the scene draws the rain over the whole monitor; its pinned panels step
    aside (hidden, and no clicks land on links nobody can see) */
-[data-mode="scene"][data-rain] :is(.contacts, .mon-info) {
+:is([data-mode="scene"], [data-projecting])[data-rain] :is(.contacts, .mon-info) {
   visibility: hidden;
   pointer-events: none;
 }
+
+[data-boot="3d"] body:not([data-scene="ready"]) .term { user-select: text; -webkit-user-select: text; }
+
+[data-boot="3d"]:not([data-console-font="ready"]) .term > * { opacity: 0; }
