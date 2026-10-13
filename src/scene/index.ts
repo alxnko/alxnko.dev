@@ -1126,7 +1126,8 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       pointer.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
       hasPointer = true;
       raycaster.setFromCamera(pointer, camera);
-      o.stage.style.cursor = raycaster.intersectObjects(hits, true).length ? 'pointer' : '';
+      const t = resolveTarget((raycaster.intersectObjects(hits, true)[0]?.object ?? null) as unknown as Named | null);
+      o.stage.style.cursor = t ? 'pointer' : '';
       world.activity();
     },
     press(x, y) {

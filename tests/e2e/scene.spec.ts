@@ -58,6 +58,99 @@ test.describe('3D desk', () => {
     await expect(page.locator('#term-input')).toHaveValue('');
   });
 
+  test('physical paddles move during cmatrix without stopping rain, and still work idle', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'mouse hold; touch gesture cancellation is covered by input unit tests');
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await promptReady(page);
+    const height = () => page.evaluate(() => (window as any).__scene.scene.getObjectByName('desk_rig').position.y as number);
+    const base = await height(); // fresh world starts at 74 cm
+    const paddle = (key: string) => page.evaluate((key) => {
+      const s = (window as any).__scene;
+      let point: any;
+      s.scene.getObjectByName(`hit_paddle_${key}`).traverse((o: any) => {
+        if (!o.isMesh || point) return;
+        o.updateWorldMatrix(true, false); // hit targets are invisible, so rendering need not update them
+        o.geometry.computeBoundingBox();
+        point = o.geometry.boundingBox.getCenter(new s.camera.position.constructor()).applyMatrix4(o.matrixWorld).project(s.camera);
+      });
+      const r = s.renderer.domElement.getBoundingClientRect();
+      return { x: r.left + (point.x + 1) * r.width / 2, y: r.top + (1 - point.y) * r.height / 2 };
+    }, key);
+    const hold = async (key: string) => {
+      // Typing focuses the laptop and flies there; return to where the physical controls are visible.
+      await page.evaluate(() => (window as any).__scene.world().fly('desk'));
+      await landed(page, 'desk');
+      const p = await paddle(key);
+      expect(p.x).toBeGreaterThan(0);
+      expect(p.x).toBeLessThan(page.viewportSize()!.width);
+      expect(p.y).toBeGreaterThan(0);
+      expect(p.y).toBeLessThan(page.viewportSize()!.height);
+      await page.mouse.move(p.x, p.y);
+      await page.mouse.down();
+    };
+    const held = () => page.evaluate(() => (window as any).__scene.hold()?.active ?? false);
+
+    const click = async (key: string) => {
+      const p = await paddle(key);
+      await page.mouse.click(p.x, p.y);
+    };
+    const busy = () => expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');
+    const rainContinues = async () => {
+      await busy();
+      const before = (await rainView(page)).text;
+      await expect.poll(async () => (await rainView(page)).text).not.toBe(before);
+      await busy();
+    };
+
+    for (const [cmd, stop] of [['cmatrix', 'q'], ['cmatrix --both', 'Control+c']]) {
+      await run(page, cmd);
+      await expect(page.locator('#term-overlay')).toBeVisible();
+      await page.evaluate(() => (window as any).__scene.world().fly('desk'));
+      await landed(page, 'desk');
+      for (const [key, target] of [['3', 1.12], ['1', 0.74], ['2', 0.95]] as const) {
+        await busy();
+        await click(key);
+        await expect.poll(height).toBeCloseTo(base + target - 0.74, 2);
+        await rainContinues();
+        if (key === '2') {
+          const baseline = await height();
+          await busy(); await click('up');
+          await expect.poll(height).toBeCloseTo(baseline + 0.05, 2);
+          await rainContinues();
+          await busy(); await click('down');
+          await expect.poll(height).toBeCloseTo(baseline, 2);
+          await rainContinues();
+        }
+      }
+      const beforeHold = await height();
+      await busy(); await hold('up');
+      await expect(page.locator('#stage')).toHaveCSS('cursor', 'pointer');
+      await expect.poll(held).toBe(true);
+      await expect.poll(height).toBeGreaterThan(beforeHold + 0.02);
+      await rainContinues();
+      await page.mouse.up();
+      expect(await held()).toBe(false);
+      const afterUp = await height();
+      await busy(); await hold('down');
+      await expect.poll(held).toBe(true);
+      await expect.poll(height).toBeLessThan(afterUp - 0.02);
+      await rainContinues();
+      await page.mouse.up();
+      expect(await held()).toBe(false);
+      await page.keyboard.press(stop);
+      await expect(page.locator('#term-overlay')).toBeHidden();
+      await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+    }
+    const idle = await height();
+    await hold('up');
+    await expect.poll(held).toBe(true);
+    await expect.poll(height).toBeGreaterThan(idle + 0.02);
+    await page.mouse.up();
+    await click('down');
+    await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+  });
+
   test('cmatrix --both covers the whole monitor; ctrl+c gives the contacts back', async ({ page }) => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
@@ -415,9 +508,14 @@ test.describe('3D desk: load and redraw cost', () => {
     let reached = '';
     for (let i = 0; i < 40 && !reached; i++) {
       await page.keyboard.press('Tab');
-      reached = await page.evaluate(() => (document.activeElement?.closest('#contacts a') as HTMLElement | null)?.dataset.contact ?? '');
+      // Read focus once: the camera can hand it from the panel to GitHub between two evaluations.
+      const focus = await page.evaluate(() => ({
+        contact: (document.activeElement?.closest('#contacts a') as HTMLElement | null)?.dataset.contact ?? '',
+        id: document.activeElement?.id ?? '',
+      }));
+      reached = focus.contact;
       // landing on the panel flies to the monitor and hands focus to the first link
-      if (!reached && (await page.evaluate(() => document.activeElement?.id)) === 'contacts') {
+      if (!reached && focus.id === 'contacts') {
         await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.contact ?? '')).toBe('github');
         reached = 'github';
       }

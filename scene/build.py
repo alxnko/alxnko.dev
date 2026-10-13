@@ -808,8 +808,8 @@ def build_monitor(m):
         bmb.faces.new((lo[i], lo[j], hi[j], hi[i]))
     bmesh.ops.recalc_face_normals(bmb, faces=bmb.faces)
     Rg(obj_from_bm("stand_base", bmb, m["stand_base"]), 0.9)
-    Rg(C.box("stand_foot", (0.08, 0.05, 0.02), (cx, neck_y + 0.01, base_z + bt_ + 0.01), bevel=0.006,
-             mat_=m["stand"]), 0.4)
+    # The neck meets the plain base directly. An overlapping foot box creates a
+    # protruding grey collar and bevel artifacts around this joint in the bake.
 
     # ring (runtime emissive) around the stand mount, following the curved back
     ring_bm = bmesh.new()

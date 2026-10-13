@@ -8,6 +8,7 @@ import { suggest } from '../term/suggest';
 import { createFs } from '../term/vfs';
 import { bootLines } from '../term/boot';
 import { DEFAULT_WORLD } from '../term/world';
+import { DESK_MAX, DESK_MIN, DESK_PRESETS } from '../term/commands/world';
 import { createSound } from '../audio/sound';
 import { decide3D } from '../scene/gate';
 import type { SceneWorld } from '../scene/index';
@@ -204,9 +205,16 @@ function enter3d() {
           store.print([{ text: 'desk: ' }, { text: `${Math.round(h * 100)} cm`, fg: 'white' }]);
         },
         onPaddle(key) {
-          // the paddle is just another way to type `desk N`: the terminal shows it too.
-          // Shell.run() never touches the input line, so a half-typed line survives the press.
-          void shell.run(`desk ${key}`);
+          // Physical controls remain independent of a running foreground command.
+          // Idle clicks still echo `desk N` without disturbing a half-typed input line.
+          if (!store.state.busy) { void shell.run(`desk ${key}`); return; }
+          const cur = Math.round(world.get().desk * 100) / 100;
+          let to: number;
+          if (key in DESK_PRESETS) to = DESK_PRESETS[key];
+          else if (key === 'up' || key === 'down') {
+            to = Math.round(Math.min(DESK_MAX, Math.max(DESK_MIN, cur + (key === 'up' ? 0.05 : -0.05))) * 100) / 100;
+          } else return;
+          if (to !== cur) void world.setDesk(to);
         },
         onAway(away) {
           const b = $('back');
