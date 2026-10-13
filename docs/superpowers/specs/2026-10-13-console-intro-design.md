@@ -53,6 +53,11 @@ different page/scene typography make the replacement visibly discontinuous.
 12. Preserve the monitor-arm correction, desk controls during `cmatrix`, touch
     cancellation, command interruption/typeahead, contact focus/navigation,
     view mode, Back behavior, and no-WebGL/data-saver fallbacks.
+13. Additional owner request: improve object shading, shadows and gradients in
+    both themes. The headphone screenshot identifies broken curvature and baked
+    normal seams: preserve rounded-part smoothing before merge, increase hero
+    bevel/circumference detail modestly, and keep broad hard planes correctly
+    shaded. Preserve the deliberately faceted cat and the real desk arrangement.
 
 ## Implementation calls
 
@@ -89,7 +94,10 @@ existing tokens. No new animation framework or runtime dependency. The black
 backdrop is deliberate in both day and night themes; terminal ANSI/RGB remains
 the site's existing palette. Keep normal screen/landmark behavior after intro.
 Keep posters for lite-page illustration/OG; stop treating them as the 3D loader.
-Do not rebuild Blender assets for this change.
+The original console/night-encoding task needed no Blender rebake. The owner's
+subsequent object-quality request supersedes that constraint: rebuild and bake
+the affected geometry through the complete existing pipeline once changes are
+checked, using a new work directory so the original masters remain recoverable.
 
 The implementer may tune the contain rectangle and timing after slowed browser
 captures, provided the equality at handoff and readable text remain. Native DOM
@@ -112,14 +120,37 @@ Use these tested night quality values in the reproducible finalizer and add a
 small deterministic monochrome dither after display-color conversion in the
 baked shader, bounded to one 8-bit code value and weighted by the night mix.
 Keep alpha, day output, shadow-decal ratio math, RGB/off behavior, and live screen
-text untouched. No blur, animated noise, new geometry, or full Blender rebake.
-Republish only affected night atlases and the manifest from the matching cached
-masters; content hashes and recorded sizes/qualities must stay coherent.
+text untouched. No blur or animated noise. The initial night-only correction republished just
+night atlases from matching cached masters. The subsequent object-quality scope
+requires a full fresh bake of the checked geometry; repeat encoding measurements
+against those new masters. Content hashes and recorded sizes/qualities stay coherent.
 
 Verify broad dark gradients visually at matching poses and numerically against
 the PNG masters. Stable dither must not shimmer on a stationary camera or leak
 into additive glow edges/transparent material alpha. This improves encoding and
 display quantization; no claim that every display eliminates all banding.
+
+### Object shading (subsequent owner screenshot)
+
+Cached Blender inspection found 248 headphone edges with 39–45° bends marked
+sharp by the final blanket 38° smoothing pass. Rounded headphone parts should
+use 60° smoothing, retain hard cap edges, and increase circumference 16→24 and
+headband sampling 12°→8°. Preserve per-part sharp flags through joining instead
+of overwriting them at the end; existing slipper smoothing also benefits.
+
+Use three segments instead of two on hero desk and stand bevels, and selectively
+apply weighted normals to broad flat hard surfaces before baking. Use roughly
+55° smoothing on the mouse/controller shells; increase mouse tessellation only
+if it earns a visible improvement within the unchanged geometry budget. No
+global subdivision or global smoothing of the cat, text, hits or screen planes.
+
+Validate actual Blender sharp-edge counts and smooth surface normals, then
+complete model→UV/bake→export→optimization→screens→posters→finalizer→import-check.
+Keep original cached masters untouched. Check optimized geometry size before
+the expensive full bake when practical; GLB remains ≤250KiB and triangles ≤40k.
+Compare headphones and representative hard surfaces at close and desk poses in
+day/night. Re-run the new analytic handoff against the new GLB; geometry metadata,
+texture/poster hashes and budgets must remain coherent.
 
 Use deliberate delays for scene JS, GLB, and textures to inspect the actual
 loading interval. Capture before/after recordings, and assert geometry and text

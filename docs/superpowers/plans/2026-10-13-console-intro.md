@@ -82,7 +82,30 @@ tinted/ghost shader strings; current content-hash finalizer/manifest budget sche
   stationary stability and shader correctness under production CSP.
 - [ ] Record evidence and commit after the relevant fast lane passes.
 
-## Task 3: Complete verification and shipping
+## Task 3: Rounded props and baked surface quality
+
+**Files:** `scene/build.py`; generated scene assets/OG from full pipeline; image
+evidence and build/geometry validation. Keep shader and finalizer changes above.
+
+**Interfaces:** Existing part-specific smoothing, `PARTS_STATIC`/`PARTS_RIG`
+merge groups, bevel/cylinder/lathe helpers, fixed mesh names and screen corners.
+The console camera consumes the actual new GLB rather than hardcoded dimensions.
+
+- [ ] Confirm headphone sharp-edge baseline and model silhouette from the supplied
+  screenshot; preserve the original cached masters and build source in git.
+- [ ] Smooth headphone rounded parts at 60° before join; keep cap edges hard,
+  use circumference24 and headband8°; preserve existing part-specific smoothing.
+- [ ] Use three-segment hero desk/stand bevels, weighted normals selectively on
+  broad flat hard surfaces, and 55° mouse/controller shell smoothing.
+- [ ] Run actual Blender build/geometry checks; inspect merged sharp flags and
+  bounded triangle/mesh growth before committing the source phase.
+- [ ] Run the complete 4096/512-sample pipeline in a new work directory. If a
+  geometry budget fails, adjust only the new detail or optimize valid redundancy;
+  do not weaken the budget or discard prior desk repairs.
+- [ ] Verify matching-pose closeups and full-room day/night renders, import checks,
+  exact node/asset contracts and budgets; record limits and commit generated assets.
+
+## Task 4: Complete verification and shipping
 
 - [ ] Capture slowed cold and cached loading recordings at desktop/phone sizes;
   inspect handoff and both ends of flight, not only final screenshots.

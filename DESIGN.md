@@ -63,6 +63,29 @@ from the current state; do not add animation to repeated typing. Respect reduced
 motion, suspend hidden-page work, and keep continuous scene values outside UI
 state updates. No new motion library is required by the design.
 
+## Console entry and scene quality
+
+The approved 3D entry starts on black with the same semantic terminal used on
+its physical laptop screen. Select readable responsive logical dimensions before
+first terminal paint, then freeze those dimensions through the reveal and camera
+pullback. Phones retain the screen proportions and surrounding black space.
+Actual display corners and canvas bounds determine the initial camera; poster
+images are reserved for the lite illustration and sharing metadata.
+
+Wait for critical scene resources, used fonts, GPU preparation and a covered
+projected frame before uncovering the desk. Preserve terminal nodes, focus,
+selection, scroll and wrapping. Explicit visitor input owns the camera once it
+interrupts the intro. Reduced motion skips the reveal duration and spatial travel;
+failures preserve the lite interface. Never manufacture loading percentages or
+repeat boot logs in a separate console.
+
+Rounded props preserve their per-part normal smoothing through mesh joining;
+broad hard planes use selective weighted normals before baking. The cat stays
+faceted. Night lightmap encoding and a static monochrome display-space dither
+reduce quantization bands without animated grain, alpha changes or day noise.
+Use the full scene pipeline when geometry changes, preserving prior masters in
+a separate cache. Keep all existing asset and runtime bundle limits.
+
 ## Skill responsibilities
 
 - Taste v2: selected visual direction, interpreted through this contract.
