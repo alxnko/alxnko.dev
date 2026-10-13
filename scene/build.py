@@ -317,7 +317,9 @@ def ellipsoid(rx, ry, rz, segs=12, rings=8):
 def build_desk(m):
     H = D.DESK_H
     w, d, t = D.TOP
-    top = C.box("desk_top", (w, d, t), (0, 0, H - t / 2), bevel=D.TOP_BEVEL, segs=3,
+    # A third band is subpixel in both the atlas and desk view, producing a dotted rim.
+    # Keep two bands; the selective weighted normals still flatten the broad top.
+    top = C.box("desk_top", (w, d, t), (0, 0, H - t / 2), bevel=D.TOP_BEVEL, segs=2,
                 drop_bottom=True)
     top.data.materials.append(m["laminate"])
     top.data.materials.append(m["laminate_edge"])

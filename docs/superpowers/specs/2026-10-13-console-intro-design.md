@@ -138,8 +138,11 @@ use 60° smoothing, retain hard cap edges, and increase circumference 16→24 an
 headband sampling 12°→8°. Preserve per-part sharp flags through joining instead
 of overwriting them at the end; existing slipper smoothing also benefits.
 
-Use three segments instead of two on hero desk and stand bevels, and selectively
-apply weighted normals to broad flat hard surfaces before baking. Use roughly
+Use three segments on the stand bevels and selectively apply weighted normals
+to broad flat hard surfaces before baking. Keep the desk bevel at two segments:
+the visual check of three segments exposed a new dark strip only 0.545 screen
+pixels and 0.571 atlas texels wide at the desk pose, producing a dotted edge.
+The two-segment desk retains its improved weighted normals without that new strip. Use roughly
 55° smoothing on the mouse/controller shells; increase mouse tessellation only
 if it earns a visible improvement within the unchanged geometry budget. No
 global subdivision or global smoothing of the cat, text, hits or screen planes.
