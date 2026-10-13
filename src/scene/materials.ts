@@ -17,6 +17,14 @@ export function bakedMaterial(day: Texture, night: Texture, mix: number): Shader
         vec3 c = mix(texture2D(uDay, vUv).rgb, texture2D(uNight, vUv).rgb, uMix);
         gl_FragColor = vec4(c, 1.0);
         #include <colorspace_fragment>
+        // Static display-space triangular dither: at most one 8-bit code
+        // value, monochrome and night-only. No frame-dependent grain.
+        if (uMix > 0.0) {
+          vec2 p = gl_FragCoord.xy;
+          float a = fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
+          float b = fract(52.9829189 * fract(dot(p + vec2(19.0, 47.0), vec2(0.00583715, 0.06711056))));
+          gl_FragColor.rgb = clamp(gl_FragColor.rgb + (a + b - 1.0) * uMix / 255.0, 0.0, 1.0);
+        }
       }`,
   });
 }

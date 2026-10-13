@@ -119,7 +119,11 @@ def main():
         files["atlas"][rig] = {}
         if bake_size != 2048:
             sh("magick", master, "-filter", "Lanczos", "-resize", "2048x2048", WORK / f"atlas-{rig}-2048.png")
-        for size, q0 in ((2048, 82), (1024, 78)):
+        # Low-quality lossy WebP flattens the night's dark gradients and erases
+        # the bake's dithering. Keep the measured higher-quality night exports
+        # within the same budgets; daylight retains its existing encoding.
+        qualities = ((2048, 96), (1024, 94)) if rig == "night" else ((2048, 82), (1024, 78))
+        for size, q0 in qualities:
             dst = enc / f"atlas-{rig}-{size}.webp"
             quality[f"atlas-{rig}-{size}"] = webp(master, dst, size, q0, BUDGET[f"atlas-{size}"])
             files["atlas"][rig][str(size)] = publish(dst, f"atlas-{rig}-{size}", "webp", sizes)
