@@ -1,6 +1,62 @@
 import { expect, test } from '@playwright/test';
 import { guard, run } from './helpers';
 
+test('zero initial viewport keeps lite usable until an explicit valid retry', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.addInitScript(() => {
+    (window as any).__holdIntro = true;
+    const width = Object.getOwnPropertyDescriptor(window, 'innerWidth')!;
+    const height = Object.getOwnPropertyDescriptor(window, 'innerHeight')!;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 0 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 0 });
+    (window as any).__restoreViewport = () => {
+      Object.defineProperty(window, 'innerWidth', width);
+      Object.defineProperty(window, 'innerHeight', height);
+      dispatchEvent(new Event('resize'));
+    };
+  });
+  let release!: () => void;
+  const held = new Promise<void>(r => release = r);
+  let requested = 0;
+  await page.route('**/scene/manifest.json', async route => { requested++; await held; await route.continue(); });
+  await page.goto('/?3d&test');
+  await expect(page.locator('html')).toHaveAttribute('data-boot', 'failed');
+  await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+  await expect(page.locator('#term')).toBeVisible();
+  await expect(page.locator('#contacts')).toBeVisible();
+  await run(page, 'echo viewport-fallback');
+  await expect(page.locator('#term-lines')).toContainText('viewport-fallback');
+  await page.evaluate(() => { (window as any).__initialTerm = document.getElementById('term'); });
+  const button = page.locator('#enter3d');
+  await expect(button).toBeVisible();
+  await button.click();
+  await expect(button).toBeEnabled();
+  await expect(button).toHaveText('enter 3d');
+  await expect(page.locator('html')).toHaveAttribute('data-boot', 'failed');
+  await expect(page.locator('canvas.stage-canvas')).toHaveCount(0);
+  expect(requested).toBe(0);
+  await page.evaluate(async () => {
+    (window as any).__restoreViewport();
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  });
+  await expect(page.locator('html')).toHaveAttribute('data-boot', 'failed');
+  await expect(button).toBeEnabled();
+  expect(requested).toBe(0);
+  await button.click();
+  await expect(page.locator('html')).toHaveAttribute('data-console-font', 'ready');
+  const retry = await page.locator('#term').evaluate(el => {
+    const term = el as HTMLElement;
+    return { same: el === (window as any).__initialTerm, width: term.offsetWidth, effectiveFont: parseFloat(getComputedStyle(el).fontSize) * el.getBoundingClientRect().width / term.offsetWidth };
+  });
+  expect(retry.same).toBe(true);
+  expect(retry.width).toBeGreaterThan(2);
+  expect(retry.effectiveFont).toBeGreaterThanOrEqual(12 - .01);
+  release();
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready');
+  expect(await page.locator('#term').evaluate(el => el === (window as any).__initialTerm)).toBe(true);
+  await expect(page.locator('#term-lines')).toContainText('viewport-fallback');
+});
+
 test('delayed scene keeps the real readable terminal on black', async ({ page }) => {
   let release!: () => void;
   const held = new Promise<void>(r => release = r);
@@ -117,6 +173,11 @@ test('resize during loading and flight keeps the same intrinsic terminal grid', 
   const metrics = () => page.locator('#term').evaluate(e => [getComputedStyle(e).width, getComputedStyle(e).height, getComputedStyle(e).fontSize, document.querySelector<HTMLElement>('#term-lines .ln')?.offsetHeight]);
   const before = await metrics();
   await page.setViewportSize({ width: 844, height: 390 });
+  // setViewportSize updates the viewport before its asynchronous resize event.
+  await expect.poll(async () => {
+    const box = await page.locator('#term').boundingBox();
+    return !!box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 844 && box.y + box.height <= 390;
+  }).toBe(true);
   expect(await metrics()).toEqual(before);
   const box = (await page.locator('#term').boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(844);

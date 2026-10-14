@@ -154,17 +154,19 @@ function takeProbe(): HTMLCanvasElement | undefined {
 const $ = (id: string) => document.getElementById(id);
 
 function enter3d() {
+  const root = document.documentElement;
   const stage = $('stage'), termEl = $('term'), contactsEl = $('contacts');
   const btn = $('enter3d') as HTMLButtonElement | null;
   if (!stage || !termEl || !contactsEl) return;
-  if (btn) { btn.disabled = true; btn.textContent = 'loading 3d'; }
   if (mounting3d || handle3d) return;
-  const controller = mounting3d = new AbortController();
-  if (document.documentElement.dataset.boot !== '3d') {
-    document.documentElement.dataset.boot = '3d';
-    (window as typeof window & { __consoleIntro?: () => void; __sceneDeadline?: () => void }).__consoleIntro?.();
+  if (root.dataset.boot !== '3d') {
+    root.dataset.boot = '3d';
+    // The bootstrap owns viewport validation; an invalid retry stays on the lite page.
+    if (!(window as typeof window & { __consoleIntro?: () => boolean }).__consoleIntro?.()) return;
     (window as typeof window & { __sceneDeadline?: () => void }).__sceneDeadline?.();
   }
+  if (btn) { btn.disabled = true; btn.textContent = 'loading 3d'; }
+  const controller = mounting3d = new AbortController();
   document.body.dataset.scene = 'loading';
   const mounting = import('../scene/index').then((m) => {
       return m.mount({

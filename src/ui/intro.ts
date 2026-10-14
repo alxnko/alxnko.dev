@@ -15,7 +15,7 @@ export function consoleLayout(view: Viewport, frozen?: { width: number; height: 
 
 export function introViewport(): Viewport {
   const el = document.createElement('i');
-  el.style.cssText = 'position:fixed;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
+  el.style.padding = 'env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
   document.documentElement.append(el);
   const s = getComputedStyle(el);
   const view = { width: innerWidth, height: innerHeight, left: parseFloat(s.paddingLeft) || 0, top: parseFloat(s.paddingTop) || 0, right: parseFloat(s.paddingRight) || 0, bottom: parseFloat(s.paddingBottom) || 0 };
@@ -31,19 +31,23 @@ export function bootstrapConsole(layout: typeof consoleLayout, viewport: typeof 
     const position = () => {
       if (root.dataset.boot !== '3d' || document.body?.dataset.scene === 'ready') { removeEventListener('resize', position); return; }
       const l = layout(viewport(), frozen);
+      // Tiny initial viewports cannot provide a readable console; preserve the lite page.
+      if (!frozen && l.rect.width < 256) { root.dataset.boot = 'failed'; return; }
       frozen = l;
       for (const [k, v] of Object.entries({ '--screen-w': l.width + 'px', '--screen-h': l.height + 'px', '--intro-x': l.rect.x + 'px', '--intro-y': l.rect.y + 'px', '--intro-scale': String(l.scale) })) root.style.setProperty(k, v);
+      return l;
     };
+    if (!position()) return false;
     // DOMContentLoaded waits for the stylesheet defining both font faces. Its preload can
     // finish sooner, but a fonts.load call before @font-face registration would resolve [].
     const fonts = () => Promise.all(['400', '700'].map(w => document.fonts.load(`${w} 24px "JetBrains Mono"`, 'a█─')))
       .then(() => { root.dataset.consoleFont = 'ready'; }, () => {});
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fonts, { once: true });
     else void fonts();
-    position();
     addEventListener('resize', position);
+    return true;
   };
-  (window as typeof window & { __consoleIntro?: () => void }).__consoleIntro = activate;
+  (window as typeof window & { __consoleIntro?: () => boolean }).__consoleIntro = activate;
   if (root.dataset.boot === '3d') activate();
 }
 
