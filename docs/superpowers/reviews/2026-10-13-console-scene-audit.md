@@ -105,8 +105,23 @@ bytes, so future additions require careful accounting. The aggregate browser
 suite passed: 216 tests, with 20 intentional skips, in 4.7 minutes. Raw gate
 output and the scoped review reports are preserved in
 [`2026-10-13-console-evidence`](2026-10-13-console-evidence). The independent
-whole-branch review remains the next shipping gate.
+whole-branch review completed against `873b7e4` and found two Important lifecycle
+gaps: retained inline terminal dimensions on resized retries, and abandoned
+desk-command/hold completion after scene disposal. Both are confirmed and enter
+one bounded fix wave; the green ordinary-path gate does not negate them.
 
 The scoped reviewer notes existing Node localStorage, Vite large-chunk and
 NO_COLOR/FORCE_COLOR warning noise. Those also appear in the earlier baseline
 gate logs; tooling cleanup is deferred rather than mixed into the runtime fix.
+
+
+Final wave `a25ef2d` restores owned inline overlay dimensions, settles pending
+desk movement and ends held controls on disposal, and validates the activator
+before manual loading. The extra controller check uses a real partial-script
+failure with a late entry and visible retry button. All three findings are
+independently re-reviewed as addressed, with no new fix-diff breakage. The
+corrected RED and final 32-pass scoped evidence are retained alongside the
+reports. The final aggregate gate passed on `a25ef2d`: 427 unit tests, 229 browser
+tests and 21 intentional skips, plus lint/types, build/CSP and all budgets.
+The final lazy scene is 172,659/174,080 bytes. Product source review is complete;
+GitHub CI, merge and separate publication remain controller-owned shipping gates.

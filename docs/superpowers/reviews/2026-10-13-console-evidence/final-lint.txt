@@ -1,6 +1,6 @@
 $ astro check && tsc --noEmit
-15:23:31 [types] Generated 25ms
-15:23:31 [check] Getting diagnostics for Astro files in /home/alxnko/Projects/code/meow/alxnko.dev/.claude/worktrees/console-intro...
+19:35:14 [types] Generated 134ms
+19:35:14 [check] Getting diagnostics for Astro files in /home/alxnko/Projects/code/meow/alxnko.dev/.claude/worktrees/console-intro...
 [96msrc/term/lazy.ts[0m:[93m10[0m:[93m17[0m - [93mwarning[0m[90m ts(80006): [0mThis may be converted to an async function.
 
 [7m10[0m export function loadText(waitMs = TEXT_WAIT_MS): Promise<Text | null> {

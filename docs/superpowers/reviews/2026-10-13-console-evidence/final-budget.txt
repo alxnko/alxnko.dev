@@ -2,7 +2,7 @@ $ bun scripts/budget.ts
 ok   initial JS (gz)             30.0 KB  (budget 30.0 KB)
 ok   CSS (gz)                     6.6 KB  (budget 10.0 KB)
 ok   fonts (woff2 total)         55.7 KB  (budget 60.0 KB)
-ok   lazy 3D JS (gz)            168.5 KB  (budget 170.0 KB)
+ok   lazy 3D JS (gz)            168.6 KB  (budget 170.0 KB)
 ok   lazy text JS (gz)            3.6 KB  (budget 6.0 KB)
 ok   desk.glb                   243.7 KB  (budget 250.0 KB)
 ok   atlas 1024 (max)           107.4 KB  (budget 120.0 KB)
