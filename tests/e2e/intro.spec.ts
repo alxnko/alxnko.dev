@@ -262,3 +262,69 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) test(`settings
   expect(mixes.length).toBeGreaterThan(2);
   expect(mixes.every(v => v === 0)).toBe(true);
 });
+
+
+test('preferences changed during the final GPU wait remain covered until the current atlas renders', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('alxnko:booted', '1'); localStorage.setItem('alxnko:theme', 'dark');
+    const state = (window as any).__finalFence = { count: 0, release: false };
+    const proto = WebGL2RenderingContext.prototype;
+    const fence = proto.fenceSync, status = proto.getSyncParameter;
+    let held: WebGLSync | null = null;
+    proto.fenceSync = function(condition, flags) {
+      const sync = fence.call(this, condition, flags);
+      if (++state.count === 3) held = sync;
+      return sync;
+    };
+    proto.getSyncParameter = function(sync, parameter) {
+      if (sync === held && parameter === this.SYNC_STATUS && !state.release) return this.UNSIGNALED;
+      return status.call(this, sync, parameter);
+    };
+  });
+  let release!: () => void;
+  const held = new Promise<void>(r => release = r);
+  await page.route('**/scene/atlas-day-*.webp', async route => { await held; await route.continue(); });
+  await page.goto('/?3d&test');
+  await page.waitForFunction(() => (window as any).__finalFence.count === 3);
+  await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+  await run(page, 'theme light'); await run(page, 'rgb off');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.evaluate(() => { (window as any).__finalFence.release = true; });
+  // The first final fence completes, but the selected day atlas is still unavailable.
+  await page.waitForTimeout(250);
+  await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'loading');
+  release();
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready');
+  const result = await page.evaluate(() => {
+    const mixes: number[] = [], glow: number[] = [];
+    (window as any).__scene.scene.traverse((node: any) => {
+      if (node.material?.uniforms?.uMix) mixes.push(node.material.uniforms.uMix.value);
+      if (/^(ring_glow|kbd_glow|laptop_kbd_glow)/.test(node.name) && node.material?.uniforms?.uIntensity) glow.push(node.material.uniforms.uIntensity.value);
+    });
+    return { count: (window as any).__finalFence.count, mixes, glow };
+  });
+  expect(result.count).toBeGreaterThanOrEqual(4);
+  expect(result.mixes.length).toBeGreaterThan(2); expect(result.mixes.every(v => v === 0)).toBe(true);
+  expect(result.glow.length).toBeGreaterThan(0); expect(result.glow.every(v => v === 0)).toBe(true);
+});
+
+for (const failure of ['missing', 'unsignaled'] as const) test(`a ${failure} GPU fence keeps the working lite fallback`, async ({ page }) => {
+  await page.addInitScript(failure => {
+    const proto = WebGL2RenderingContext.prototype;
+    if (failure === 'missing') proto.fenceSync = () => null;
+    else {
+      const status = proto.getSyncParameter;
+      proto.getSyncParameter = function(sync, parameter) {
+        return parameter === this.SYNC_STATUS ? this.UNSIGNALED : status.call(this, sync, parameter);
+      };
+    }
+  }, failure);
+  await page.goto('/?3d&test');
+  await expect(page.locator('html')).not.toHaveAttribute('data-boot', '3d', { timeout: 10000 });
+  await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+  await expect(page.locator('canvas.stage-canvas')).toHaveCount(0);
+  await expect(page.locator('#contacts')).toBeVisible();
+  await run(page, 'echo gpu-fallback');
+  await expect(page.locator('#term-lines')).toContainText('gpu-fallback');
+});

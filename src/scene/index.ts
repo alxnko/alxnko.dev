@@ -21,6 +21,7 @@ import { screenPose, type ScreenPose } from './intro';
 import { resolveTarget, type Named } from './pick';
 import { unsupportedExtensions, watchMonitor, yieldToMain } from './phases';
 import { isSoftwareRenderer } from './gate';
+import { gpuDone } from './ready';
 import type { Line, TermState } from '../term/types';
 
 export interface SceneStore {
@@ -149,19 +150,6 @@ function isSoftwareGL(gl: WebGL2RenderingContext | null): boolean {
   } catch {
     return false;
   }
-}
-
-/** Resolves once the GL process has run everything submitted so far (polled between tasks,
- *  never a blocking wait; gives up after 3 s). */
-async function gpuDone(gl: WebGL2RenderingContext): Promise<void> {
-  const sync = gl.fenceSync?.(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-  if (!sync) return;
-  gl.flush();
-  const t0 = performance.now();
-  while (gl.getSyncParameter(sync, gl.SYNC_STATUS) !== gl.SIGNALED && !gl.isContextLost() && performance.now() - t0 < 3000) {
-    await new Promise((r) => setTimeout(r, 8));
-  }
-  gl.deleteSync(sync);
 }
 
 /**
@@ -1341,7 +1329,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<Omit<SceneH
     renderer.render(scene, camera);
     renderer.setScissorTest(false);
 
-    await gpuDone(renderer.getContext() as WebGL2RenderingContext);
+    await gpuDone(renderer.getContext() as WebGL2RenderingContext, o.signal);
     o.signal?.throwIfAborted();
 
   }
@@ -1356,7 +1344,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<Omit<SceneH
   o.stage.after(canvas); // above the pinned screens (they show through its windows)
   drawing = true;
   frame(performance.now());
-  await gpuDone(renderer.getContext() as WebGL2RenderingContext);
+  await gpuDone(renderer.getContext() as WebGL2RenderingContext, o.signal);
   o.signal?.throwIfAborted();
   tickClock();
 
@@ -1380,20 +1368,28 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<Omit<SceneH
     world,
     beginIntro,
     async prepare(read) {
-      // Theme may change again while its atlas loads: only the current choice may uncover.
-      let theme: Theme;
-      do { theme = read().theme; await world.setTheme(theme); o.signal?.throwIfAborted(); } while (read().theme !== theme);
-      const now = read();
-      world.setRgb(now.rgb, now.accent); world.setFan(now.fan);
-      if (now.desk !== o.initial.desk) await world.setDesk(now.desk);
-      if (!disposed) {
-        dirty = true; frame(performance.now());
-        await gpuDone(renderer.getContext() as WebGL2RenderingContext);
+      // An input may change preferences during any atlas or fence wait. Commit the
+      // reveal in the same synchronous checkpoint that verifies the covered snapshot.
+      while (!disposed) {
+        const snapshot = read();
+        await world.setTheme(snapshot.theme);
         o.signal?.throwIfAborted();
+        world.setRgb(snapshot.rgb, snapshot.accent); world.setFan(snapshot.fan);
+        await world.setDesk(snapshot.desk);
+        o.signal?.throwIfAborted();
+        if (disposed) break;
+        dirty = true; frame(performance.now());
+        await gpuDone(renderer.getContext() as WebGL2RenderingContext, o.signal);
+        o.signal?.throwIfAborted();
+        if (disposed) break;
+        const current = read();
+        if (snapshot.theme !== current.theme || snapshot.rgb !== current.rgb || snapshot.accent !== current.accent || snapshot.desk !== current.desk || snapshot.fan !== current.fan) continue;
         revealed = true;
         document.body.dataset.mode = 'scene';
         delete document.body.dataset.projecting;
+        return;
       }
+      throw new Error('Scene disposed before reveal');
     },
 
   };
