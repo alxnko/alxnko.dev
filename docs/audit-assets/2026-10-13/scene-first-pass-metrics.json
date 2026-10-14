@@ -1,0 +1,193 @@
+{
+  "light": {
+    "theme": "light",
+    "dest": "desk",
+    "position": [
+      0.1599999964237213,
+      1.4199999570846558,
+      1.5499999523162842
+    ],
+    "quaternion": [
+      -0.1630155470530901,
+      0.06861929488310287,
+      0.011365949013365345,
+      0.9841687553421685
+    ],
+    "fov": 32.5487491631144,
+    "aspect": 1.6,
+    "materials": [
+      {
+        "name": "cat_head__geo",
+        "mix": 0,
+        "dither": true
+      },
+      {
+        "name": "cat_tail__geo",
+        "mix": 0,
+        "dither": true
+      },
+      {
+        "name": "cat_body__geo",
+        "mix": 0,
+        "dither": true
+      },
+      {
+        "name": "desk_baked__geo",
+        "mix": 0,
+        "dither": true
+      },
+      {
+        "name": "fan_blades__geo",
+        "mix": 0,
+        "dither": true
+      },
+      {
+        "name": "kbd_accent__geo",
+        "mix": 0,
+        "dither": true
+      },
+      {
+        "name": "paddle_glyphs__geo",
+        "mix": 0,
+        "dither": true
+      },
+      {
+        "name": "shadow_wall__geo",
+        "mix": 0,
+        "dither": false
+      },
+      {
+        "name": "fan_blades__geo",
+        "mix": 0,
+        "dither": true
+      },
+      {
+        "name": "fan_blades__geo",
+        "mix": 0,
+        "dither": true
+      },
+      {
+        "name": "fan_blades__geo",
+        "mix": 0,
+        "dither": true
+      },
+      {
+        "name": "shadow_floor__geo",
+        "mix": 0,
+        "dither": false
+      },
+      {
+        "name": "static__geo",
+        "mix": 0,
+        "dither": true
+      },
+      {
+        "name": "window_sky__geo",
+        "mix": 0,
+        "dither": false
+      }
+    ],
+    "gpu": {
+      "bytes": 5184000,
+      "changed": 0,
+      "nonzero": 3252458,
+      "glError": 0
+    }
+  },
+  "dark": {
+    "theme": "dark",
+    "dest": "desk",
+    "position": [
+      0.1599999964237213,
+      1.4199999570846558,
+      1.5499999523162842
+    ],
+    "quaternion": [
+      -0.1630155470530901,
+      0.06861929488310287,
+      0.011365949013365345,
+      0.9841687553421685
+    ],
+    "fov": 32.5487491631144,
+    "aspect": 1.6,
+    "materials": [
+      {
+        "name": "cat_head__geo",
+        "mix": 1,
+        "dither": true
+      },
+      {
+        "name": "cat_tail__geo",
+        "mix": 1,
+        "dither": true
+      },
+      {
+        "name": "cat_body__geo",
+        "mix": 1,
+        "dither": true
+      },
+      {
+        "name": "desk_baked__geo",
+        "mix": 1,
+        "dither": true
+      },
+      {
+        "name": "fan_blades__geo",
+        "mix": 1,
+        "dither": true
+      },
+      {
+        "name": "kbd_accent__geo",
+        "mix": 1,
+        "dither": true
+      },
+      {
+        "name": "paddle_glyphs__geo",
+        "mix": 1,
+        "dither": true
+      },
+      {
+        "name": "shadow_wall__geo",
+        "mix": 1,
+        "dither": false
+      },
+      {
+        "name": "fan_blades__geo",
+        "mix": 1,
+        "dither": true
+      },
+      {
+        "name": "fan_blades__geo",
+        "mix": 1,
+        "dither": true
+      },
+      {
+        "name": "fan_blades__geo",
+        "mix": 1,
+        "dither": true
+      },
+      {
+        "name": "shadow_floor__geo",
+        "mix": 1,
+        "dither": false
+      },
+      {
+        "name": "static__geo",
+        "mix": 1,
+        "dither": true
+      },
+      {
+        "name": "window_sky__geo",
+        "mix": 1,
+        "dither": false
+      }
+    ],
+    "gpu": {
+      "bytes": 5184000,
+      "changed": 0,
+      "nonzero": 3075744,
+      "glError": 0
+    }
+  },
+  "errors": []
+}

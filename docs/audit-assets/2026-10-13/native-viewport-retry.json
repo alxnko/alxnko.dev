@@ -1,0 +1,29 @@
+{
+  "sourceCommit": "779ee85ceafc4e1a229f446fff4dff092340ab26",
+  "native240x568": {
+    "boot": "failed",
+    "canvas": false,
+    "buttonDisabled": false,
+    "inlineLogicalGrid": ""
+  },
+  "invalidManualAttempt": {
+    "boot": "failed",
+    "canvas": false,
+    "buttonDisabled": false
+  },
+  "resize320x568WithoutClick": {
+    "boot": "failed",
+    "canvas": false
+  },
+  "explicitRetry320x568": {
+    "boot": "3d",
+    "logicalGrid": [
+      576,
+      360
+    ],
+    "font": "ready",
+    "scene": "ready",
+    "glError": 0
+  },
+  "limit": "Native T3 preview is background-throttled; this confirms fallback/retry/GPU readiness, not flight duration."
+}

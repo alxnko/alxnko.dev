@@ -67,6 +67,9 @@ different page/scene typography make the replacement visibly discontinuous.
   first terminal paint, then freeze them through this intro. Target at least
   12 CSS pixels effective text at the initial contain rectangle in small phone
   and landscape tests; use a readable lite fallback if that cannot be achieved.
+  Reject unavailable viewport dimensions or a contained rectangle
+  narrower than 256 CSS pixels before freezing layout. Keep the lite terminal
+  and allow an explicit 3D retry after the viewport becomes usable.
 - Use the actual inner display corners with all parent world transforms, canvas
   CSS bounds, safe areas and clipping. One projection pipeline is authoritative.
   Corner/text boxes must match within 1 CSS pixel; wraps, scroll and focus must

@@ -95,7 +95,8 @@ The console camera consumes the actual new GLB rather than hardcoded dimensions.
   screenshot; preserve the original cached masters and build source in git.
 - [ ] Smooth headphone rounded parts at 60° before join; keep cap edges hard,
   use circumference24 and headband8°; preserve existing part-specific smoothing.
-- [ ] Use three-segment hero desk/stand bevels, weighted normals selectively on
+- [ ] Use three-segment stand bevels and retain two-segment desk bevels after the
+  measured dotted-rim regression; use weighted normals selectively on
   broad flat hard surfaces, and 55° mouse/controller shell smoothing.
 - [ ] Run actual Blender build/geometry checks; inspect merged sharp flags and
   bounded triangle/mesh growth before committing the source phase.
