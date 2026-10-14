@@ -709,6 +709,15 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<Omit<SceneH
   };
   setDeskHeight(clamp(o.initial.desk, manifest.range[0], manifest.range[1]));
 
+  const endHold = () => {
+    const was = hold;
+    hold = null;
+    if (!was?.active) return false;
+    ledPaddle.set(LED_OFF);
+    o.onHold?.('end', rigDy + manifest.deskBase);
+    return true;
+  };
+
 
   // ---------- render loop ----------
   let raf = 0, timer = 0, last = performance.now();
@@ -722,7 +731,17 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<Omit<SceneH
       tickClock();
     }, 60_000 - (Date.now() % 60_000) + 50);
   };
-  undo.push(() => { disposed = true; cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(clockTimer); });
+  undo.push(() => {
+    disposed = true;
+    cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(clockTimer);
+    // The lite world already owns a preset's desired height. Complete its pending command
+    // without another frame; a physical hold instead reports its last actual height.
+    deskTween = null;
+    const done = deskDone;
+    deskDone = null;
+    done?.();
+    endHold();
+  });
   const frameTimes: number[] = [];
   let slept = -1; // ms this frame was deliberately delayed by (-1: it was not scheduled as a paced frame)
   const hidden = () => document.visibilityState === 'hidden';
@@ -739,6 +758,19 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<Omit<SceneH
 
   const dock = new Dock([o.termEl, o.contactsEl, ...(o.infoEl ? [o.infoEl] : [])]);
   undo.push(() => dock.destroy());
+  // Release only the scene's dimension overrides so a retry's bootstrap grid inherits
+  // immediately. An embedding page may already own inline values (including !important).
+  const overlayStyles = [
+    [o.termEl, '--screen'], [o.contactsEl, '--contacts'], ...(o.infoEl ? [[o.infoEl, '--info'] as const] : []),
+  ] as const;
+  const priorSizes = overlayStyles.flatMap(([el, prefix]) => ['w', 'h'].map(axis => {
+    const name = `${prefix}-${axis}`;
+    return { el, name, value: el.style.getPropertyValue(name), priority: el.style.getPropertyPriority(name) };
+  }));
+  undo.push(() => priorSizes.forEach(({ el, name, value, priority }) => {
+    if (value) el.style.setProperty(name, value, priority);
+    else el.style.removeProperty(name);
+  }));
   // logical overlay sizes: the laptop terminal is a 16:10 grid (fewer columns on phones so
   // text stays readable when the screen fills the view); contacts match their arc's aspect
   const sizeOverlays = () => {
@@ -762,6 +794,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<Omit<SceneH
   const upWorld = new Vector3(0, 1, 0);
 
   function frame(now: number) {
+    if (disposed) return;
     // one chain of frames only, however this one was started (rAF, the pacing timer, or the
     // mount's direct first frame)
     if (raf) cancelAnimationFrame(raf);
@@ -1077,11 +1110,14 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<Omit<SceneH
       invalidate();
     },
     setDesk(h) {
+      if (disposed) return Promise.resolve();
       // a typed/clicked preset takes over from a held arrow (and stops its motor hum)
-      if (hold?.active) { ledPaddle.set(LED_OFF); o.onHold?.('end', rigDy + manifest.deskBase); }
-      hold = null;
+      endHold();
       const target = clamp(h, manifest.range[0], manifest.range[1]);
-      deskDone?.();
+      const done = deskDone;
+      deskDone = null;
+      deskTween = null;
+      done?.();
       if (!revealed) { heldPose = null; setDeskHeight(target); rebuildPoses(); invalidate(); return Promise.resolve(); }
       const from = rigDy + manifest.deskBase;
       deskTween = new Tween(from, target, performance.now(), o.reducedMotion ? 0 : 1500);
@@ -1221,11 +1257,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<Omit<SceneH
       }
     },
     release() {
-      const was = hold;
-      hold = null;
-      if (!was?.active) return false; // a short press stays a tap (a 5 cm nudge)
-      ledPaddle.set(LED_OFF);
-      o.onHold?.('end', rigDy + manifest.deskBase);
+      if (!endHold()) return false; // a short press stays a tap (a 5 cm nudge)
       invalidate();
       return true;
     },

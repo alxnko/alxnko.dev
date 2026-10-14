@@ -160,9 +160,11 @@ function enter3d() {
   if (!stage || !termEl || !contactsEl) return;
   if (mounting3d || handle3d) return;
   if (root.dataset.boot !== '3d') {
+    const activate = (window as typeof window & { __consoleIntro?: () => boolean }).__consoleIntro;
+    if (!activate) return;
     root.dataset.boot = '3d';
     // The bootstrap owns viewport validation; an invalid retry stays on the lite page.
-    if (!(window as typeof window & { __consoleIntro?: () => boolean }).__consoleIntro?.()) return;
+    if (!activate()) return;
     (window as typeof window & { __sceneDeadline?: () => void }).__sceneDeadline?.();
   }
   if (btn) { btn.disabled = true; btn.textContent = 'loading 3d'; }

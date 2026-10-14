@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { guard, run } from './helpers';
+import { guard, promptReady, run } from './helpers';
 
 test('zero initial viewport keeps lite usable until an explicit valid retry', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
@@ -222,6 +222,124 @@ test('context loss disposes the scene and preserves a usable lite terminal', asy
   await expect(page.locator('#term-lines')).toContainText('context-fallback');
 });
 
+for (const [from, to] of [
+  [[1440, 900], [320, 568]],
+  [[320, 568], [1440, 900]],
+] as const) test(`context-loss retry contains the new grid and preserves its handoff ${from[0]}→${to[0]}`, async ({ page }) => {
+  await page.setViewportSize({ width: from[0], height: from[1] });
+  await page.addInitScript(() => { (window as any).__holdIntro = true; localStorage.setItem('alxnko:booted', '1'); });
+  await page.goto('/?3d&test');
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready');
+  await promptReady(page);
+  await page.evaluate(() => (window as any).__scene.renderer.getContext().getExtension('WEBGL_lose_context').loseContext());
+  await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+  await page.setViewportSize({ width: to[0], height: to[1] });
+  // Preserve terminal content/input without requesting a laptop flight: that intentional
+  // focus path is covered separately, while this test holds the analytic handoff camera.
+  await page.evaluate(() => {
+    const input = document.getElementById('term-input') as HTMLInputElement;
+    input.value = 'echo retry-keeps-output-and-wrapping-abcdefghijklmnopqrstuvwxyz';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    (document.getElementById('term-form') as HTMLFormElement).requestSubmit();
+  });
+  await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+  await page.evaluate(() => {
+    const input = document.getElementById('term-input') as HTMLInputElement;
+    input.value = 'unfinished retry input'; input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  let release!: () => void;
+  const held = new Promise<void>(r => release = r);
+  await page.route('**/scene/manifest.json', async route => { await held; await route.continue(); });
+  await page.locator('#enter3d').click();
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'loading');
+  await page.waitForTimeout(100);
+  const before = await page.evaluate(() => {
+    const term = document.getElementById('term')!, line = document.querySelector<HTMLElement>('#term-lines .ln:last-child')!;
+    (window as any).__retryNodes = [term, line, document.getElementById('term-input')];
+    const box = (e: Element) => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; };
+    document.getElementById('term-screen')!.scrollTop = 0;
+    return { term: box(term), line: box(line), logical: [term.offsetWidth, term.offsetHeight], wrap: line.offsetHeight, input: (document.getElementById('term-input') as HTMLInputElement).value };
+  });
+  const [x, y, w, h] = before.term;
+  expect(x).toBeGreaterThanOrEqual(0); expect(y).toBeGreaterThanOrEqual(0);
+  expect(x + w).toBeLessThanOrEqual(to[0]); expect(y + h).toBeLessThanOrEqual(to[1]);
+  release();
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready');
+  const after = await page.evaluate(() => {
+    const term = document.getElementById('term')!, line = document.querySelector<HTMLElement>('#term-lines .ln:last-child')!, input = document.getElementById('term-input') as HTMLInputElement;
+    const box = (e: Element) => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; };
+    const sc = (window as any).__scene, bounds = sc.renderer.domElement.getBoundingClientRect();
+    return { term: box(term), line: box(line), logical: [term.offsetWidth, term.offsetHeight], wrap: line.offsetHeight, input: input.value, scroll: document.getElementById('term-screen')!.scrollTop,
+      identity: [term, line, input].every((e, i) => e === (window as any).__retryNodes[i]), intro: sc.intro(),
+      projected: sc.corners().map((p: number[]) => { const q = sc.camera.position.clone().set(...p).project(sc.camera); return [bounds.x + (q.x + 1) * bounds.width / 2, bounds.y + (1 - q.y) * bounds.height / 2]; }) };
+  });
+  expect(after.identity).toBe(true); expect(after.intro).toBe('held');
+  expect(after.logical).toEqual(before.logical); expect(after.wrap).toBe(before.wrap);
+  expect(after.input).toBe(before.input); expect(after.scroll).toBe(0);
+  for (const key of ['term', 'line'] as const) after[key].forEach((v, i) => expect(Math.abs(v - before[key][i])).toBeLessThanOrEqual(1));
+  const quad = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+  after.projected.forEach((p: number[], i: number) => p.forEach((v, j) => expect(Math.abs(v - quad[i][j])).toBeLessThanOrEqual(1)));
+  await expect(page.locator('#term-lines')).toContainText('retry-keeps-output-and-wrapping-abcdefghijklmnopqrstuvwxyz');
+});
+
+test('scene disposal restores prior overlay dimensions and CSS priorities', async ({ page }) => {
+  let release!: () => void;
+  const held = new Promise<void>(r => release = r);
+  await page.route('**/scene/manifest.json', async route => { await held; await route.continue(); });
+  await page.goto('/?3d&test');
+  await page.evaluate(() => {
+    document.getElementById('term')!.style.setProperty('--screen-w', '700px', 'important');
+    document.getElementById('contacts')!.style.setProperty('--contacts-h', '500px');
+    document.getElementById('mon-info')!.style.setProperty('--info-w', '400px', 'important');
+  });
+  release();
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready');
+  await page.evaluate(() => (window as any).__scene.renderer.getContext().getExtension('WEBGL_lose_context').loseContext());
+  await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+  const styles = () => page.evaluate(() => ['term', 'contacts', 'mon-info'].map((id, i) => {
+    const style = document.getElementById(id)!.style, prefix = ['screen', 'contacts', 'info'][i];
+    return ['w', 'h'].map(axis => [style.getPropertyValue(`--${prefix}-${axis}`), style.getPropertyPriority(`--${prefix}-${axis}`)]);
+  }));
+  const expected = [[['700px', 'important'], ['', '']], [['', ''], ['500px', '']], [['400px', 'important'], ['', '']]];
+  expect(await styles()).toEqual(expected);
+  await page.evaluate(() => { dispatchEvent(new Event('pagehide')); dispatchEvent(new Event('pagehide')); });
+  expect(await styles()).toEqual(expected);
+});
+
+test('context loss completes a moving typed desk command and releases queued input', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('alxnko:booted', '1'));
+  await page.goto('/?3d&test');
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready');
+  await promptReady(page);
+  const height = () => page.evaluate(() => (window as any).__scene.scene.getObjectByName('desk_rig').position.y as number);
+  const base = await height();
+  await run(page, 'desk 3');
+  await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');
+  await page.waitForFunction(base => {
+    const scene = (window as any).__scene, h = scene.scene.getObjectByName('desk_rig').position.y;
+    if (h <= base + .001) return false;
+    if (document.getElementById('term-form')!.dataset.busy !== 'true' || h >= base + 1.12 - .74) throw new Error('desk must still be moving when context is lost');
+    scene.renderer.getContext().getExtension('WEBGL_lose_context').loseContext();
+    return true;
+  }, base);
+  await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+  await run(page, 'echo fallback-queue');
+  await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+  await expect(page.locator('#term-lines .ln').filter({ hasText: /^fallback-queue$/ })).toHaveCount(1);
+  await expect(page.locator('#term-lines .ln').filter({ hasText: /^desk: 112 cm$/ })).toHaveCount(1);
+  const stopped = await height();
+  await page.waitForTimeout(1700);
+  expect(await height()).toBe(stopped);
+  await page.evaluate(() => { dispatchEvent(new Event('pagehide')); dispatchEvent(new Event('pagehide')); });
+  await expect(page.locator('#term-lines .ln').filter({ hasText: /^desk: 112 cm$/ })).toHaveCount(1);
+  await page.locator('#enter3d').click();
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready');
+  expect(await height()).toBeCloseTo(base + 1.12 - .74, 4);
+  await run(page, 'desk 1');
+  await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+  expect(await height()).toBeCloseTo(base, 4);
+});
+
 test('the visible-time watchdog releases a stalled late mount', async ({ page }) => {
   test.setTimeout(45000);
   let release!: () => void;
@@ -274,6 +392,59 @@ test('blocked first-paint bootstrap preserves the usable lite baseline', async (
   await expect(page.locator('#contacts')).toBeVisible();
   await run(page, 'echo blocked-bootstrap');
   await expect(page.locator('#term-lines')).toContainText('blocked-bootstrap');
+});
+
+test('manual retry after a blocked intro bootstrap and late entry keeps the working lite interface', async ({ page }) => {
+  test.setTimeout(45000);
+  let requested = 0;
+  await page.route('**/scene/manifest.json', async route => { requested++; await route.continue(); });
+  let release!: () => void;
+  const held = new Promise<void>(r => release = r);
+  await page.route('**/_astro/Base*.js', async route => { await held; await route.continue(); });
+  await page.route('**/?3d&test', async route => {
+    const response = await route.fetch();
+    // Keep the real capability gate and its visible-time deadline; only the console
+    // activator fails to arrive. Late entry sees the expired boot and offers a retry.
+    const body = (await response.text()).replace(/<script(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/g, script => script.includes('__consoleIntro') ? '' : script);
+    await route.fulfill({ response, body });
+  });
+  await page.goto('/?3d&test', { waitUntil: 'commit' });
+  await expect(page.locator('html')).toHaveAttribute('data-boot', '3d');
+  expect(await page.evaluate(() => typeof (window as any).__sceneDeadline)).toBe('function');
+  await expect(page.locator('html')).toHaveAttribute('data-boot', 'failed', { timeout: 17000 });
+  await expect(page.locator('#contacts')).toBeVisible();
+  release();
+  await page.waitForLoadState('load');
+  await promptReady(page);
+  const button = page.locator('#enter3d');
+  await expect(button).toBeVisible();
+  expect(await page.evaluate(() => typeof (window as any).__consoleIntro)).toBe('undefined');
+  await button.click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-boot', '3d');
+  await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+  await expect(page.locator('#term')).toBeVisible();
+  await expect(page.locator('#contacts')).toBeVisible();
+  await expect(page.locator('canvas.stage-canvas')).toHaveCount(0);
+  await expect(button).toBeEnabled(); await expect(button).toHaveText('enter 3d');
+  await run(page, 'echo manual-blocked-bootstrap');
+  await expect(page.locator('#term-lines .ln').filter({ hasText: /^manual-blocked-bootstrap$/ })).toHaveCount(1);
+  expect(requested).toBe(0);
+});
+
+test('an offered manual entry remains lite if its bootstrap becomes unavailable', async ({ page }) => {
+  await page.goto('/?lite&test');
+  await promptReady(page);
+  const button = page.locator('#enter3d');
+  await expect(button).toBeVisible();
+  await page.evaluate(() => { delete (window as any).__consoleIntro; delete (window as any).__sceneDeadline; });
+  await button.click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-boot', '3d');
+  await expect(page.locator('#contacts')).toBeVisible();
+  await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+  await expect(page.locator('canvas.stage-canvas')).toHaveCount(0);
+  await expect(button).toBeEnabled();
+  await run(page, 'echo missing-offer-bootstrap');
+  await expect(page.locator('#term-lines .ln').filter({ hasText: /^missing-offer-bootstrap$/ })).toHaveCount(1);
 });
 
 test('an entry module arriving after fallback cannot take over the lite page', async ({ page }) => {

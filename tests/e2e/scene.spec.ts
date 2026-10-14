@@ -151,6 +151,67 @@ test.describe('3D desk', () => {
     await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
   });
 
+  test('context loss ends a physical paddle hold and its motor once without interrupting cmatrix', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'physical mouse hold; touch cancellation has separate coverage');
+    await page.addInitScript(() => {
+      localStorage.setItem('alxnko:booted', '1'); localStorage.setItem('alxnko:sound', 'on');
+      const motors = (window as any).__motors = [] as { node: OscillatorNode; stops: number }[];
+      const start = OscillatorNode.prototype.start, stop = OscillatorNode.prototype.stop;
+      OscillatorNode.prototype.start = function(...args) { motors.push({ node: this, stops: 0 }); return start.apply(this, args); };
+      OscillatorNode.prototype.stop = function(...args) { const motor = motors.find(m => m.node === this)!; motor.stops++; return stop.apply(this, args); };
+    });
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready');
+    await promptReady(page);
+    await run(page, 'cmatrix');
+    await expect(page.locator('#term-overlay')).toBeVisible();
+    await page.evaluate(() => (window as any).__scene.world().fly('desk'));
+    await landed(page, 'desk');
+    const p = await page.evaluate(() => {
+      const s = (window as any).__scene;
+      let point: any;
+      s.scene.getObjectByName('hit_paddle_up').traverse((o: any) => {
+        if (!o.isMesh || point) return;
+        o.updateWorldMatrix(true, false); o.geometry.computeBoundingBox();
+        point = o.geometry.boundingBox.getCenter(s.camera.position.clone()).applyMatrix4(o.matrixWorld).project(s.camera);
+      });
+      const r = s.renderer.domElement.getBoundingClientRect();
+      return { x: r.x + (point.x + 1) * r.width / 2, y: r.y + (1 - point.y) * r.height / 2 };
+    });
+    const height = () => page.evaluate(() => (window as any).__scene.scene.getObjectByName('desk_rig').position.y as number);
+    const base = await height();
+    await page.mouse.move(p.x, p.y); await page.mouse.down();
+    await expect.poll(() => page.evaluate(() => !!(window as any).__scene.hold()?.active)).toBe(true);
+    await expect.poll(height).toBeGreaterThan(base + .01);
+    expect(await page.evaluate(() => (window as any).__motors.map((m: any) => m.stops))).toEqual([0]);
+    await page.evaluate(() => (window as any).__scene.renderer.getContext().getExtension('WEBGL_lose_context').loseContext());
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+    expect(await page.evaluate(() => (window as any).__scene.hold())).toBeNull();
+    expect(await page.evaluate(() => (window as any).__motors.map((m: any) => m.stops))).toEqual([1]);
+    const finalHeight = await height();
+    await page.mouse.up();
+    await page.evaluate(() => { dispatchEvent(new Event('pagehide')); dispatchEvent(new Event('pagehide')); });
+    expect(await page.evaluate(() => (window as any).__motors.map((m: any) => m.stops))).toEqual([1]);
+    const before = (await rainView(page)).text;
+    await expect.poll(async () => (await rainView(page)).text).not.toBe(before);
+    await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');
+    await page.keyboard.press('Control+c');
+    await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+    await run(page, 'desk');
+    await expect(page.locator('#term-lines .ln').filter({ hasText: /^desk: \d+ cm$/ })).toHaveCount(2);
+    await page.locator('#enter3d').click();
+    await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready');
+    expect(await height()).toBeCloseTo(finalHeight, 4);
+    await page.evaluate(async () => {
+      const s = (window as any).__scene;
+      const world = s.world();
+      s.renderer.getContext().getExtension('WEBGL_lose_context').loseContext();
+      await new Promise(r => setTimeout(r, 50));
+      await world.setDesk(1.2); // a retained disposed world must not start another pending move
+    });
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+  });
+
   test('cmatrix --both covers the whole monitor; ctrl+c gives the contacts back', async ({ page }) => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
