@@ -1,0 +1,26 @@
+$ vitest run
+
+ RUN  v5.0.1 /home/alxnko/Projects/code/meow/alxnko.dev/.claude/worktrees/console-intro
+
+(node:509454) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:509430) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:509723) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:509531) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:510302) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:510653) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  29 passed (29)
+      Tests  427 passed (427)
+   Start at  19:35:30
+   Duration  4.63s (transform 44%, environment 30%, tests 14%, import 11%, worker 2%)
+
+  Transform  transforming modules took 12.97s · 44% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

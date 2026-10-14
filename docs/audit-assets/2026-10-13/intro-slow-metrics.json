@@ -1,0 +1,72 @@
+{
+  "desktop": {
+    "usable": 214.5,
+    "deliberateDelays": {
+      "sceneJS": 2000,
+      "glb": 3500,
+      "atlas": 1000
+    },
+    "before": {
+      "box": [
+        80,
+        50,
+        1280,
+        800
+      ],
+      "width": 1280,
+      "height": 800,
+      "lines": "[  OK  ] Finished Load Kernel Modules.[  OK  ] Mounted Temporary Directory /tmp.[  OK  ] Reached target Local File Systems.[  OK  ] Started Journal Service.[  OK  ] Started Network Time Synchronization.[  OK  ] Reached target System Time Set.[  OK  ] Started Network Configuration.[  OK  ] Reached target Network.[  OK  ] Started Desk Height Controller.[  OK  ] Started Fan Speed Daemon.[  OK  ] Started Cat Supervisor (best effort).[  OK  ] Started Getty on tty1.[  OK  ] Reached target Login Prompts.[  OK  ] Reached target Multi-User System.meowOS rolling (tty1)nitro login: alxnko (automatic login)[alxnko@nitro ~]$ fastfetch ▄█▄  ▄▄▄  ▄█▄       alxnko@nitro ▀▀ ▄█████▄ ▀▀       ------------ ▄███████████▄       os     meowOS x86_64  ▀█████████▀        host   nitro     ▀███▀    █▄     kernel 7.2.6-meow   ██▄▄ ▄▄██  ██▄    uptime 1 sec  █████ █████ ▀███   shell  bash 5.3 ██████ ██████ ██▀   role   tech lead▄██████ ██████▄      loc    Kyrgyzstan▀██████ ██████▀      rank   #1 committer in KG   ▀███ ███▀               ▀ ▀            gh     github.com/alxnko                     tg     t.me/ALXNK0                     in     linkedin.com/in/alxnko                     ig     instagram.com/alxnko                     mail   aleksandrnyrko@gmail.com                                          ████████████████████████"
+    },
+    "after": {
+      "identity": true,
+      "box": [
+        80,
+        50,
+        1280,
+        800
+      ],
+      "width": 1280,
+      "height": 800,
+      "lines": "[  OK  ] Finished Load Kernel Modules.[  OK  ] Mounted Temporary Directory /tmp.[  OK  ] Reached target Local File Systems.[  OK  ] Started Journal Service.[  OK  ] Started Network Time Synchronization.[  OK  ] Reached target System Time Set.[  OK  ] Started Network Configuration.[  OK  ] Reached target Network.[  OK  ] Started Desk Height Controller.[  OK  ] Started Fan Speed Daemon.[  OK  ] Started Cat Supervisor (best effort).[  OK  ] Started Getty on tty1.[  OK  ] Reached target Login Prompts.[  OK  ] Reached target Multi-User System.meowOS rolling (tty1)nitro login: alxnko (automatic login)[alxnko@nitro ~]$ fastfetch ▄█▄  ▄▄▄  ▄█▄       alxnko@nitro ▀▀ ▄█████▄ ▀▀       ------------ ▄███████████▄       os     meowOS x86_64  ▀█████████▀        host   nitro     ▀███▀    █▄     kernel 7.2.6-meow   ██▄▄ ▄▄██  ██▄    uptime 1 sec  █████ █████ ▀███   shell  bash 5.3 ██████ ██████ ██▀   role   tech lead▄██████ ██████▄      loc    Kyrgyzstan▀██████ ██████▀      rank   #1 committer in KG   ▀███ ███▀               ▀ ▀            gh     github.com/alxnko                     tg     t.me/ALXNK0                     in     linkedin.com/in/alxnko                     ig     instagram.com/alxnko                     mail   aleksandrnyrko@gmail.com                                          ████████████████████████",
+      "ready": 5987.29999999702,
+      "intro": "held",
+      "active": "app"
+    },
+    "errors": []
+  },
+  "mobile": {
+    "usable": 66.79999999701977,
+    "deliberateDelays": {
+      "sceneJS": 2000,
+      "glb": 3500,
+      "atlas": 1000
+    },
+    "before": {
+      "box": [
+        16,
+        300.75,
+        380,
+        237.5
+      ],
+      "width": 760,
+      "height": 475,
+      "lines": "[  OK  ] Finished Load Kernel Modules.[  OK  ] Mounted Temporary Directory /tmp.[  OK  ] Reached target Local File Systems.[  OK  ] Started Journal Service.[  OK  ] Started Network Time Synchronization.[  OK  ] Reached target System Time Set.[  OK  ] Started Network Configuration.[  OK  ] Reached target Network.[  OK  ] Started Desk Height Controller.[  OK  ] Started Fan Speed Daemon.[  OK  ] Started Cat Supervisor (best effort).[  OK  ] Started Getty on tty1.[  OK  ] Reached target Login Prompts.[  OK  ] Reached target Multi-User System.meowOS rolling (tty1)nitro login: alxnko (automatic login)[alxnko@nitro ~]$ fastfetch --compact ▄█▄  ▄▄▄  ▄█▄       alxnko@nitro ▀▀ ▄█████▄ ▀▀       ------------ ▄███████████▄       os     meowOS x86_64  ▀█████████▀        host   nitro     ▀███▀    █▄     kernel 7.2.6-meow   ██▄▄ ▄▄██  ██▄    uptime 1 sec  █████ █████ ▀███   shell  bash 5.3 ██████ ██████ ██▀   role   tech lead▄██████ ██████▄      loc    Kyrgyzstan▀██████ ██████▀      rank   #1 committer in KG   ▀███ ███▀               ▀ ▀            "
+    },
+    "after": {
+      "identity": true,
+      "box": [
+        16,
+        300.75,
+        380,
+        237.5
+      ],
+      "width": 760,
+      "height": 475,
+      "lines": "[  OK  ] Finished Load Kernel Modules.[  OK  ] Mounted Temporary Directory /tmp.[  OK  ] Reached target Local File Systems.[  OK  ] Started Journal Service.[  OK  ] Started Network Time Synchronization.[  OK  ] Reached target System Time Set.[  OK  ] Started Network Configuration.[  OK  ] Reached target Network.[  OK  ] Started Desk Height Controller.[  OK  ] Started Fan Speed Daemon.[  OK  ] Started Cat Supervisor (best effort).[  OK  ] Started Getty on tty1.[  OK  ] Reached target Login Prompts.[  OK  ] Reached target Multi-User System.meowOS rolling (tty1)nitro login: alxnko (automatic login)[alxnko@nitro ~]$ fastfetch --compact ▄█▄  ▄▄▄  ▄█▄       alxnko@nitro ▀▀ ▄█████▄ ▀▀       ------------ ▄███████████▄       os     meowOS x86_64  ▀█████████▀        host   nitro     ▀███▀    █▄     kernel 7.2.6-meow   ██▄▄ ▄▄██  ██▄    uptime 1 sec  █████ █████ ▀███   shell  bash 5.3 ██████ ██████ ██▀   role   tech lead▄██████ ██████▄      loc    Kyrgyzstan▀██████ ██████▀      rank   #1 committer in KG   ▀███ ███▀               ▀ ▀            ",
+      "ready": 5790.5,
+      "intro": "held",
+      "active": "app"
+    },
+    "errors": []
+  }
+}

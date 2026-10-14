@@ -58,6 +58,160 @@ test.describe('3D desk', () => {
     await expect(page.locator('#term-input')).toHaveValue('');
   });
 
+  test('physical paddles move during cmatrix without stopping rain, and still work idle', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'mouse hold; touch gesture cancellation is covered by input unit tests');
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    await promptReady(page);
+    const height = () => page.evaluate(() => (window as any).__scene.scene.getObjectByName('desk_rig').position.y as number);
+    const base = await height(); // fresh world starts at 74 cm
+    const paddle = (key: string) => page.evaluate((key) => {
+      const s = (window as any).__scene;
+      let point: any;
+      s.scene.getObjectByName(`hit_paddle_${key}`).traverse((o: any) => {
+        if (!o.isMesh || point) return;
+        o.updateWorldMatrix(true, false); // hit targets are invisible, so rendering need not update them
+        o.geometry.computeBoundingBox();
+        point = o.geometry.boundingBox.getCenter(new s.camera.position.constructor()).applyMatrix4(o.matrixWorld).project(s.camera);
+      });
+      const r = s.renderer.domElement.getBoundingClientRect();
+      return { x: r.left + (point.x + 1) * r.width / 2, y: r.top + (1 - point.y) * r.height / 2 };
+    }, key);
+    const hold = async (key: string) => {
+      // Typing focuses the laptop and flies there; return to where the physical controls are visible.
+      await page.evaluate(() => (window as any).__scene.world().fly('desk'));
+      await landed(page, 'desk');
+      const p = await paddle(key);
+      expect(p.x).toBeGreaterThan(0);
+      expect(p.x).toBeLessThan(page.viewportSize()!.width);
+      expect(p.y).toBeGreaterThan(0);
+      expect(p.y).toBeLessThan(page.viewportSize()!.height);
+      await page.mouse.move(p.x, p.y);
+      await page.mouse.down();
+    };
+    const held = () => page.evaluate(() => (window as any).__scene.hold()?.active ?? false);
+
+    const click = async (key: string) => {
+      const p = await paddle(key);
+      await page.mouse.click(p.x, p.y);
+    };
+    const busy = () => expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');
+    const rainContinues = async () => {
+      await busy();
+      const before = (await rainView(page)).text;
+      await expect.poll(async () => (await rainView(page)).text).not.toBe(before);
+      await busy();
+    };
+
+    for (const [cmd, stop] of [['cmatrix', 'q'], ['cmatrix --both', 'Control+c']]) {
+      await run(page, cmd);
+      await expect(page.locator('#term-overlay')).toBeVisible();
+      await page.evaluate(() => (window as any).__scene.world().fly('desk'));
+      await landed(page, 'desk');
+      for (const [key, target] of [['3', 1.12], ['1', 0.74], ['2', 0.95]] as const) {
+        await busy();
+        await click(key);
+        await expect.poll(height).toBeCloseTo(base + target - 0.74, 2);
+        await rainContinues();
+        if (key === '2') {
+          const baseline = await height();
+          await busy(); await click('up');
+          await expect.poll(height).toBeCloseTo(baseline + 0.05, 2);
+          await rainContinues();
+          await busy(); await click('down');
+          await expect.poll(height).toBeCloseTo(baseline, 2);
+          await rainContinues();
+        }
+      }
+      const beforeHold = await height();
+      await busy(); await hold('up');
+      await expect(page.locator('#stage')).toHaveCSS('cursor', 'pointer');
+      await expect.poll(held).toBe(true);
+      await expect.poll(height).toBeGreaterThan(beforeHold + 0.02);
+      await rainContinues();
+      await page.mouse.up();
+      expect(await held()).toBe(false);
+      const afterUp = await height();
+      await busy(); await hold('down');
+      await expect.poll(held).toBe(true);
+      await expect.poll(height).toBeLessThan(afterUp - 0.02);
+      await rainContinues();
+      await page.mouse.up();
+      expect(await held()).toBe(false);
+      await page.keyboard.press(stop);
+      await expect(page.locator('#term-overlay')).toBeHidden();
+      await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+    }
+    const idle = await height();
+    await hold('up');
+    await expect.poll(held).toBe(true);
+    await expect.poll(height).toBeGreaterThan(idle + 0.02);
+    await page.mouse.up();
+    await click('down');
+    await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+  });
+
+  test('context loss ends a physical paddle hold and its motor once without interrupting cmatrix', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'physical mouse hold; touch cancellation has separate coverage');
+    await page.addInitScript(() => {
+      localStorage.setItem('alxnko:booted', '1'); localStorage.setItem('alxnko:sound', 'on');
+      const motors = (window as any).__motors = [] as { node: OscillatorNode; stops: number }[];
+      const start = OscillatorNode.prototype.start, stop = OscillatorNode.prototype.stop;
+      OscillatorNode.prototype.start = function(...args) { motors.push({ node: this, stops: 0 }); return start.apply(this, args); };
+      OscillatorNode.prototype.stop = function(...args) { const motor = motors.find(m => m.node === this)!; motor.stops++; return stop.apply(this, args); };
+    });
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready');
+    await promptReady(page);
+    await run(page, 'cmatrix');
+    await expect(page.locator('#term-overlay')).toBeVisible();
+    await page.evaluate(() => (window as any).__scene.world().fly('desk'));
+    await landed(page, 'desk');
+    const p = await page.evaluate(() => {
+      const s = (window as any).__scene;
+      let point: any;
+      s.scene.getObjectByName('hit_paddle_up').traverse((o: any) => {
+        if (!o.isMesh || point) return;
+        o.updateWorldMatrix(true, false); o.geometry.computeBoundingBox();
+        point = o.geometry.boundingBox.getCenter(s.camera.position.clone()).applyMatrix4(o.matrixWorld).project(s.camera);
+      });
+      const r = s.renderer.domElement.getBoundingClientRect();
+      return { x: r.x + (point.x + 1) * r.width / 2, y: r.y + (1 - point.y) * r.height / 2 };
+    });
+    const height = () => page.evaluate(() => (window as any).__scene.scene.getObjectByName('desk_rig').position.y as number);
+    const base = await height();
+    await page.mouse.move(p.x, p.y); await page.mouse.down();
+    await expect.poll(() => page.evaluate(() => !!(window as any).__scene.hold()?.active)).toBe(true);
+    await expect.poll(height).toBeGreaterThan(base + .01);
+    expect(await page.evaluate(() => (window as any).__motors.map((m: any) => m.stops))).toEqual([0]);
+    await page.evaluate(() => (window as any).__scene.renderer.getContext().getExtension('WEBGL_lose_context').loseContext());
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+    expect(await page.evaluate(() => (window as any).__scene.hold())).toBeNull();
+    expect(await page.evaluate(() => (window as any).__motors.map((m: any) => m.stops))).toEqual([1]);
+    const finalHeight = await height();
+    await page.mouse.up();
+    await page.evaluate(() => { dispatchEvent(new Event('pagehide')); dispatchEvent(new Event('pagehide')); });
+    expect(await page.evaluate(() => (window as any).__motors.map((m: any) => m.stops))).toEqual([1]);
+    const before = (await rainView(page)).text;
+    await expect.poll(async () => (await rainView(page)).text).not.toBe(before);
+    await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'true');
+    await page.keyboard.press('Control+c');
+    await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+    await run(page, 'desk');
+    await expect(page.locator('#term-lines .ln').filter({ hasText: /^desk: \d+ cm$/ })).toHaveCount(2);
+    await page.locator('#enter3d').click();
+    await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready');
+    expect(await height()).toBeCloseTo(finalHeight, 4);
+    await page.evaluate(async () => {
+      const s = (window as any).__scene;
+      const world = s.world();
+      s.renderer.getContext().getExtension('WEBGL_lose_context').loseContext();
+      await new Promise(r => setTimeout(r, 50));
+      await world.setDesk(1.2); // a retained disposed world must not start another pending move
+    });
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+  });
+
   test('cmatrix --both covers the whole monitor; ctrl+c gives the contacts back', async ({ page }) => {
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
@@ -415,9 +569,14 @@ test.describe('3D desk: load and redraw cost', () => {
     let reached = '';
     for (let i = 0; i < 40 && !reached; i++) {
       await page.keyboard.press('Tab');
-      reached = await page.evaluate(() => (document.activeElement?.closest('#contacts a') as HTMLElement | null)?.dataset.contact ?? '');
+      // Read focus once: the camera can hand it from the panel to GitHub between two evaluations.
+      const focus = await page.evaluate(() => ({
+        contact: (document.activeElement?.closest('#contacts a') as HTMLElement | null)?.dataset.contact ?? '',
+        id: document.activeElement?.id ?? '',
+      }));
+      reached = focus.contact;
       // landing on the panel flies to the monitor and hands focus to the first link
-      if (!reached && (await page.evaluate(() => document.activeElement?.id)) === 'contacts') {
+      if (!reached && focus.id === 'contacts') {
         await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.contact ?? '')).toBe('github');
         reached = 'github';
       }
@@ -489,27 +648,16 @@ test.describe('3D desk: load and redraw cost', () => {
     expect(frames.length - new Set(frames).size).toBe(0);
   });
 
-  test('the desk poster is the loader backdrop while the 3D boots, then the live desk replaces it', async ({ page }) => {
+  test('loading shows the actual console on black and keeps the poster hidden', async ({ page }) => {
     let release!: () => void;
-    const held = new Promise<void>((r) => (release = r));
-    // (released well inside the head watchdog's 15 s)
-    await page.route('**/scene/manifest.json', async (route) => { await held; await route.continue(); });
+    const held = new Promise<void>(r => release = r);
+    await page.route('**/scene/manifest.json', async route => { await held; await route.continue(); });
     await page.goto('/?3d');
-    await expect(page.locator('#loader')).toBeVisible();
-    const img = page.locator('#poster img');
-    await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
-    const vp = page.viewportSize()!;
-    const box = (await img.boundingBox())!;
-    expect(Math.round(box.x)).toBe(0);
-    expect(Math.round(box.y)).toBe(0);
-    expect(Math.round(box.width)).toBe(vp.width);
-    expect(Math.round(box.height)).toBe(vp.height);
-    await expect(img).toBeVisible();
-    await expect(page.locator('.poster figcaption')).toBeHidden();
-    await expect(page.locator('#term')).toBeHidden(); // the page layout stays out of sight
-    await expect(page.locator('#loader-steps')).toBeVisible(); // the real progress, over the desk
+    await expect(page.locator('#term')).toBeVisible();
+    await expect(page.locator('#loader')).toHaveCount(0);
+    await expect(page.locator('.poster')).toBeHidden();
     release();
-    await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready', { timeout: 30_000 });
+    await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready', { timeout: 30000 });
     await expect(page.locator('.poster')).toBeHidden();
   });
 });

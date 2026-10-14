@@ -47,6 +47,7 @@ export function attachInput(h: InputHandlers): () => void {
   let draggedAt = -1e9; // when a drag that began on a surface ended (its click is swallowed)
   let pinch0 = 0;
   let axis: 'x' | null = null;
+  let noTap = false; // persists through every remaining finger of a pinch or consumed press
 
   const onWheel = (e: WheelEvent) => {
     if (e.ctrlKey || inScrollable(e.target)) return; // ctrl+wheel = browser zoom
@@ -56,11 +57,15 @@ export function attachInput(h: InputHandlers): () => void {
   };
 
   const onDown = (e: PointerEvent, surface = false) => {
-    if (pts.size === 0 && !surface) h.press?.(e.clientX, e.clientY);
+    if (pts.size === 0) {
+      noTap = false;
+      axis = null;
+      if (!surface) h.press?.(e.clientX, e.clientY);
+    }
     // (a surface keeps its pointer, or its links would never get their click)
     if (!surface) try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or already-released pointer */ }
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now(), surface });
-    axis = null;
+    if (pts.size >= 2) noTap = true;
     if (pts.size === 2) {
       h.release?.(); // a pinch is not a press on the paddle
       const [a, b] = [...pts.values()];
@@ -81,7 +86,7 @@ export function attachInput(h: InputHandlers): () => void {
       pinch0 = d;
       return;
     }
-    if (!axis && Math.hypot(p.x - p.x0, p.y - p.y0) > TAP_PX) { axis = 'x'; h.release?.(); }
+    if (!axis && Math.hypot(p.x - p.x0, p.y - p.y0) > TAP_PX) { axis = 'x'; noTap = true; h.release?.(); }
     if (axis) h.orbit(dx, dy);
   };
 
@@ -89,11 +94,13 @@ export function attachInput(h: InputHandlers): () => void {
     const p = pts.get(e.pointerId);
     pts.delete(e.pointerId);
     if (!p) return;
-    // the last finger up always ends a paddle hold, wherever it was
+    // Cancellation and any consumed release invalidate the whole gesture, through its last finger.
+    if (e.type === 'pointercancel') noTap = true;
     const held = pts.size === 0 && (h.release?.() ?? false);
-    if (p.surface) { if (axis) draggedAt = performance.now(); }
-    else if (!held && !axis && performance.now() - p.t0 < TAP_MS && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < TAP_PX) h.tap(e.clientX, e.clientY);
-    if (pts.size === 0) axis = null;
+    if (held) noTap = true;
+    if (p.surface) { if (axis || noTap) draggedAt = performance.now(); }
+    else if (pts.size === 0 && !noTap && !axis && performance.now() - p.t0 < TAP_MS && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < TAP_PX) h.tap(e.clientX, e.clientY);
+    if (pts.size === 0) { axis = null; noTap = false; }
   };
 
   const onCanvasDown = (e: PointerEvent) => onDown(e);

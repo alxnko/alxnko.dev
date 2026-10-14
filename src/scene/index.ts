@@ -16,9 +16,12 @@ import { FanDisplay, MonitorScreen } from './monitor-screen';
 import { catStep, constrainGaze, clamp, easeOut, frameInterval, nextFlickIn, SPIN_FRAME_MS, Tween, type CatState } from './anim';
 import { attachInput } from './input';
 import { Dock } from './dock';
+import { consoleLayout, introViewport } from '../ui/intro';
+import { screenPose, type ScreenPose } from './intro';
 import { resolveTarget, type Named } from './pick';
 import { unsupportedExtensions, watchMonitor, yieldToMain } from './phases';
 import { isSoftwareRenderer } from './gate';
+import { gpuDone } from './ready';
 import type { Line, TermState } from '../term/types';
 
 export interface SceneStore {
@@ -56,15 +59,14 @@ export interface SceneOptions {
   onPaddle?(key: string): void;
   /** ▲/▼ held: the desk moves until release; `end` reports the final height (m). */
   onHold?(state: 'start' | 'end', height: number): void;
-  /** Loading progress for the boot loader. */
-  onStep?(step: LoadStep, state: 'run' | 'ok'): void;
-  onProgress?(p: number): void;
+  signal?: AbortSignal;
+  onFailure?(): void;
 }
 
 export interface SceneWorld {
   fly(to: Landmark): void;
   setDesk(h: number): Promise<void>;
-  setTheme(t: Theme): void;
+  setTheme(t: Theme): Promise<void>;
   /** `rgb`: the lights (ring, glow, fan ring, backlights) and the tinted parts; `accent` is
    * the colour in use (the last one while `rgb` is off: the server LED and screens keep it). */
   setRgb(rgb: string, accent: string): void;
@@ -77,9 +79,7 @@ export interface SceneWorld {
   setFreeLook(on: boolean): void;
 }
 
-export type LoadStep = 'manifest' | 'geometry' | 'lighting' | 'screens';
-
-export interface SceneHandle { world: SceneWorld; destroy(): void }
+export interface SceneHandle { world: SceneWorld; beginIntro(): void; prepare(read: () => WorldState): Promise<void>; destroy(): void }
 
 const RING_OFF = '#161618';
 // `rgb off`: the tinted parts show their own colours (the lime caps, white legends, green cat)
@@ -152,19 +152,6 @@ function isSoftwareGL(gl: WebGL2RenderingContext | null): boolean {
   }
 }
 
-/** Resolves once the GL process has run everything submitted so far (polled between tasks,
- *  never a blocking wait; gives up after 3 s). */
-async function gpuDone(gl: WebGL2RenderingContext): Promise<void> {
-  const sync = gl.fenceSync?.(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-  if (!sync) return;
-  gl.flush();
-  const t0 = performance.now();
-  while (gl.getSyncParameter(sync, gl.SYNC_STATUS) !== gl.SIGNALED && !gl.isContextLost() && performance.now() - t0 < 3000) {
-    await new Promise((r) => setTimeout(r, 8));
-  }
-  gl.deleteSync(sync);
-}
-
 /**
  * Load and start the desk. If anything fails partway, whatever was already created (GL
  * context, canvas, subscriptions, listeners, pinned-screen transforms) is torn down before
@@ -172,23 +159,33 @@ async function gpuDone(gl: WebGL2RenderingContext): Promise<void> {
  */
 export async function mount(o: SceneOptions): Promise<SceneHandle> {
   const undo: (() => void)[] = [];
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    for (const f of undo.splice(0).reverse()) { try { f(); } catch { /* keep tearing down */ } }
+  };
+  o.signal?.addEventListener('abort', cleanup, { once: true });
   try {
-    return await build(o, undo);
+    o.signal?.throwIfAborted();
+    const handle = await build(o, undo);
+    o.signal?.throwIfAborted();
+    return { ...handle, destroy() { o.signal?.removeEventListener('abort', cleanup); cleanup(); } };
   } catch (e) {
-    for (const f of undo.reverse()) { try { f(); } catch { /* keep tearing down */ } }
+    // Work resolving after abort may have registered further resources. Dispose those too.
+    cleaned = false;
+    cleanup();
+    o.signal?.removeEventListener('abort', cleanup);
     throw e;
   }
 }
 
-async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle> {
+async function build(o: SceneOptions, undo: (() => void)[]): Promise<Omit<SceneHandle, 'destroy'>> {
   const base = '/scene/';
-  const step = (s: LoadStep, st: 'run' | 'ok') => o.onStep?.(s, st);
-  step('manifest', 'run');
-  const res = await fetch(base + 'manifest.json', { cache: 'no-cache' });
+  const res = await fetch(base + 'manifest.json', { cache: 'no-cache', signal: o.signal });
   if (!res.ok) throw new Error(`manifest ${res.status}`);
   const manifest: Manifest = parseManifest(await res.json());
-  step('manifest', 'ok');
-  o.onProgress?.(0.1);
+
 
   // ---------- renderer ----------
   // one GL context: the <head> probe's, when it is alive and made the way the renderer needs
@@ -203,6 +200,9 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const reuse = !!(live && o.probe && got && got.antialias === antialias && got.alpha && got.depth && !got.stencil && !got.preserveDrawingBuffer && got.premultipliedAlpha);
   if (live && !reuse) live.getExtension('WEBGL_lose_context')?.loseContext();
   const canvas = reuse ? o.probe! : document.createElement('canvas');
+  const onLost = (e: Event) => { e.preventDefault(); o.onFailure?.(); };
+  canvas.addEventListener('webglcontextlost', onLost);
+  undo.push(() => canvas.removeEventListener('webglcontextlost', onLost));
   canvas.className = 'stage-canvas';
   canvas.setAttribute('aria-hidden', 'true');
   const renderer = new WebGLRenderer({
@@ -254,25 +254,30 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     });
   const atlases: Partial<Record<'day' | 'night', Promise<Texture>>> = {};
   const atlas = (t: 'day' | 'night') => (atlases[t] ??= loadAtlas(t));
+  undo.push(() => Object.values(atlases).forEach(p => void p?.then(tx => tx.dispose(), () => {})));
   const themeKey = (t: Theme) => (t === 'light' ? 'day' : 'night');
 
   const gltfLoader = new GLTFLoader();
   gltfLoader.setMeshoptDecoder(MeshoptDecoder);
-  step('geometry', 'run');
-  step('lighting', 'run');
-  let gp = 0;
+
+
   const [gltf, firstAtlas] = await Promise.all([
-    gltfLoader.loadAsync(base + manifest.files.glb, (e) => {
-      if (e.total) { gp = e.loaded / e.total; o.onProgress?.(0.1 + gp * 0.6); }
-    }).then((g) => { step('geometry', 'ok'); return g; }),
-    atlas(themeKey(o.initial.theme)).then((t) => { step('lighting', 'ok'); return t; }),
+    gltfLoader.loadAsync(base + manifest.files.glb),
+    atlas(themeKey(o.initial.theme)),
   ]);
+  undo.push(() => gltf.scene.traverse((obj) => {
+    const mesh = obj as Mesh;
+    mesh.geometry?.dispose();
+    const materials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+    materials.forEach(m => m.dispose());
+  }));
+  o.signal?.throwIfAborted();
   // the loader is slimmed to the extensions the desk uses: a glb needing more would load half
   // parsed, so refuse it (the boot then falls back to the page)
   const unsupported = unsupportedExtensions(gltf.parser.json as { extensionsUsed?: string[] });
   if (unsupported.length) throw new Error(`glb needs unsupported glTF extensions: ${unsupported.join(', ')}`);
-  o.onProgress?.(0.8);
-  step('screens', 'run');
+
+
   // the mount runs as a few short tasks, not one long one: input and paint get in between
   await yieldToMain();
 
@@ -616,6 +621,36 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const currentPose = (): Pose => ({ pos: camera.position.toArray() as Vec3, target: lookAt.toArray() as Vec3, fov: camera.fov });
   const settled = () => flight.value === 1 && [orbit.yaw, orbit.pitch, ...pan].every((sp) => sp.target === 0 && sp.value === 0) && orbit.dolly.value === 1 && orbit.dolly.target === 1;
   flight.snap(1);
+  let intro: 'held' | 'reveal' | 'flight' | 'done' | 'cancelled' = o.reducedMotion ? 'done' : 'held';
+  let revealed = false;
+  let introElapsed = 0;
+  let introFrom: ScreenPose | null = null;
+  const introActive = () => intro === 'held' || intro === 'reveal' || intro === 'flight';
+  const frozen = {
+    width: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--screen-w')) || consoleLayout(introViewport()).width,
+    height: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--screen-h')) || consoleLayout(introViewport()).height,
+  };
+  let heldPose: ScreenPose | null = null;
+  const initialPose = () => {
+    if (heldPose) return heldPose;
+    const view = introViewport();
+    const rect = consoleLayout(view, frozen).rect;
+    return heldPose = screenPose(screenCorners(laptopScreen), rect, view, new Vector3(...deskRef.pose.pos));
+  };
+  const beginIntro = () => {
+    if (disposed || intro !== 'held' || (new URLSearchParams(location.search).has('test') && (window as any).__holdIntro)) return;
+    intro = 'reveal'; introElapsed = 0;
+    invalidate();
+  };
+  const fromUp = new Vector3(0, 1, 0);
+  let fromAspect = camera.aspect;
+  const orientation = new Spring(160);
+  orientation.snap(1);
+  const cancelIntro = () => {
+    if (!introActive()) return;
+    intro = 'cancelled';
+    from = currentPose(); fromUp.copy(camera.up); fromAspect = camera.aspect; orientation.snap(0); orientation.target = 1;
+  };
   const basePose = (): Pose => lerpPose(from, rail.pose(dest), flight.value);
   // free look on top of the landmark pose: drag orbits around what you look at, wheel or
   // pinch dolly in and out; both stay where you leave them until the next flight
@@ -657,6 +692,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   let lastInput = performance.now();
   let srvNext = 0;
   let currentLandmark: Landmark = o.initial.landmark;
+  let announcedLandmark: Landmark | null = currentLandmark;
   let wasAway = false;
   // press-and-hold on ▲/▼: after HOLD_MS the desk runs at a real desk's speed until release
   const HOLD_MS = 260, HOLD_SPEED = 0.06; // m/s
@@ -673,6 +709,15 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   };
   setDeskHeight(clamp(o.initial.desk, manifest.range[0], manifest.range[1]));
 
+  const endHold = () => {
+    const was = hold;
+    hold = null;
+    if (!was?.active) return false;
+    ledPaddle.set(LED_OFF);
+    o.onHold?.('end', rigDy + manifest.deskBase);
+    return true;
+  };
+
 
   // ---------- render loop ----------
   let raf = 0, timer = 0, last = performance.now();
@@ -686,7 +731,17 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       tickClock();
     }, 60_000 - (Date.now() % 60_000) + 50);
   };
-  undo.push(() => { disposed = true; cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(clockTimer); });
+  undo.push(() => {
+    disposed = true;
+    cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(clockTimer);
+    // The lite world already owns a preset's desired height. Complete its pending command
+    // without another frame; a physical hold instead reports its last actual height.
+    deskTween = null;
+    const done = deskDone;
+    deskDone = null;
+    done?.();
+    endHold();
+  });
   const frameTimes: number[] = [];
   let slept = -1; // ms this frame was deliberately delayed by (-1: it was not scheduled as a paced frame)
   const hidden = () => document.visibilityState === 'hidden';
@@ -703,11 +758,24 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
 
   const dock = new Dock([o.termEl, o.contactsEl, ...(o.infoEl ? [o.infoEl] : [])]);
   undo.push(() => dock.destroy());
+  // Release only the scene's dimension overrides so a retry's bootstrap grid inherits
+  // immediately. An embedding page may already own inline values (including !important).
+  const overlayStyles = [
+    [o.termEl, '--screen'], [o.contactsEl, '--contacts'], ...(o.infoEl ? [[o.infoEl, '--info'] as const] : []),
+  ] as const;
+  const priorSizes = overlayStyles.flatMap(([el, prefix]) => ['w', 'h'].map(axis => {
+    const name = `${prefix}-${axis}`;
+    return { el, name, value: el.style.getPropertyValue(name), priority: el.style.getPropertyPriority(name) };
+  }));
+  undo.push(() => priorSizes.forEach(({ el, name, value, priority }) => {
+    if (value) el.style.setProperty(name, value, priority);
+    else el.style.removeProperty(name);
+  }));
   // logical overlay sizes: the laptop terminal is a 16:10 grid (fewer columns on phones so
   // text stays readable when the screen fills the view); contacts match their arc's aspect
   const sizeOverlays = () => {
     const px = (el: HTMLElement, name: string, v: number) => el.style.setProperty(name, `${v}px`);
-    const tw = Math.round(clamp(innerWidth * 2.2, 640, 1280)), th = Math.round(tw * 0.625);
+    const tw = frozen.width, th = frozen.height;
     px(o.termEl, '--screen-w', tw); px(o.termEl, '--screen-h', th);
     dock.setSize(o.termEl, tw, th);
     const [tl, tr, , bl] = contactsCorners();
@@ -726,6 +794,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const upWorld = new Vector3(0, 1, 0);
 
   function frame(now: number) {
+    if (disposed) return;
     // one chain of frames only, however this one was started (rAF, the pacing timer, or the
     // mount's direct first frame)
     if (raf) cancelAnimationFrame(raf);
@@ -734,8 +803,17 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     let animating = false;
+    if (!hidden() && (intro === 'reveal' || intro === 'flight')) {
+      introElapsed += dt * 1000;
+      if (intro === 'reveal' && introElapsed >= 240) {
+        introFrom = initialPose(); intro = 'flight'; introElapsed = 0;
+      }
+      if (intro === 'flight' && introElapsed >= 600) { intro = 'done'; camera.up.set(0, 1, 0); }
+      animating = introActive();
+    }
 
     // camera
+    animating = orientation.step(dt) || animating;
     animating = flight.step(dt) || animating;
     animating = orbit.yaw.step(dt) || animating;
     animating = orbit.pitch.step(dt) || animating;
@@ -884,12 +962,24 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     if (monitor.update()) dirty = true;
 
     // apply camera
+    if (introActive()) {
+      const initial = intro === 'flight' && introFrom ? introFrom : initialPose();
+      const progress = intro === 'flight' ? Math.min(1, introElapsed / 600) : 0;
+      const k = progress * progress * (3 - 2 * progress);
+      const p = lerpPose(initial, rail.pose('desk'), k);
+      camera.position.set(...p.pos); camera.fov = p.fov;
+      camera.aspect = initial.aspect + ((o.stage.clientWidth || innerWidth) / (o.stage.clientHeight || innerHeight) - initial.aspect) * k;
+      camera.up.set(...initial.up).lerp(upWorld, k).normalize();
+      camera.updateProjectionMatrix(); camera.lookAt(...p.target); lookAt.set(...p.target);
+    } else {
     const p = basePose();
+    camera.aspect = fromAspect + ((o.stage.clientWidth || innerWidth) / (o.stage.clientHeight || innerHeight) - fromAspect) * orientation.value;
     const pv = new Vector3(pan[0].value, pan[1].value, pan[2].value);
     camera.position.set(...p.pos).add(pv);
     camera.fov = p.fov;
     camera.updateProjectionMatrix();
     {
+      camera.up.copy(fromUp).lerp(upWorld, orientation.value).normalize();
       const tgt = v.set(...p.target).add(pv);
       const off = camera.position.clone().sub(tgt).multiplyScalar(orbit.dolly.value);
       off.applyAxisAngle(upWorld, orbit.yaw.value);
@@ -922,12 +1012,13 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       camera.lookAt(tgt);
       lookAt.copy(tgt);
     }
+    }
     camera.updateMatrixWorld();
 
     const away = dest !== 'desk' || pan.some((s) => Math.abs(s.target) > 0.01) || Math.abs(orbit.yaw.target) > 0.02 || Math.abs(orbit.pitch.target) > 0.02 || Math.abs(orbit.dolly.target - 1) > 0.03;
     if (away !== wasAway) { wasAway = away; o.onAway?.(away); }
     const nearest = dest;
-    if (nearest !== currentLandmark) { currentLandmark = nearest; o.onLandmark(nearest); }
+    currentLandmark = nearest;
 
     // pin the live DOM onto both screens (every frame the camera or desk moves)
     const size = renderer.getSize(new Vector2());
@@ -946,6 +1037,11 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       return { quad: out, facing };
     };
     dock.update([quad(screenCorners(laptopScreen)), quad(contactsCorners()), ...(o.infoEl ? [quad(infoCorners())] : [])]);
+    // Focus can only move onto the monitor once its real DOM quad is visible. From the
+    // close laptop intro it starts behind the eye; notifying before Dock rejected focus.
+    if (nearest !== announcedLandmark && (nearest !== 'monitor' || o.contactsEl.dataset.dock === 'screen')) {
+      announcedLandmark = nearest; o.onLandmark(nearest);
+    }
 
     const spinning = !o.softwareGL && fanSpeed > 0.05 && !o.reducedMotion && fanInView();
     if (o.softwareGL) {
@@ -995,12 +1091,16 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   // ---------- world API ----------
   const world: SceneWorld = {
     fly(to) {
+      const wasIntro = introActive();
+      cancelIntro();
+      announcedLandmark = null;
       lastInput = performance.now();
       if (to === 'laptop') needViews('laptop');
       else if (to === 'monitor') needViews('monitor', 'contacts');
-      if (to === dest && settled()) return; // already there: nothing to animate
+      if (!wasIntro && to === dest && settled()) { invalidate(); return; } // notify focus on a fresh projected frame
       // start from the camera exactly as it is, then fold the free-look offsets into the flight
       from = currentPose();
+      fromUp.copy(camera.up); fromAspect = camera.aspect; orientation.snap(o.reducedMotion ? 1 : 0); orientation.target = 1;
       dest = to;
       orbit.yaw.snap(0); orbit.pitch.snap(0); orbit.dolly.snap(1);
       for (const sp of pan) sp.snap(0);
@@ -1010,28 +1110,36 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       invalidate();
     },
     setDesk(h) {
+      if (disposed) return Promise.resolve();
       // a typed/clicked preset takes over from a held arrow (and stops its motor hum)
-      if (hold?.active) { ledPaddle.set(LED_OFF); o.onHold?.('end', rigDy + manifest.deskBase); }
-      hold = null;
+      endHold();
       const target = clamp(h, manifest.range[0], manifest.range[1]);
-      deskDone?.();
+      const done = deskDone;
+      deskDone = null;
+      deskTween = null;
+      done?.();
+      if (!revealed) { heldPose = null; setDeskHeight(target); rebuildPoses(); invalidate(); return Promise.resolve(); }
       const from = rigDy + manifest.deskBase;
       deskTween = new Tween(from, target, performance.now(), o.reducedMotion ? 0 : 1500);
       invalidate();
       return new Promise<void>((res) => (deskDone = res));
     },
-    setTheme(t) {
+    async setTheme(t) {
       const want = t === 'light' ? 0 : 1;
       const req = ++themeReq;
-      atlas(themeKey(t)).then((tx) => {
+      await atlas(themeKey(t)).then((tx) => {
         if (disposed) return;
         if (t === 'light') baked.uniforms.uDay.value = shadowMat.uniforms.uDay.value = tx;
         else baked.uniforms.uNight.value = shadowMat.uniforms.uNight.value = tx;
         if (req !== themeReq) return; // a newer toggle owns the crossfade
-        mixTween = new Tween(mix, want, performance.now(), o.reducedMotion ? 0 : 600);
+        if (!revealed) renderer.initTexture(tx);
+        // The zero-duration covered update uses the same frame path as live crossfades,
+        // including sky/background/floor uniforms. It also covers reduced motion/cancel.
+        mixTween = new Tween(mix, want, performance.now(), !revealed || o.reducedMotion ? 0 : 600);
         invalidate();
       }).catch((e) => {
-        // once the desk is up we never drop back to the page: keep the current lighting
+        if (!revealed) { o.onFailure?.(); return; }
+        // Once exposed, keep the current lighting if an optional new atlas fails.
         console.warn('3d: lighting atlas unavailable, keeping current lighting', e);
       });
     },
@@ -1045,7 +1153,8 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
         [u(ringMat, 'uColor'), to.ring], [u(keysMat, 'uTint'), to.keys], [u(catMat, 'uTint'), to.cat],
         [u(legendMat, 'uTint'), to.legend], [srvLeds[0], to.led],
       ];
-      ringTween = { pairs: pairs.map(([c, t]) => [c, c.clone(), t]), start: performance.now() };
+      if (!revealed) { pairs.forEach(([c, t]) => c.copy(t)); ringTween = null; }
+      else ringTween = { pairs: pairs.map(([c, t]) => [c, c.clone(), t]), start: performance.now() };
       if (screen) {
         // the monitor's cat mark and bar underline are the terminal accent: redraw once
         setAnsiAccent(to.screen);
@@ -1093,6 +1202,10 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     // the monitor's panes (the terminal scrolls, so a drag there stays a scroll)
     surfaces: [o.contactsEl, ...(o.infoEl ? [o.infoEl] : [])],
     zoom(f, x, y) {
+      if (introActive()) {
+        cancelIntro(); from = currentPose(); fromUp.copy(camera.up);
+        flight.snap(0); // preserve this view while normal springs answer the gesture
+      }
       lastInput = performance.now();
       // against a wall the view is nearer than the zoom setting: continue from what is seen
       if (roomK < 1) { orbit.dolly.snap(orbit.dolly.value * roomK); roomK = 1; }
@@ -1114,6 +1227,10 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       invalidate();
     },
     orbit(dx, dy) {
+      if (introActive()) {
+        cancelIntro(); from = currentPose(); fromUp.copy(camera.up);
+        flight.snap(0); // preserve this view while normal springs answer the gesture
+      }
       lastInput = performance.now();
       orbit.yaw.target = clamp(orbit.yaw.target - dx * 0.005, -YAW(), YAW());
       // grab-the-scene: moving the pointer up tilts the view down, like dragging right turns left
@@ -1126,7 +1243,8 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       pointer.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
       hasPointer = true;
       raycaster.setFromCamera(pointer, camera);
-      o.stage.style.cursor = raycaster.intersectObjects(hits, true).length ? 'pointer' : '';
+      const t = resolveTarget((raycaster.intersectObjects(hits, true)[0]?.object ?? null) as unknown as Named | null);
+      o.stage.style.cursor = t ? 'pointer' : '';
       world.activity();
     },
     press(x, y) {
@@ -1139,11 +1257,7 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
       }
     },
     release() {
-      const was = hold;
-      hold = null;
-      if (!was?.active) return false; // a short press stays a tap (a 5 cm nudge)
-      ledPaddle.set(LED_OFF);
-      o.onHold?.('end', rigDy + manifest.deskBase);
+      if (!endHold()) return false; // a short press stays a tap (a 5 cm nudge)
       invalidate();
       return true;
     },
@@ -1162,11 +1276,13 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
 
   const onResize = () => {
     const before = currentPose();
+    heldPose = null;
     const wasSettled = flight.value === 1;
+    if (intro === 'flight') { introFrom = { ...before, up: camera.up.toArray() as Vec3, aspect: camera.aspect }; introElapsed = 0; }
     sizeOverlays();
     applySize();
     // a re-fit (keyboard, rotation) glides from the current view instead of jumping
-    if (wasSettled && !o.reducedMotion && lookAt.lengthSq() > 0) {
+    if (!introActive() && wasSettled && !o.reducedMotion && lookAt.lengthSq() > 0) {
       from = before;
       flight.snap(0);
       flight.target = 1;
@@ -1174,29 +1290,27 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     }
   };
   const onVis = () => { if (!hidden()) { last = performance.now(); invalidate(); } };
-  // GPU context loss (driver reset, tab backgrounded on mobile): let the browser restore it
-  // and redraw; the page never drops out of 3D once it has loaded
-  const onLost = (e: Event) => e.preventDefault();
-  const onRestored = () => { monitor.invalidate(); fanReadout?.texture && (fanReadout.texture.needsUpdate = true); invalidate(); };
+  // Restoration can race failure cleanup; ignore any wake after disposal.
+  const onRestored = () => { if (disposed) return; monitor.invalidate(); fanReadout?.texture && (fanReadout.texture.needsUpdate = true); invalidate(); };
   addEventListener('resize', onResize);
   addEventListener('scene:refit', onResize);
   document.addEventListener('visibilitychange', onVis);
-  canvas.addEventListener('webglcontextlost', onLost);
   canvas.addEventListener('webglcontextrestored', onRestored);
   undo.push(() => {
     removeEventListener('resize', onResize);
     removeEventListener('scene:refit', onResize);
     document.removeEventListener('visibilitychange', onVis);
+    canvas.removeEventListener('webglcontextrestored', onRestored);
   });
 
-  if (new URLSearchParams(location.search).has('test')) (window as any).__scene = { scene, camera, renderer, rail, flight, dest: () => dest, orbit, invalidate, world: () => world, hold: () => hold, pan, views: () => [...exact] };
+  if (new URLSearchParams(location.search).has('test')) (window as any).__scene = { scene, camera, renderer, rail, flight, dest: () => dest, orbit, invalidate, world: () => world, hold: () => hold, pan, views: () => [...exact], intro: () => intro, releaseIntro: () => { (window as any).__holdIntro = false; beginIntro(); }, corners: () => screenCorners(laptopScreen).map(p => p.toArray()) };
   sizeOverlays();
   applySize();
   // the monitor's canvas is drawn in the site font (before its first upload below)
-  await document.fonts?.load('400 24px "JetBrains Mono"').catch(() => {});
+  await Promise.all(['400', '700'].map(w => document.fonts.load(`${w} 24px "JetBrains Mono"`, 'a█─')));
+  o.signal?.throwIfAborted();
+  document.documentElement.dataset.consoleFont = 'ready';
   monitor.update();
-  // the loader's bar keeps moving through the tail: 0.8 → 0.98, then 1 with the first frame
-  const tailStep = (k: number) => o.onProgress?.(0.8 + 0.18 * k);
   await yieldToMain();
   // shaders: linked in parallel where the driver can (KHR_parallel_shader_compile), then each
   // program's link status and uniforms read in a task of its own. The invisible hit targets
@@ -1207,7 +1321,8 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
   const compiled = renderer.extensions.has('KHR_parallel_shader_compile') ? renderer.compileAsync(scene, camera) : renderer.compile(scene, camera);
   hitMeshes.forEach((m, i) => (m.material = hitMats[i]));
   await compiled;
-  tailStep(0.3);
+  o.signal?.throwIfAborted();
+
   await yieldToMain();
   const programs = new Set<{ getUniforms(): unknown }>();
   scene.traverse((c) => {
@@ -1215,18 +1330,19 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     const p = m && !Array.isArray(m) ? (renderer.properties.get(m) as { currentProgram?: { getUniforms(): unknown } }).currentProgram : undefined;
     if (p) programs.add(p);
   });
-  let pi = 0;
   for (const p of programs) {
     p.getUniforms();
-    tailStep(0.3 + (0.25 * ++pi) / programs.size);
+
     await yieldToMain();
+    o.signal?.throwIfAborted();
   }
   // texture uploads, one per task (the atlas, then the 2048×858 monitor canvas)
   const uploads = [firstAtlas, monitor.texture, fanReadout?.texture].filter((t): t is Texture => !!t);
-  for (const [i, t] of uploads.entries()) {
+  for (const t of uploads) {
     renderer.initTexture(t);
-    tailStep(0.55 + (0.25 * (i + 1)) / uploads.length);
+
     await yieldToMain();
+    o.signal?.throwIfAborted();
   }
   // Warm-up while the canvas is still off the page: one draw of the whole view clipped to a
   // single pixel, so the GL process builds every pipeline (a CPU renderer compiles them at
@@ -1244,47 +1360,69 @@ async function build(o: SceneOptions, undo: (() => void)[]): Promise<SceneHandle
     renderer.setScissorTest(true);
     renderer.render(scene, camera);
     renderer.setScissorTest(false);
-    tailStep(0.9);
-    await gpuDone(renderer.getContext() as WebGL2RenderingContext);
-    tailStep(1);
+
+    await gpuDone(renderer.getContext() as WebGL2RenderingContext, o.signal);
+    o.signal?.throwIfAborted();
+
   }
-  // first frame, then reveal (the app fades the poster out). Drawn directly, not in a rAF: a
+  // A full covered frame establishes the screen projection before the black surround reveals.
+  // Drawn directly, not in a rAF: a
   // covered or background window gets no animation frames, and the desk must still finish
   // loading there (it simply paints once shown)
+  document.body.dataset.projecting = '';
+  undo.push(() => { delete document.body.dataset.projecting; });
+  heldPose = null;
+  applySize(); // scene layout establishes the canvas CSS bounds before the authoritative draw
   o.stage.after(canvas); // above the pinned screens (they show through its windows)
   drawing = true;
   frame(performance.now());
+  await gpuDone(renderer.getContext() as WebGL2RenderingContext, o.signal);
+  o.signal?.throwIfAborted();
   tickClock();
-  step('screens', 'ok');
-  o.onProgress?.(1);
+
   idleViews();
   // warm the other theme's atlas in idle time so toggling is instant
-  const warm = () =>
-    atlas(o.initial.theme === 'light' ? 'night' : 'day').then((tx) => {
+  const warm = () => {
+    if (disposed) return;
+    void atlas(o.initial.theme === 'light' ? 'night' : 'day').then((tx) => {
       if (o.initial.theme === 'light') baked.uniforms.uNight.value = tx; else baked.uniforms.uDay.value = tx;
     }).catch(() => {});
-  if ('requestIdleCallback' in window) requestIdleCallback(warm, { timeout: 3000 });
-  else setTimeout(warm, 3000);
+  };
+  if ('requestIdleCallback' in window) {
+    const warmId = requestIdleCallback(warm, { timeout: 3000 });
+    undo.push(() => cancelIdleCallback(warmId));
+  } else {
+    const warmId = setTimeout(warm, 3000);
+    undo.push(() => clearTimeout(warmId));
+  }
 
   return {
     world,
-    destroy() {
-      disposed = true;
-      cancelAnimationFrame(raf);
-      clearTimeout(timer);
-      clearTimeout(clockTimer);
-      detachInput();
-      dock.destroy();
-      removeEventListener('resize', onResize);
-      removeEventListener('scene:refit', onResize);
-      document.removeEventListener('visibilitychange', onVis);
-      canvas.removeEventListener('webglcontextlost', onLost);
-      canvas.removeEventListener('webglcontextrestored', onRestored);
-      unsubStore();
-      monitor.dispose();
-      fanReadout?.dispose();
-      renderer.dispose();
-      canvas.remove();
+    beginIntro,
+    async prepare(read) {
+      // An input may change preferences during any atlas or fence wait. Commit the
+      // reveal in the same synchronous checkpoint that verifies the covered snapshot.
+      while (!disposed) {
+        const snapshot = read();
+        await world.setTheme(snapshot.theme);
+        o.signal?.throwIfAborted();
+        world.setRgb(snapshot.rgb, snapshot.accent); world.setFan(snapshot.fan);
+        await world.setDesk(snapshot.desk);
+        o.signal?.throwIfAborted();
+        if (disposed) break;
+        dirty = true; frame(performance.now());
+        await gpuDone(renderer.getContext() as WebGL2RenderingContext, o.signal);
+        o.signal?.throwIfAborted();
+        if (disposed) break;
+        const current = read();
+        if (snapshot.theme !== current.theme || snapshot.rgb !== current.rgb || snapshot.accent !== current.accent || snapshot.desk !== current.desk || snapshot.fan !== current.fan) continue;
+        revealed = true;
+        document.body.dataset.mode = 'scene';
+        delete document.body.dataset.projecting;
+        return;
+      }
+      throw new Error('Scene disposed before reveal');
     },
+
   };
 }

@@ -1,0 +1,45 @@
+
+Running 1 test using 1 worker
+
+(node:411609) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 [desktop] › tests/e2e/intro.spec.ts:397:1 › manual retry after a blocked intro bootstrap and late entry keeps the working lite interface (22.1s)
+
+
+  1) [desktop] › tests/e2e/intro.spec.ts:397:1 › manual retry after a blocked intro bootstrap and late entry keeps the working lite interface 
+
+    Error: expect(locator).not.toHaveAttribute(expected) failed
+
+    Locator:  locator('html')
+    Expected: not "3d"
+    Received: "3d"
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "not toHaveAttribute" locator('html') with timeout 5000ms
+      - waiting for locator('html')
+        14 × locator resolved to <html lang="en" class="js" data-gl="2" data-boot="3d" data-theme="light">…</html>
+           - unexpected value "3d"
+
+
+      421 |   expect(await page.evaluate(() => typeof (window as any).__consoleIntro)).toBe('undefined');
+      422 |   await button.click();
+    > 423 |   await expect(page.locator('html')).not.toHaveAttribute('data-boot', '3d');
+          |                                          ^
+      424 |   await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+      425 |   await expect(page.locator('#term')).toBeVisible();
+      426 |   await expect(page.locator('#contacts')).toBeVisible();
+        at /home/alxnko/Projects/code/meow/alxnko.dev/.claude/worktrees/console-intro/tests/e2e/intro.spec.ts:423:42
+
+    Error Context: .superpowers/sdd/2026-10-13-console-intro/final-fix-activation-reachable-red-traces/intro-manual-retry-after-a-ba278--the-working-lite-interface-desktop/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    .superpowers/sdd/2026-10-13-console-intro/final-fix-activation-reachable-red-traces/intro-manual-retry-after-a-ba278--the-working-lite-interface-desktop/trace.zip
+    Usage:
+
+        npx playwright show-trace .superpowers/sdd/2026-10-13-console-intro/final-fix-activation-reachable-red-traces/intro-manual-retry-after-a-ba278--the-working-lite-interface-desktop/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [desktop] › tests/e2e/intro.spec.ts:397:1 › manual retry after a blocked intro bootstrap and late entry keeps the working lite interface 

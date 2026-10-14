@@ -120,6 +120,7 @@ function whenIdle(fn: () => void) {
 }
 
 export function start(app: AppDeps): App {
+  document.documentElement.classList.add('js');
   const cleanup: (() => void)[] = [];
   applyTheme(currentTheme()); // posters + theme-color follow a stored theme, not only the OS
   cleanup.push(bindTheme(app.onTheme), bindSound(app.onSound), startClock());

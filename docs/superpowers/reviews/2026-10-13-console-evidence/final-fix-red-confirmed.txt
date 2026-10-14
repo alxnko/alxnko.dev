@@ -1,0 +1,112 @@
+
+Running 3 tests using 1 worker
+
+(node:322392) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 [desktop] › tests/e2e/intro.spec.ts:228:13 › context-loss retry contains the new grid and preserves its handoff 1440→320 (2.2s)
+(node:322942) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  2 [desktop] › tests/e2e/intro.spec.ts:228:13 › context-loss retry contains the new grid and preserves its handoff 320→1440 (1.8s)
+(node:323694) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  3 [desktop] › tests/e2e/intro.spec.ts:309:1 › context loss completes a moving typed desk command and releases queued input (9.5s)
+
+
+  1) [desktop] › tests/e2e/intro.spec.ts:228:13 › context-loss retry contains the new grid and preserves its handoff 1440→320 
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 320
+    Received:    656
+
+      263 |   const [x, y, w, h] = before.term;
+      264 |   expect(x).toBeGreaterThanOrEqual(0); expect(y).toBeGreaterThanOrEqual(0);
+    > 265 |   expect(x + w).toBeLessThanOrEqual(to[0]); expect(y + h).toBeLessThanOrEqual(to[1]);
+          |                 ^
+      266 |   release();
+      267 |   await expect(page.locator('body')).toHaveAttribute('data-scene', 'ready');
+      268 |   const after = await page.evaluate(() => {
+        at /home/alxnko/Projects/code/meow/alxnko.dev/.claude/worktrees/console-intro/tests/e2e/intro.spec.ts:265:17
+
+    Error Context: .superpowers/sdd/2026-10-13-console-intro/final-fix-red-confirmed-traces/intro-context-loss-retry-c-6f6d0-serves-its-handoff-1440→320-desktop/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    .superpowers/sdd/2026-10-13-console-intro/final-fix-red-confirmed-traces/intro-context-loss-retry-c-6f6d0-serves-its-handoff-1440→320-desktop/trace.zip
+    Usage:
+
+        npx playwright show-trace .superpowers/sdd/2026-10-13-console-intro/final-fix-red-confirmed-traces/intro-context-loss-retry-c-6f6d0-serves-its-handoff-1440→320-desktop/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [desktop] › tests/e2e/intro.spec.ts:228:13 › context-loss retry contains the new grid and preserves its handoff 320→1440 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 2
+    + Received  + 2
+
+      Array [
+    -   576,
+    -   360,
+    +   1280,
+    +   800,
+      ]
+
+      275 |   });
+      276 |   expect(after.identity).toBe(true); expect(after.intro).toBe('held');
+    > 277 |   expect(after.logical).toEqual(before.logical); expect(after.wrap).toBe(before.wrap);
+          |                         ^
+      278 |   expect(after.input).toBe(before.input); expect(after.scroll).toBe(0);
+      279 |   for (const key of ['term', 'line'] as const) after[key].forEach((v, i) => expect(Math.abs(v - before[key][i])).toBeLessThanOrEqual(1));
+      280 |   const quad = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+        at /home/alxnko/Projects/code/meow/alxnko.dev/.claude/worktrees/console-intro/tests/e2e/intro.spec.ts:277:25
+
+    Error Context: .superpowers/sdd/2026-10-13-console-intro/final-fix-red-confirmed-traces/intro-context-loss-retry-c-5bea2-serves-its-handoff-320→1440-desktop/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    .superpowers/sdd/2026-10-13-console-intro/final-fix-red-confirmed-traces/intro-context-loss-retry-c-5bea2-serves-its-handoff-320→1440-desktop/trace.zip
+    Usage:
+
+        npx playwright show-trace .superpowers/sdd/2026-10-13-console-intro/final-fix-red-confirmed-traces/intro-context-loss-retry-c-5bea2-serves-its-handoff-320→1440-desktop/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [desktop] › tests/e2e/intro.spec.ts:309:1 › context loss completes a moving typed desk command and releases queued input 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator:  locator('#term-form')
+    Expected: "false"
+    Received: "true"
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveAttribute" locator('#term-form') with timeout 5000ms
+      - waiting for locator('#term-form')
+        14 × locator resolved to <form id="term-form" data-busy="true" class="term-form">…</form>
+           - unexpected value "true"
+
+
+      325 |   await expect(page.locator('body')).toHaveAttribute('data-mode', 'page');
+      326 |   await run(page, 'echo fallback-queue');
+    > 327 |   await expect(page.locator('#term-form')).toHaveAttribute('data-busy', 'false');
+          |                                            ^
+      328 |   await expect(page.locator('#term-lines .ln').filter({ hasText: /^fallback-queue$/ })).toHaveCount(1);
+      329 |   await expect(page.locator('#term-lines .ln').filter({ hasText: /^desk: 112 cm$/ })).toHaveCount(1);
+      330 |   const stopped = await height();
+        at /home/alxnko/Projects/code/meow/alxnko.dev/.claude/worktrees/console-intro/tests/e2e/intro.spec.ts:327:44
+
+    Error Context: .superpowers/sdd/2026-10-13-console-intro/final-fix-red-confirmed-traces/intro-context-loss-complet-a780b-d-and-releases-queued-input-desktop/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    .superpowers/sdd/2026-10-13-console-intro/final-fix-red-confirmed-traces/intro-context-loss-complet-a780b-d-and-releases-queued-input-desktop/trace.zip
+    Usage:
+
+        npx playwright show-trace .superpowers/sdd/2026-10-13-console-intro/final-fix-red-confirmed-traces/intro-context-loss-complet-a780b-d-and-releases-queued-input-desktop/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3 failed
+    [desktop] › tests/e2e/intro.spec.ts:228:13 › context-loss retry contains the new grid and preserves its handoff 1440→320 
+    [desktop] › tests/e2e/intro.spec.ts:228:13 › context-loss retry contains the new grid and preserves its handoff 320→1440 
+    [desktop] › tests/e2e/intro.spec.ts:309:1 › context loss completes a moving typed desk command and releases queued input 

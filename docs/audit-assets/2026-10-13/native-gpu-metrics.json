@@ -1,0 +1,15 @@
+{
+  "sourceCommit": "4db0f602dc6cc0292bbf5c0a1e2d4cf8b183287d",
+  "renderer": "ANGLE (AMD, AMD Radeon 760M Graphics (radeonsi phoenix ACO), OpenGL ES 3.2)",
+  "glError": 0,
+  "reportedCssViewport": [
+    1440,
+    900
+  ],
+  "dpr": 1,
+  "documentVisibility": "visible",
+  "t3PreviewVisible": false,
+  "timingLimit": "Background native preview throttling prevents animation-duration certification",
+  "startupRegression": "Opening with unavailable viewport froze 2px terminal; separate viewport fix pending final gate",
+  "screenshot": "native-night-desk.png"
+}

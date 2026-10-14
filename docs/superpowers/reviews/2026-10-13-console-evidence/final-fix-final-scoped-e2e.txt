@@ -1,0 +1,44 @@
+
+Running 34 tests using 1 worker
+
+(node:431350) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [desktop] › tests/e2e/intro.spec.ts:4:1 › zero initial viewport keeps lite usable until an explicit valid retry (912ms)
+  ✓   2 [desktop] › tests/e2e/intro.spec.ts:74:3 › held handoff preserves nodes, text and real screen projection 320×568 (1.7s)
+  ✓   3 [desktop] › tests/e2e/intro.spec.ts:74:3 › held handoff preserves nodes, text and real screen projection 390×844 (1.8s)
+  ✓   4 [desktop] › tests/e2e/intro.spec.ts:74:3 › held handoff preserves nodes, text and real screen projection 844×390 (1.7s)
+  ✓   5 [desktop] › tests/e2e/intro.spec.ts:74:3 › held handoff preserves nodes, text and real screen projection 768×1024 (1.7s)
+  ✓   6 [desktop] › tests/e2e/intro.spec.ts:74:3 › held handoff preserves nodes, text and real screen projection 1440×900 (2.2s)
+  ✓   7 [desktop] › tests/e2e/intro.spec.ts:167:1 › resize during loading and flight keeps the same intrinsic terminal grid (1.8s)
+  ✓   8 [desktop] › tests/e2e/intro.spec.ts:215:1 › context loss disposes the scene and preserves a usable lite terminal (633ms)
+  ✓   9 [desktop] › tests/e2e/intro.spec.ts:228:13 › context-loss retry contains the new grid and preserves its handoff 1440→320 (1.1s)
+  ✓  10 [desktop] › tests/e2e/intro.spec.ts:228:13 › context-loss retry contains the new grid and preserves its handoff 320→1440 (1.0s)
+  ✓  11 [desktop] › tests/e2e/intro.spec.ts:285:1 › scene disposal restores prior overlay dimensions and CSS priorities (635ms)
+  ✓  12 [desktop] › tests/e2e/intro.spec.ts:309:1 › context loss completes a moving typed desk command and releases queued input (5.5s)
+  ✓  13 [desktop] › tests/e2e/intro.spec.ts:381:1 › blocked first-paint bootstrap preserves the usable lite baseline (2.6s)
+  ✓  14 [desktop] › tests/e2e/intro.spec.ts:397:1 › manual retry after a blocked intro bootstrap and late entry keeps the working lite interface (17.0s)
+  ✓  15 [desktop] › tests/e2e/intro.spec.ts:434:1 › an offered manual entry remains lite if its bootstrap becomes unavailable (1.5s)
+  ✓  16 [desktop] › tests/e2e/scene.spec.ts:61:3 › 3D desk › physical paddles move during cmatrix without stopping rain, and still work idle (42.5s)
+  ✓  17 [desktop] › tests/e2e/scene.spec.ts:154:3 › 3D desk › context loss ends a physical paddle hold and its motor once without interrupting cmatrix (4.2s)
+(node:443876) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  18 [mobile] › tests/e2e/intro.spec.ts:4:1 › zero initial viewport keeps lite usable until an explicit valid retry (878ms)
+  ✓  19 [mobile] › tests/e2e/intro.spec.ts:74:3 › held handoff preserves nodes, text and real screen projection 320×568 (1.7s)
+  ✓  20 [mobile] › tests/e2e/intro.spec.ts:74:3 › held handoff preserves nodes, text and real screen projection 390×844 (1.7s)
+  ✓  21 [mobile] › tests/e2e/intro.spec.ts:74:3 › held handoff preserves nodes, text and real screen projection 844×390 (2.7s)
+  ✓  22 [mobile] › tests/e2e/intro.spec.ts:74:3 › held handoff preserves nodes, text and real screen projection 768×1024 (1.7s)
+  ✓  23 [mobile] › tests/e2e/intro.spec.ts:74:3 › held handoff preserves nodes, text and real screen projection 1440×900 (1.8s)
+  ✓  24 [mobile] › tests/e2e/intro.spec.ts:167:1 › resize during loading and flight keeps the same intrinsic terminal grid (1.9s)
+  ✓  25 [mobile] › tests/e2e/intro.spec.ts:215:1 › context loss disposes the scene and preserves a usable lite terminal (495ms)
+  ✓  26 [mobile] › tests/e2e/intro.spec.ts:228:13 › context-loss retry contains the new grid and preserves its handoff 1440→320 (1.1s)
+  ✓  27 [mobile] › tests/e2e/intro.spec.ts:228:13 › context-loss retry contains the new grid and preserves its handoff 320→1440 (971ms)
+  ✓  28 [mobile] › tests/e2e/intro.spec.ts:285:1 › scene disposal restores prior overlay dimensions and CSS priorities (496ms)
+  ✓  29 [mobile] › tests/e2e/intro.spec.ts:309:1 › context loss completes a moving typed desk command and releases queued input (4.8s)
+  ✓  30 [mobile] › tests/e2e/intro.spec.ts:381:1 › blocked first-paint bootstrap preserves the usable lite baseline (2.6s)
+  ✓  31 [mobile] › tests/e2e/intro.spec.ts:397:1 › manual retry after a blocked intro bootstrap and late entry keeps the working lite interface (16.9s)
+  ✓  32 [mobile] › tests/e2e/intro.spec.ts:434:1 › an offered manual entry remains lite if its bootstrap becomes unavailable (1.6s)
+  -  33 [mobile] › tests/e2e/scene.spec.ts:61:3 › 3D desk › physical paddles move during cmatrix without stopping rain, and still work idle
+  -  34 [mobile] › tests/e2e/scene.spec.ts:154:3 › 3D desk › context loss ends a physical paddle hold and its motor once without interrupting cmatrix
+
+  2 skipped
+  32 passed (2.2m)

@@ -1,0 +1,30 @@
+{
+  "sourceCommit": "a25ef2dd621b8258c585e6f79d2df1e7d5d8d9f1",
+  "sequence": "1440\u00d7900 mounted \u2192 actual context loss \u2192 320\u00d7568 \u2192 explicit retry with manifest held",
+  "loading": {
+    "rootGrid": "576px",
+    "inlineGrid": "",
+    "logical": [
+      576,
+      360
+    ],
+    "bounds": [
+      16,
+      194,
+      288,
+      180,
+      304
+    ],
+    "priorBrokenRight": 656
+  },
+  "sceneReady": {
+    "sameNode": true,
+    "logical": [
+      576,
+      360
+    ],
+    "gpuError": 0,
+    "intro": "cancelled"
+  },
+  "limit": "Native intro was interrupted; scene-ready sample is not held-handoff geometry proof. Held equality is verified by scoped production-browser tests."
+}
