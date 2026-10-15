@@ -1,0 +1,22 @@
+$ vitest run
+
+ RUN  v5.0.1 /home/alxnko/Projects/code/meow/alxnko.dev/.claude/worktrees/mobile-fastfetch
+
+(node:20292) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:20290) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:20322) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:20344) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:20411) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:20469) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  29 passed (29)
+      Tests  430 passed (430)
+   Start at  15:45:02
+   Duration  783ms (transform 38%, environment 33%, tests 16%, import 11%, worker 2%)
+
