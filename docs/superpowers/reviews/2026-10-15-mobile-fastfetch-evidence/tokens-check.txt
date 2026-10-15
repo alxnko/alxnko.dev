@@ -1,0 +1,3 @@
+$ bun run tokens:check
+$ bun scripts/gen-tokens.ts --check
+exit 0

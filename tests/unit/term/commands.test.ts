@@ -57,7 +57,10 @@ describe('info commands', () => {
     tick(3 * 60_000 + 5000);
     const lines = await run('fastfetch');
     const t = lines.map(text);
-    for (let i = 0; i < CAT_MARK.length; i++) expect(lines[i][0].fg).toBe('accent'); // the rgb accent
+    for (let i = 0; i < CAT_MARK.length; i++) {
+      expect(lines[i][0].fg).toBe('accent');
+      expect(lines[i][0].text.trimEnd()).toBe(CAT_MARK[i].trimEnd());
+    } // the rgb accent
     const all = t.join('\n');
     expect(all).toContain('alxnko@nitro');
     for (const re of [
@@ -85,6 +88,39 @@ describe('info commands', () => {
     expect(t).toContain('meowOS');
     expect(t).not.toContain('github.com');
     expect(t).not.toMatch(/█{24}/);
+  });
+
+  it.each(['--compact', '-c'])('fastfetch %s keeps every fact beside a bottom-aligned 11×7 cat', async (flag) => {
+    const { run } = setup();
+    const lines = await run(`fastfetch ${flag}`);
+    expect(lines).toHaveLength(10);
+    const art = lines.map((line) => line[0]);
+    expect(art.every((span) => span.art && span.text.length === 14 && span.text.endsWith('   '))).toBe(true);
+    expect(art.slice(0, 3).map((span) => span.text.trim())).toEqual(['', '', '']);
+    expect(art.slice(3).map((span) => span.text.slice(0, 11))).toEqual([
+      ' █ ▄▄▄ █   ', ' ███████   ', '  ▀▀██▀  ▄ ', ' ▄██ ██▄ █▄',
+      ' ███ ████▀▀', '▀███ ███▀  ', '  ▀▀ ▀▀    ',
+    ]);
+    expect(lines.map(text).every((line) => line.length <= 34)).toBe(true);
+    const facts = lines.map((line) => text(line.slice(1)));
+    expect(facts).toEqual([
+      'alxnko@nitro', '------------', 'os     meowOS x86_64', 'host   nitro',
+      'kernel 7.2.6-meow', 'uptime 0 secs', 'shell  bash 5.3', 'role   tech lead',
+      'loc    Kyrgyzstan', 'rank   #1 in KG',
+    ]);
+    expect(lines.flat().filter((span) => span.href).map(({ text, href }) => ({ text, href }))).toEqual([
+      { text: '#1 in KG', href: 'https://committers.top/kyrgyzstan_private' },
+    ]);
+  });
+
+  it('compact uptime stays within the phone columns after days of use', async () => {
+    const { run, tick } = setup();
+    tick((3 * 86400 + 23 * 3600 + 59 * 60) * 1000);
+    const lines = await run('fastfetch -c');
+    expect(text(lines[5])).toContain('uptime 5759 min');
+    expect(lines.map(text).every((line) => line.length <= 34)).toBe(true);
+    const full = await run('fastfetch');
+    expect(text(full[5])).toContain('3 days, 23 hours, 59 mins');
   });
 
   it('uname', async () => {

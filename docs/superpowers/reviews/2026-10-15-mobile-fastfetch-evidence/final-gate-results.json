@@ -1,0 +1,60 @@
+[
+  {
+    "name": "lint",
+    "command": [
+      "rtk",
+      "proxy",
+      "bun",
+      "run",
+      "lint"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "unit",
+    "command": [
+      "rtk",
+      "proxy",
+      "bun",
+      "run",
+      "test"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "build",
+    "command": [
+      "rtk",
+      "proxy",
+      "bun",
+      "run",
+      "build"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "budget",
+    "command": [
+      "rtk",
+      "proxy",
+      "bun",
+      "run",
+      "budget"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "e2e",
+    "command": [
+      "rtk",
+      "proxy",
+      "bunx",
+      "playwright",
+      "test",
+      "--workers=2",
+      "--output",
+      ".superpowers/mobile-fastfetch/final-e2e-output"
+    ],
+    "exit": 0
+  }
+]

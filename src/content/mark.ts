@@ -16,3 +16,14 @@ export const CAT_MARK: readonly string[] = [
   '   ▀███ ███▀',
   '      ▀ ▀',
 ];
+
+// Lower-resolution half-block rendering for the phone terminal (11 × 7 cells).
+export const COMPACT_CAT_MARK: readonly string[] = [
+  ' █ ▄▄▄ █   ',
+  ' ███████   ',
+  '  ▀▀██▀  ▄ ',
+  ' ▄██ ██▄ █▄',
+  ' ███ ████▀▀',
+  '▀███ ███▀  ',
+  '  ▀▀ ▀▀    ',
+];
