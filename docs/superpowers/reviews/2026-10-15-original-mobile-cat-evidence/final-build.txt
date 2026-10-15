@@ -1,0 +1,35 @@
+$ bun run tokens:check && astro build && bun scripts/postbuild-csp.ts
+$ bun scripts/gen-tokens.ts --check
+16:14:29 [types] Generated 23ms
+16:14:29 [build] output: "static"
+16:14:29 [build] mode: "static"
+16:14:29 [build] directory: /home/alxnko/Projects/code/meow/alxnko.dev/.claude/worktrees/original-mobile-mark/dist/
+16:14:29 [build] Collecting build info...
+16:14:29 [build] ✓ Completed in 43ms.
+16:14:29 [build] Building static entrypoints...
+16:14:29 [vite] ✓ built in 106ms
+16:14:29 [WARN] [vite] [plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+16:14:29 [vite] ✓ built in 131ms
+16:14:29 [build] Rearranging server assets...
+
+ generating static routes 
+16:14:29   ├─ /404.html (+9ms) 
+16:14:29   ├─ /email/index.html (+1ms) 
+16:14:29   ├─ /gh/index.html (+1ms) 
+16:14:29   ├─ /github/index.html (+1ms) 
+16:14:29   ├─ /ig/index.html (+1ms) 
+16:14:29   ├─ /in/index.html (+1ms) 
+16:14:29   ├─ /li/index.html (+1ms) 
+16:14:29   ├─ /mail/index.html (+1ms) 
+16:14:29   ├─ /tg/index.html (+1ms) 
+16:14:29   ├─ /index.html (+4ms) 
+16:14:29 ✓ Completed in 27ms.
+
+16:14:29 [build] ✓ Completed in 282ms.
+16:14:29 [build] 10 page(s) built in 328ms
+16:14:29 [build] Complete!
+csp: 979 chars, 12 hashes → dist/_headers
