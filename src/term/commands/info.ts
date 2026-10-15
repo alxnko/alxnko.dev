@@ -1,6 +1,6 @@
 // help, man, whoami, fastfetch, uname, uptime, date, echo, hostname.
 import { CONTACTS, SITE } from '../../content/site';
-import { CAT_MARK } from '../../content/mark';
+import { CAT_MARK, COMPACT_CAT_MARK } from '../../content/mark';
 import { b, fg, link, pad, PALETTE } from '../format';
 import { fail, flags, untilAborted, type ShellEnv } from '../registry';
 import { loadText } from '../lazy';
@@ -42,17 +42,13 @@ function since(env: ShellEnv) {
 }
 
 /** fastfetch style: `3 mins`, `1 hour, 2 mins`, `12 secs`. */
-function shortUptime(env: ShellEnv): string {
+function shortUptime(env: ShellEnv, compact?: boolean): string {
   const { s, d, h, m } = since(env);
   if (s < 60) return plural(s, 'sec');
+  if (compact) return `${Math.floor(s / 60)} min`;
   const parts = [d && plural(d, 'day'), h && plural(h, 'hour'), m && plural(m, 'min')].filter(Boolean);
   return parts.join(', ');
 }
-
-// The cat mark (shared with the monitor screen), padded to a fixed width.
-const CAT_W = Math.max(...CAT_MARK.map((l) => l.length));
-const CAT = CAT_MARK.map((l) => l.padEnd(CAT_W, ' '));
-
 
 export function infoCommands(env: ShellEnv): Command[] {
   // `help`: the most fun or useful first, then the rest by group. Names are buttons: a click
@@ -167,20 +163,19 @@ export function infoCommands(env: ShellEnv): Command[] {
         kv('os', `${SITE.os} x86_64`),
         kv('host', SITE.host),
         kv('kernel', KERNEL),
-        kv('uptime', shortUptime(env)),
+        kv('uptime', shortUptime(env, compact)),
         kv('shell', 'bash 5.3'),
         kv('role', SITE.role),
         kv('loc', SITE.country),
-        kv('rank', [link(SITE.rank.short, SITE.rank.href)]),
+        kv('rank', [link(compact ? '#1 in KG' : SITE.rank.short, SITE.rank.href)]),
       ];
       if (!compact) {
-        rows.push([], ...CONTACTS.map((c) => kv(c.short, [link(c.display, c.href)])), [], [...PALETTE.map((c) => fg(c, '███'))]);
+        rows.push([], ...CONTACTS.map((c) => kv(c.short, [link(c.display, c.href)])), [], PALETTE.map((c) => fg(c, '███')));
       }
-      const width = CAT[0].length;
-      const n = Math.max(CAT.length, rows.length);
-      for (let i = 0; i < n; i++) {
-        const art: Line = i < CAT.length ? [{ ...fg('accent', CAT[i]), art: true }] : [{ text: ' '.repeat(width), art: true }];
-        ctx.out([...art, { text: '   ' }, ...(rows[i] ?? [])]);
+      const cat = compact ? COMPACT_CAT_MARK : CAT_MARK;
+      // Both layouts have more facts than art; compact ears start three rows down.
+      for (let i = 0; i < rows.length; i++) {
+        ctx.out([{ text: pad(cat[i - (compact ? 3 : 0)] ?? '', compact ? 14 : 21), fg: 'accent', art: true }, ...rows[i]]);
       }
     },
   };
