@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { promptReady, run } from './helpers';
+import { CAT_MARK } from '../../src/content/mark';
 
 for (const [width, height] of [[320, 780], [360, 780], [390, 844], [844, 390]]) {
   for (const cached of [false, true]) {
@@ -25,7 +26,10 @@ for (const [width, height] of [[320, 780], [360, 780], [390, 844], [844, 390]]) 
         const scale = term.getBoundingClientRect().width / term.clientWidth;
         return {
           font: getComputedStyle(term).fontSize, lineHeight: getComputedStyle(term).lineHeight,
-          art: art.map(el => el.textContent), heights: rows.map(el => el.offsetHeight),
+          art: art.map(el => el.textContent), heights: rows.map(el => el.getBoundingClientRect().height / scale),
+          rowFonts: rows.map(el => parseFloat(getComputedStyle(el).fontSize)),
+          rowLineHeights: rows.map(el => parseFloat(getComputedStyle(el).lineHeight)),
+          inputFont: getComputedStyle(document.getElementById('term-input')!).fontSize,
           visible: art.every(el => { const r = el.getBoundingClientRect(); return r.top >= visible.top - 1 && r.bottom <= visible.bottom + 1; }),
           effectiveFont: parseFloat(getComputedStyle(term).fontSize) * scale,
         };
@@ -37,13 +41,23 @@ for (const [width, height] of [[320, 780], [360, 780], [390, 844], [844, 390]]) 
       expect(geometry.effectiveFont).toBeGreaterThanOrEqual(12 - .01);
       // First wide boot intentionally uses full fastfetch; cached boots use compact.
       const compact = cached || width < 600;
-      expect(geometry.heights).toEqual(Array(compact ? 10 : 18).fill(30));
-      expect(geometry.art).toHaveLength(compact ? 7 : 12);
+      expect(geometry.heights).toHaveLength(compact ? 12 : 18);
+      expect(geometry.art.map(row => row?.trimEnd())).toEqual(CAT_MARK);
+      expect(geometry.inputFont).toBe('24px');
+      for (let i = 0; i < geometry.heights.length; i++) {
+        expect(geometry.heights[i]).toBeCloseTo(geometry.rowLineHeights[i], 1);
+        expect(geometry.rowLineHeights[i]).toBeCloseTo(geometry.rowFonts[i] * 1.25, 1);
+      }
+      expect(new Set(geometry.rowFonts).size).toBe(1);
       expect(geometry.visible).toBe(true);
       await expect(page.locator('#term-lines a[href="https://committers.top/kyrgyzstan_private"]')).toHaveText(compact ? '#1 in KG' : '#1 committer in KG');
       // Ordinary user output must still wrap.
       await run(page, `echo ${'word '.repeat(50)}`);
       await expect.poll(() => page.locator('#term-lines .ln').last().evaluate(el => (el as HTMLElement).offsetHeight)).toBeGreaterThan(30);
+      await expect(page.locator('#term-lines .ln').last()).toHaveCSS('font-size', '24px');
+      await run(page, 'catsay hi');
+      await expect(page.locator('#term-lines .ln').last().locator('[aria-hidden]')).toBeVisible();
+      await expect(page.locator('#term-lines .ln').last()).toHaveCSS('font-size', '24px');
     });
   }
 }

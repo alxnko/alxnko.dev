@@ -1,0 +1,13 @@
+$ astro check && tsc --noEmit
+16:14:23 [types] Generated 27ms
+16:14:23 [check] Getting diagnostics for Astro files in /home/alxnko/Projects/code/meow/alxnko.dev/.claude/worktrees/original-mobile-mark...
+[96msrc/term/lazy.ts[0m:[93m10[0m:[93m17[0m - [93mwarning[0m[90m ts(80006): [0mThis may be converted to an async function.
+
+[7m10[0m export function loadText(waitMs = TEXT_WAIT_MS): Promise<Text | null> {
+[7m  [0m [93m                ~~~~~~~~[0m
+
+Result (70 files): 
+- 0 errors
+- 0 warnings
+- 1 hint
+

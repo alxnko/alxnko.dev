@@ -201,6 +201,12 @@
   padding: var(--screen-pad) var(--screen-pad) 0;
 }
 
+/* Size mixed art/fact rows from the frozen screen grid; pure art and input keep their size. */
+:is([data-mode="scene"], [data-projecting], [data-boot="3d"] body) .term .ln:has(> [aria-hidden] + *) {
+  font-size: min(1em, calc(var(--screen-h) * .042));
+  line-height: 1.25;
+}
+
 :is([data-mode="scene"], [data-projecting], [data-boot="3d"] body) .term .term-form {
   padding: 0 var(--screen-pad) var(--screen-pad);
   border-top: 0;

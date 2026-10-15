@@ -1,6 +1,6 @@
 // help, man, whoami, fastfetch, uname, uptime, date, echo, hostname.
 import { CONTACTS, SITE } from '../../content/site';
-import { CAT_MARK, COMPACT_CAT_MARK } from '../../content/mark';
+import { CAT_MARK } from '../../content/mark';
 import { b, fg, link, pad, PALETTE } from '../format';
 import { fail, flags, untilAborted, type ShellEnv } from '../registry';
 import { loadText } from '../lazy';
@@ -172,10 +172,8 @@ export function infoCommands(env: ShellEnv): Command[] {
       if (!compact) {
         rows.push([], ...CONTACTS.map((c) => kv(c.short, [link(c.display, c.href)])), [], PALETTE.map((c) => fg(c, '███')));
       }
-      const cat = compact ? COMPACT_CAT_MARK : CAT_MARK;
-      // Both layouts have more facts than art; compact ears start three rows down.
-      for (let i = 0; i < rows.length; i++) {
-        ctx.out([{ text: pad(cat[i - (compact ? 3 : 0)] ?? '', compact ? 14 : 21), fg: 'accent', art: true }, ...rows[i]]);
+      for (let i = 0; i < Math.max(rows.length, CAT_MARK.length); i++) {
+        ctx.out([{ text: pad(CAT_MARK[i] ?? '', 21), fg: 'accent', art: true }, ...(rows[i]?.length ? rows[i] : [{ text: '' }])]);
       }
     },
   };
