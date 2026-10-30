@@ -172,7 +172,7 @@ def monitor(path: Path):
     cx0 = LEFT + sc(96)
     lines = [[("contacts", ANSI["dim"], False)], []]
     rows = [("gh", "github.com/alxnko"), ("tg", "t.me/ALXNK0"), ("in", "linkedin.com/in/alxnko"),
-            ("ig", "instagram.com/alxnko"), ("mail", "aleksandrnyrko@gmail.com")]
+            ("ig", "instagram.com/alxnko"), ("mail", "contact@alxnko.dev")]
     for short, url in rows:
         lines.append([(f"{short:<6}", ANSI["dim"], True), (url, ANSI["fg"], False)])
     cy0 = TOP + sc(120)
