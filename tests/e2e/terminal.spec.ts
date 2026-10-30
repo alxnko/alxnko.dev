@@ -195,7 +195,7 @@ test.describe('terminal', () => {
     const hrefs = await page.locator('#term-lines a').evaluateAll((as) => as.map((a) => [a.getAttribute('href'), a.getAttribute('rel')]));
     expect(hrefs.length).toBeGreaterThan(0);
     for (const [href, rel] of hrefs) {
-      expect(href).toMatch(/^(https:\/\/(github\.com|t\.me|linkedin\.com|instagram\.com|committers\.top)\/|mailto:aleksandrnyrko@gmail\.com$)/);
+      expect(href).toMatch(/^(https:\/\/(github\.com|t\.me|linkedin\.com|instagram\.com|committers\.top)\/|mailto:contact@alxnko\.dev$)/);
       expect(rel).toContain('noopener');
     }
   });

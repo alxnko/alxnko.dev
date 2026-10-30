@@ -42,7 +42,7 @@ describe('JSON-LD structured data', () => {
     const p = node('Person');
     expect(p.jobTitle).toBe('Tech Lead');
     expect(p.address).toEqual({ '@type': 'PostalAddress', addressCountry: 'KG' });
-    expect(p.email).toBe('mailto:aleksandrnyrko@gmail.com');
+    expect(p.email).toBe('mailto:contact@alxnko.dev');
     expect(p.sameAs).toEqual(CONTACTS.filter((c) => c.href.startsWith('https:')).map((c) => c.href));
     expect(p.sameAs).toHaveLength(4);
     expect(raw).not.toMatch(/worksFor|affiliation|geo|latitude|longitude|ait solutions/i);

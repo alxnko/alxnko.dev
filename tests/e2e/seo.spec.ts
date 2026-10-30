@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Decision R71: the legal name is findable through structured data but never shown.
 // The one allowed exception is the published email address, which contains it.
-const EMAIL = 'aleksandrnyrko@gmail.com';
+const EMAIL = 'contact@alxnko.dev';
 const HIDDEN = ['nyrko', 'нырко', 'aleksandr', 'александр', 'alexander', 'alexandr', 'саша'];
 
 async function visibleText(page: Page) {

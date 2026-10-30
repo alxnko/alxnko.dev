@@ -21,7 +21,7 @@ describe('_redirects', () => {
     expect(rules.filter(([, to]) => to?.startsWith('mailto:'))).toEqual([]);
     for (const p of ['mail', 'email']) {
       const page = readFileSync(new URL(`../../src/pages/${p}.astro`, import.meta.url), 'utf8');
-      expect(page).toContain('target="mailto:aleksandrnyrko@gmail.com"');
+      expect(page).toContain('target="mailto:contact@alxnko.dev"');
     }
   });
 });
