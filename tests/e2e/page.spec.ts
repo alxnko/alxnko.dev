@@ -10,7 +10,7 @@ test.describe('page (no 3D)', () => {
     expect((await page.locator('body').innerText()).toLowerCase()).not.toContain('ait solutions');
     await expect(page.locator('#identity')).toContainText('kyrgyzstan');
     await expect(page.locator('#contacts a')).toHaveCount(5);
-    for (const href of ['https://github.com/alxnko', 'https://t.me/ALXNK0', 'https://linkedin.com/in/alxnko', 'https://instagram.com/alxnko', 'mailto:aleksandrnyrko@gmail.com'])
+    for (const href of ['https://github.com/alxnko', 'https://t.me/ALXNK0', 'https://linkedin.com/in/alxnko', 'https://instagram.com/alxnko', 'mailto:contact@alxnko.dev'])
       await expect(page.locator(`#contacts a[href="${href}"]`)).toHaveCount(1);
     await expect(lines(page)).toContainText('alxnko@nitro', { timeout: 5000 });
     await page.waitForTimeout(500);

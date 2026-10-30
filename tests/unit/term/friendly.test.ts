@@ -115,7 +115,7 @@ describe('contacts and tour', () => {
     const { run } = setup();
     const ls = await run('contacts');
     expect(ls.slice(0, 5).map(text)).toEqual([
-      'gh    github.com/alxnko', 'tg    t.me/ALXNK0', 'in    linkedin.com/in/alxnko', 'ig    instagram.com/alxnko', 'mail  aleksandrnyrko@gmail.com',
+      'gh    github.com/alxnko', 'tg    t.me/ALXNK0', 'in    linkedin.com/in/alxnko', 'ig    instagram.com/alxnko', 'mail  contact@alxnko.dev',
     ]);
     expect(ls.slice(0, 5).every((l) => l[1].href)).toBe(true);
     expect(text(ls[6])).toContain('short links: alxnko.dev/gh /tg /in /ig /mail');

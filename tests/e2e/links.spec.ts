@@ -60,7 +60,7 @@ test('every email address in a page body is marked email_off', () => {
     const body = html.slice(html.indexOf('<body')).replace(/<script\b[\s\S]*?<\/script>/g, '');
     const outside = body.replace(/<!--email_off-->[\s\S]*?<!--\/email_off-->/g, '');
     expect(outside, f).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.]+/);
-    if (/@gmail\.com/.test(body)) seen++;
+    if (/contact@alxnko\.dev/.test(body)) seen++;
   }
   expect(seen).toBeGreaterThanOrEqual(3); // the home page, /email and /mail
 });

@@ -53,7 +53,7 @@ export const CONTACTS: readonly Contact[] = [
   { id: 'telegram', short: 'tg', label: 'telegram', handle: '@ALXNK0', display: 't.me/ALXNK0', href: 'https://t.me/ALXNK0' },
   { id: 'linkedin', short: 'in', label: 'linkedin', handle: 'alxnko', display: 'linkedin.com/in/alxnko', href: 'https://linkedin.com/in/alxnko' },
   { id: 'instagram', short: 'ig', label: 'instagram', handle: 'alxnko', display: 'instagram.com/alxnko', href: 'https://instagram.com/alxnko' },
-  { id: 'email', short: 'mail', label: 'email', handle: 'aleksandrnyrko@gmail.com', display: 'aleksandrnyrko@gmail.com', href: 'mailto:aleksandrnyrko@gmail.com' },
+  { id: 'email', short: 'mail', label: 'email', handle: 'contact@alxnko.dev', display: 'contact@alxnko.dev', href: 'mailto:contact@alxnko.dev' },
 ];
 
 /** The only URLs that may ever render as links or be opened by `open`. */

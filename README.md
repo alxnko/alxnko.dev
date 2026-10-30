@@ -27,7 +27,7 @@ with the live terminal and contacts on its screens.
 - `/tg` → [Telegram](https://t.me/ALXNK0)
 - `/in`, `/li` → [LinkedIn](https://linkedin.com/in/alxnko)
 - `/ig` → [Instagram](https://instagram.com/alxnko)
-- `/mail` → [Email](mailto:aleksandrnyrko@gmail.com)
+- `/mail` → [Email](mailto:contact@alxnko.dev)
 
 ## Development
 

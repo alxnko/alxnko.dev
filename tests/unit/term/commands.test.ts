@@ -73,11 +73,11 @@ describe('info commands', () => {
       /loc\s+Kyrgyzstan$/m,
       /rank\s+#1 committer in KG/,
       /gh\s+github\.com\/alxnko/,
-      /mail\s+aleksandrnyrko@gmail\.com/,
+      /mail\s+contact@alxnko\.dev/,
     ])
       expect(all).toMatch(re);
     const hrefs = lines.flat().filter((s) => s.href).map((s) => s.href);
-    expect(hrefs).toEqual(expect.arrayContaining(['https://github.com/alxnko', 'https://t.me/ALXNK0', 'mailto:aleksandrnyrko@gmail.com', 'https://committers.top/kyrgyzstan_private']));
+    expect(hrefs).toEqual(expect.arrayContaining(['https://github.com/alxnko', 'https://t.me/ALXNK0', 'mailto:contact@alxnko.dev', 'https://committers.top/kyrgyzstan_private']));
     const swatch = lines.at(-1)!.filter((s) => s.text.includes('█'));
     expect(swatch.map((s) => s.fg)).toEqual([...PALETTE]);
   });
@@ -272,14 +272,14 @@ describe('filesystem commands', () => {
     const { out, run, opened } = setup();
     expect(await out('open gh')).toBe('opening https://github.com/alxnko');
     expect(await out('open telegram')).toBe('opening https://t.me/ALXNK0');
-    expect(await out('open monitor/email.lnk')).toBe('opening mailto:aleksandrnyrko@gmail.com');
+    expect(await out('open monitor/email.lnk')).toBe('opening mailto:contact@alxnko.dev');
     expect(await out('open https://linkedin.com/in/alxnko')).toBe('opening https://linkedin.com/in/alxnko');
     const [l] = await run('open ig');
     expect(l.find((s) => s.href)?.href).toBe('https://instagram.com/alxnko');
     expect(opened).toEqual([
       'https://github.com/alxnko',
       'https://t.me/ALXNK0',
-      'mailto:aleksandrnyrko@gmail.com',
+      'mailto:contact@alxnko.dev',
       'https://linkedin.com/in/alxnko',
       'https://instagram.com/alxnko',
     ]);
