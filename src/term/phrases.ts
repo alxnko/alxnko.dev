@@ -2,6 +2,7 @@
 // visitor may type ("hi", "who are you", "how can i contact you") answer with the real command that does
 // it. A line that means a command runs that command, shown first as a `#` comment so the
 // visitor learns it; a greeting just answers. Cat sounds are catspeak's (checked before this).
+import { MEOWSENGER, MEOWSENGER_PITCH } from '../content/site';
 import type { Line } from './types';
 
 export interface Phrase {
@@ -27,6 +28,8 @@ const MEANS: [RegExp, string][] = [
 const HELLO = /^(hi|hii+|hello|hey|hey there|hello there|hi there|yo|sup|good (morning|evening|afternoon)|привет|салам|салют|hola|salut|ciao)$/;
 const THANKS = /^(thanks|thank you|thx|ty|спасибо|рахмат)$/;
 const CONTACTS = /^(github|telegram|linkedin|instagram)$/;
+/** The first-party promo (owner decision 2026-10-31): one line, a link, no tab opened for you. */
+const MEOWSENGER_RE = /^(meowsenger|meowerse|meowsenger\.alxnko\.dev)$/;
 
 /** Normalises a typed line: lower case, no trailing punctuation, single spaces. */
 const norm = (s: string) => s.trim().toLowerCase().replace(/[!.,]+$/g, '').replace(/[’']/g, '').replace(/\s+/g, ' ');
@@ -36,6 +39,17 @@ export function phrase(src: string): Phrase | null {
   if (!s) return null;
   if (HELLO.test(s)) return { say: [{ text: 'hi. this is a real terminal: type a command and press enter. start with ' }, ...tip('help'), { text: ' or ' }, ...tip('tour'), { text: '.' }] };
   if (THANKS.test(s)) return { say: [{ text: 'anytime. meow.' }] };
+  if (MEOWSENGER_RE.test(s)) return {
+    say: [
+      { text: '=^..^=  ', fg: 'accent' },
+      { text: 'meowsenger', bold: true },
+      { text: `: ${MEOWSENGER_PITCH} at ` },
+      { text: MEOWSENGER.replace('https://', ''), fg: 'accent', href: MEOWSENGER },
+      { text: ' (or ' },
+      ...tip('open meowsenger'),
+      { text: ')' },
+    ],
+  };
   if (CONTACTS.test(s)) return { say: [{ text: `${s} is a contact, not a command. try ` }, ...tip(`open ${s}`), { text: '.' }] };
   for (const [re, cmd] of MEANS) if (re.test(s.replace(/\?+$/, '')) || re.test(s)) return { say: comment(cmd), run: cmd };
   return null;

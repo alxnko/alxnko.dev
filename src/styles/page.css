@@ -121,7 +121,7 @@
   width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "id" "term" "ct" "poster";
+  grid-template-areas: "id" "term" "ct" "promo" "poster";
   padding: 0 var(--gutter-r) 0 var(--gutter);
 }
 
@@ -296,6 +296,66 @@
   }
 }
 
+/* meowsenger (first-party promo, owner decision 2026-10-31): one quiet row under the
+   contacts, in their idiom; the cat avatar is the site's own mark (same-origin favicon.svg) */
+.promo {
+  grid-area: promo;
+  align-self: start;
+  padding-bottom: var(--sp-7);
+}
+
+.promo-card {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 12px;
+  align-items: center;
+  column-gap: var(--sp-3);
+  min-height: 56px;
+  padding: var(--sp-2) var(--sp-1);
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-fg);
+  transition: background-color var(--d-fast) var(--ease);
+}
+
+.promo-card:focus-visible {
+  outline-offset: -2px;
+}
+
+.promo-cat {
+  width: 24px;
+  height: 24px;
+  background: var(--c-accent);
+  -webkit-mask: url("/favicon.svg") center / contain no-repeat;
+  mask: url("/favicon.svg") center / contain no-repeat;
+}
+
+.promo-text {
+  display: grid;
+  min-width: 0;
+}
+
+.promo-msg,
+.promo-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.promo-url {
+  color: var(--c-fg-subtle);
+  font-size: var(--fs-1);
+}
+
+@media (hover: hover) {
+  .promo-card:hover {
+    background: var(--c-bg-elev);
+  }
+
+  .promo-card:hover .c-go {
+    color: var(--c-accent);
+    transform: translate(2px, -2px);
+  }
+}
+
 /* poster (baked render, LCP image when present) ---------------------------------------- */
 .poster {
   grid-area: poster;
@@ -450,7 +510,7 @@
     grid-template-areas:
       "id term"
       "ct term"
-      "ct poster";
+      "promo poster";
     column-gap: var(--sp-8);
     max-width: 1360px;
     margin-inline: auto;
@@ -474,6 +534,7 @@
   .contacts {
     align-self: start;
     padding-top: var(--sp-5);
+    padding-bottom: 0; /* the promo row below brings its own top space */
   }
 
   .sheet > .term {
@@ -481,7 +542,8 @@
     margin-top: var(--sp-8);
   }
 
-  .poster {
+  .poster,
+  .promo {
     padding-top: var(--sp-5);
   }
 

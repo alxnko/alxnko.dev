@@ -56,8 +56,17 @@ export const CONTACTS: readonly Contact[] = [
   { id: 'email', short: 'mail', label: 'email', handle: 'contact@alxnko.dev', display: 'contact@alxnko.dev', href: 'mailto:contact@alxnko.dev' },
 ];
 
+/**
+ * First-party promo (owner decision 2026-10-31): Meowsenger, the owner's own messenger, on the
+ * monitor's status pane, the lite page and the terminal. Not a contact: it never joins CONTACTS.
+ */
+export const MEOWSENGER = 'https://meowsenger.alxnko.dev';
+/** Its one-line pitch (a separate export, so the initial bundle carries only the URL). */
+export const MEOWSENGER_PITCH = 'chat with the meowerse';
+
 /** The only URLs that may ever render as links or be opened by `open`. */
 export const LINK_ALLOWLIST: ReadonlySet<string> = new Set([
   ...CONTACTS.map((c) => c.href),
   SITE.rank.href,
+  MEOWSENGER,
 ]);

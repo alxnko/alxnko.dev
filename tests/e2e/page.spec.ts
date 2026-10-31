@@ -9,7 +9,8 @@ test.describe('page (no 3D)', () => {
     await expect(page.locator('#identity')).toContainText('tech lead');
     expect((await page.locator('body').innerText()).toLowerCase()).not.toContain('ait solutions');
     await expect(page.locator('#identity')).toContainText('kyrgyzstan');
-    await expect(page.locator('#contacts a')).toHaveCount(5);
+    // five shown (the 3D portrait-only meowsenger row is in the list but hidden here)
+    await expect(page.locator('#contacts a').filter({ visible: true })).toHaveCount(5);
     for (const href of ['https://github.com/alxnko', 'https://t.me/ALXNK0', 'https://linkedin.com/in/alxnko', 'https://instagram.com/alxnko', 'mailto:contact@alxnko.dev'])
       await expect(page.locator(`#contacts a[href="${href}"]`)).toHaveCount(1);
     await expect(lines(page)).toContainText('alxnko@nitro', { timeout: 5000 });
@@ -100,4 +101,24 @@ test('external links open in a new tab, safely; mail opens the mail app', async 
   }
   const mail = await page.$$eval('a[href^="mailto:"]', (as) => as.map((a) => a.getAttribute('target')));
   for (const t of mail) expect(t).not.toBe('_blank');
+});
+
+test('lite page: the meowsenger promo sits under the contacts, a safe new-tab link', async ({ page }) => {
+  await page.goto('/?lite');
+  const promo = page.getByRole('complementary', { name: 'meowsenger' }).filter({ has: page.locator('.promo-card') });
+  await expect(promo).toBeVisible();
+  const a = promo.getByRole('link', { name: 'chat with the meowerse meowsenger.alxnko.dev (opens in a new tab)' });
+  await expect(a).toHaveAttribute('href', 'https://meowsenger.alxnko.dev');
+  await expect(a).toHaveAttribute('target', '_blank');
+  expect(await a.getAttribute('rel')).toContain('noopener');
+  // secondary: after all five contacts, never among them
+  const below = await page.evaluate(() => {
+    const last = document.querySelector('#contacts li:nth-child(5)')!.getBoundingClientRect(); // the 5th real contact (the 6th li is the hidden 3D-only promo row)
+    if (last.height === 0) return false;
+    return document.getElementById('promo')!.getBoundingClientRect().top >= last.bottom;
+  });
+  expect(below).toBe(true);
+  // the 3D portrait-only contacts row is neither shown nor announced on the lite page
+  await expect(page.locator('#contacts a[href*="meowsenger"]')).toBeHidden();
+  await expect(page.getByRole('region', { name: 'contacts' }).getByRole('link')).toHaveCount(5);
 });

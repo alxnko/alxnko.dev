@@ -1,0 +1,21 @@
+---
+// The lite page's mirror of the monitor's meowsenger card (owner decision 2026-10-31): a
+// first-party promo under the contacts, secondary to them. 3D shows the card on the monitor
+// instead (scene.css hides this one).
+import { MEOWSENGER, MEOWSENGER_PITCH } from '../content/site';
+import Icon from './Icon.astro';
+const display = MEOWSENGER.replace('https://', '');
+---
+<aside id="promo" class="promo" aria-labelledby="promo-h">
+  <h2 id="promo-h" class="label">
+    <span>meowsenger</span><span class="label-path" aria-hidden="true">~/meowsenger</span>
+  </h2>
+  <a class="promo-card" data-promo="meowsenger" href={MEOWSENGER} target="_blank" rel="noopener noreferrer">
+    <span class="promo-cat" aria-hidden="true"></span>
+    <span class="promo-text">
+      <span class="promo-msg">{MEOWSENGER_PITCH}</span>
+      <span class="promo-url">{display}<span class="visually-hidden"> (opens in a new tab)</span></span>
+    </span>
+    <Icon name="arrow" size={12} class="c-go" />
+  </a>
+</aside>
