@@ -18,7 +18,7 @@ export const MAN: Record<string, string> = {
   ls: 'Lists directory contents. -a includes dotfiles, -l uses a long listing format. Directories end in /.',
   cd: 'Changes the working directory. Directories bound to a place on the desk (~, laptop, monitor, /) move the camera there. cd - goes back.',
   cat: 'Concatenates files to standard output. Files under ~/desk reflect the live state of the desk.',
-  open: 'Opens a contact in a new tab. Only the five contacts and the committers.top rank are allowed.',
+  open: 'Opens a contact in a new tab. Only the five contacts, the committers.top rank and meowsenger (open meowsenger) are allowed.',
   desk: 'Moves the sit-stand desk. Presets 1, 2, 3 are 74, 95 and 112 cm; up and down step 5 cm within 70 to 120 cm.',
   theme: 'Switches between day and night lighting. Without an argument, toggles.',
   rgb: `One color for the whole desk: the ring light, its glow on the wall, the fan ring, both keyboard backlights, the accent keys, the cat, and this site's accent (links, prompt, cursor). Presets: ${PRESET_NAMES.join(', ')}. Any #rgb or #rrggbb works too (rgb #ff8800); its text shades are worked out so they stay readable by day and by night. rgb off turns the lights off and gives the keys and the cat their own colors back; the accent keeps the last color, and rgb on brings the lights back. Without an argument, shows the color and the presets. Also answers to color, colour and ring. Kept for this browser.`,

@@ -4,8 +4,9 @@ import Identity from '../components/Identity.astro';
 import Terminal from '../components/Terminal.astro';
 import Contacts from '../components/Contacts.astro';
 import Nav from '../components/Nav.astro';
+import Promo from '../components/Promo.astro';
 import Icon from '../components/Icon.astro';
-import { SITE } from '../content/site';
+import { MEOWSENGER, MEOWSENGER_PITCH, SITE } from '../content/site';
 import { readPosters } from '../lib/poster';
 
 const posters = readPosters();
@@ -24,11 +25,27 @@ const PORTRAIT = '(max-width: 719px)';
     <Identity />
     <Terminal />
     <Contacts />
-    <aside id="mon-info" class="mon-info" aria-hidden="true">
+    <Promo />
+    {/* The monitor's right pane (3D only). Role/loc/rank repeat the identity, so they stay out
+        of the accessibility tree; the meowsenger card (owner decision 2026-10-31) is the pane's
+        own content and a real link. The whole list is inert until the camera is at the monitor
+        (syncMonitorLinks in entry.ts). */}
+    <aside id="mon-info" class="mon-info" aria-label="meowsenger">
       <dl>
-        <div><dt>role</dt><dd>{SITE.role}</dd></div>
-        <div><dt>loc</dt><dd>{SITE.country}</dd></div>
-        <div><dt>rank</dt><dd><a href={SITE.rank.href} target="_blank" rel="noopener noreferrer" tabindex="-1">{SITE.rank.short}</a></dd></div>
+        <div aria-hidden="true"><dt>role</dt><dd>{SITE.role}</dd></div>
+        <div aria-hidden="true"><dt>loc</dt><dd>{SITE.country}</dd></div>
+        <div aria-hidden="true"><dt>rank</dt><dd><a href={SITE.rank.href} target="_blank" rel="noopener noreferrer" tabindex="-1">{SITE.rank.short}</a></dd></div>
+        <div class="mp">
+          <dt aria-hidden="true">chat</dt>
+          <dd>
+            <a id="mon-promo" class="mp-card" data-promo="meowsenger" href={MEOWSENGER} target="_blank" rel="noopener noreferrer">
+              <span class="mp-head"><span class="mp-cat" aria-hidden="true"></span>meowsenger</span>
+              <span class="mp-msg">{MEOWSENGER_PITCH}</span>
+              <span class="mp-typing" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="mp-url">{MEOWSENGER.replace('https://', '')}<span class="visually-hidden"> (opens in a new tab)</span></span>
+            </a>
+          </dd>
+        </div>
       </dl>
     </aside>
     {posters && (

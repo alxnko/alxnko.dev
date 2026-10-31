@@ -69,6 +69,7 @@
   margin-left: auto;
 }
 
+:is([data-mode="scene"], [data-projecting]) .promo,
 :is([data-mode="scene"], [data-projecting]) .bar-home,
 :is([data-mode="scene"], [data-projecting]) .bar-meta,
 :is([data-mode="scene"], [data-projecting]) .foot,
@@ -465,6 +466,91 @@
 :is([data-mode="scene"], [data-projecting])[data-view="monitor"] .mon-info {
   -webkit-user-select: text;
   user-select: text;
+}
+
+/* the pane's meowsenger card (owner decision 2026-10-31): a small chat window in the screen's
+   own idiom, the cat as the sender. Secondary to the facts above it; only its typing dots move,
+   and only while you are at the monitor (no motion from afar, none with reduced motion). */
+.mon-info .mp { margin: 0; }
+
+.mon-info .mp-card {
+  display: grid;
+  gap: 14px;
+  margin-top: 6px;
+  color: var(--ansi-fg);
+  text-decoration: none;
+}
+
+.mp-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ansi-white);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.mp-cat {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  background: var(--ansi-accent);
+  -webkit-mask: url("/favicon.svg") center / contain no-repeat;
+  mask: url("/favicon.svg") center / contain no-repeat;
+}
+
+.mp-msg {
+  justify-self: start;
+  padding: 12px 18px;
+  border-radius: 20px 20px 20px 6px;
+  background: color-mix(in srgb, var(--ansi-fg) 11%, var(--ansi-bg));
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+.mp-typing {
+  display: flex;
+  gap: 8px;
+  padding-left: 18px;
+}
+
+.mp-typing i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ansi-dim);
+}
+
+.mon-info .mp-url {
+  justify-self: start;
+  color: var(--ansi-accent);
+  font-size: 24px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--ansi-accent) 40%, transparent);
+  text-underline-offset: 6px;
+}
+
+.mon-info .mp-card:hover .mp-url {
+  text-decoration-color: currentColor;
+}
+
+.mon-info .mp-card:focus-visible {
+  outline: 3px solid var(--ansi-accent);
+  outline-offset: 8px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :is([data-mode="scene"], [data-projecting])[data-view="monitor"] .mp-typing i {
+    animation: mp-typing 1.2s var(--ease) infinite;
+  }
+
+  :is([data-mode="scene"], [data-projecting])[data-view="monitor"] .mp-typing i:nth-child(2) { animation-delay: 0.2s; }
+  :is([data-mode="scene"], [data-projecting])[data-view="monitor"] .mp-typing i:nth-child(3) { animation-delay: 0.4s; }
+}
+
+@keyframes mp-typing {
+  0%, 60%, 100% { opacity: 0.35; }
+  30% { opacity: 1; }
 }
 
 .hint-touch { display: none; }

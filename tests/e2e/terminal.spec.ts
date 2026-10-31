@@ -200,6 +200,15 @@ test.describe('terminal', () => {
     }
   });
 
+  test('meowsenger: the terminal mirror of the monitor promo is one safe link', async ({ page }) => {
+    await run(page, 'meowsenger');
+    const a = page.locator('#term-lines a[href="https://meowsenger.alxnko.dev"]');
+    await expect(a).toHaveText('meowsenger.alxnko.dev', { timeout: 5000 });
+    await expect(a).toHaveAttribute('target', '_blank');
+    expect(await a.getAttribute('rel')).toContain('noopener');
+    await expect(lines(page)).toContainText('chat with the meowverse');
+  });
+
   test('output never renders markup', async ({ page }) => {
     await run(page, 'echo <img src=x onerror=alert(1)>');
     await expect(lines(page)).toContainText('<img src=x onerror=alert(1)>');

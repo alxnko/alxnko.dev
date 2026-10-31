@@ -285,6 +285,15 @@ describe('filesystem commands', () => {
     ]);
   });
 
+  it('open meowsenger opens the promo (allowlisted), not a contact', async () => {
+    const { out, opened } = setup();
+    expect(await out('open meowsenger')).toBe('opening https://meowsenger.alxnko.dev');
+    expect(await out('open https://meowsenger.alxnko.dev')).toBe('opening https://meowsenger.alxnko.dev');
+    expect(opened).toEqual(['https://meowsenger.alxnko.dev', 'https://meowsenger.alxnko.dev']);
+    expect(await out('open meowsenger.evil.example')).toBe('open: meowsenger.evil.example: No such file or directory');
+    expect(await out('ls monitor')).not.toContain('meowsenger'); // ~/monitor stays the contacts
+  });
+
   it('open rejects everything else', async () => {
     const { out, run, opened } = setup();
     expect(await out('open https://evil.example; echo $?')).toBe("open: refusing to open 'https://evil.example': not in the allowlist\n1");

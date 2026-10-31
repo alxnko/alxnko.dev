@@ -537,9 +537,46 @@ test.describe('3D desk: load and redraw cost', () => {
     expect(await focusable()).toBe(0);
     await page.locator('#nav [data-landmark="monitor"]').click();
     await expect.poll(state).toEqual(['false:null', 'false:null']);
-    expect(await focusable()).toBe(6); // the five contacts and the rank link
+    expect(await focusable()).toBe(7); // the five contacts, the rank link and the meowsenger card
     await page.locator('#nav [data-landmark="desk"]').click();
     await expect.poll(state).toEqual(['true:true', 'true:true']);
+  });
+
+  test('the monitor meowsenger card: a safe link, out of reach (and unannounced) until the camera is at the monitor', async ({ page, isMobile }) => {
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    const card = page.locator('#mon-promo');
+    await expect(card).toHaveAttribute('href', 'https://meowsenger.alxnko.dev');
+    await expect(card).toHaveAttribute('target', '_blank');
+    expect(await card.getAttribute('rel')).toContain('noopener');
+    await expect(card).not.toHaveAttribute('tabindex', /.*/); // a real tab stop once live (unlike the rank copy)
+    // the lite copy is not shown in 3D: the monitor carries the promo
+    await expect(page.locator('#promo')).toBeHidden();
+    const reach = () => page.evaluate(() => {
+      const a = document.getElementById('mon-promo')!;
+      a.focus();
+      return { focused: document.activeElement === a, hidden: !!a.closest('[aria-hidden="true"], [inert]') };
+    });
+    await expect.poll(reach).toEqual({ focused: false, hidden: true });
+    // a click from afar flies to the monitor and never opens the link
+    const popups: string[] = [];
+    page.context().on('page', (p) => popups.push(p.url()));
+    if (!isMobile) {
+      await page.locator('#nav [data-landmark="desk"]').click();
+      await expect(page.locator('#mon-info')).toHaveAttribute('data-dock', 'screen', { timeout: 15_000 });
+      await card.dispatchEvent('click');
+      await expect.poll(() => page.evaluate(() => document.body.dataset.view), { timeout: 15_000 }).toBe('monitor');
+      expect(popups).toEqual([]);
+    } else {
+      await page.locator('#nav [data-landmark="monitor"]').tap();
+    }
+    await expect.poll(reach).toEqual({ focused: true, hidden: false });
+    // its accessible name says what and where; the repeated facts above it stay unannounced
+    await expect(page.getByRole('link', { name: 'meowsenger chat with the meowverse meowsenger.alxnko.dev (opens in a new tab)', exact: true })).toHaveCount(1);
+    expect(await page.locator('#mon-info dl > div:not(.mp)').evaluateAll((ds) => ds.every((d) => d.getAttribute('aria-hidden') === 'true'))).toBe(true);
+    // back at the desk it is out of reach again
+    await page.locator('#nav [data-landmark="desk"]').click();
+    await expect.poll(reach).toEqual({ focused: false, hidden: true });
   });
 
   test('on a phone at the monitor, every contact link is a comfortable tap target', async ({ page, isMobile }) => {
