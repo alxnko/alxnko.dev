@@ -35,6 +35,9 @@ export function styleAttrs(html: string): number {
 /** The Trusted Types directives: every script sink needs a trusted value, and no policy may exist. */
 export const TRUSTED_TYPES = ["require-trusted-types-for 'script'", "trusted-types 'none'"];
 
+export const CF_BEACON = 'https://static.cloudflareinsights.com/beacon.min.js/';
+export const CF_INSIGHTS = 'https://cloudflareinsights.com';
+
 export function buildCsp(htmls: string[], opts: { trustedTypes?: boolean } = {}): string {
   const s = new Set<string>();
   const st = new Set<string>();
@@ -46,11 +49,14 @@ export function buildCsp(htmls: string[], opts: { trustedTypes?: boolean } = {})
   const list = (set: Set<string>) => [...set].sort().map((x) => ' ' + x).join('');
   return [
     "default-src 'none'",
-    `script-src 'self' 'wasm-unsafe-eval'${list(s)}`,
+    // Cloudflare Web Analytics (owner decision D7, 2026-10-31): the zone auto-injects beacon.min.js/v… (external,
+    // SRI-pinned). Allow exactly that path; it reports to same-origin /cdn-cgi/rum, or cloudflareinsights.com without
+    // a "version" in its config.
+    `script-src 'self' 'wasm-unsafe-eval'${list(s)} ${CF_BEACON}`,
     `style-src 'self'${list(st)}`,
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    "connect-src 'self'",
+    `connect-src 'self' ${CF_INSIGHTS}`,
     "manifest-src 'self'",
     "worker-src 'self' blob:",
     "base-uri 'none'",

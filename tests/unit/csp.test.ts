@@ -28,16 +28,17 @@ describe('postbuild CSP', () => {
     expect(inlineBlocks(html).scripts).not.toContain('');
   });
 
-  it('never allows unsafe-inline, schemes or third-party origins', () => {
-    expect(csp).not.toMatch(/unsafe-inline|'unsafe-eval'|https:|http:|googleapis|gstatic|\*/);
+  it('never allows unsafe-inline, schemes or third-party origins (except the two Cloudflare Web Analytics sources, D7)', () => {
+    const rest = csp.replace(' https://static.cloudflareinsights.com/beacon.min.js/', '').replace(' https://cloudflareinsights.com', '');
+    expect(rest).not.toMatch(/unsafe-inline|'unsafe-eval'|https:|http:|googleapis|gstatic|\*/);
   });
 
   it('matches the spec §7.3 policy shape', () => {
     expect(csp.startsWith("default-src 'none';")).toBe(true);
-    expect(directive(csp, 'script-src')).toMatch(/^script-src 'self' 'wasm-unsafe-eval'( 'sha256-[A-Za-z0-9+/=]+')+$/);
+    expect(directive(csp, 'script-src')).toMatch(/^script-src 'self' 'wasm-unsafe-eval'( 'sha256-[A-Za-z0-9+/=]+')+ https:\/\/static\.cloudflareinsights\.com\/beacon\.min\.js\/$/);
     expect(directive(csp, 'img-src')).toBe("img-src 'self' data: blob:");
     expect(directive(csp, 'font-src')).toBe("font-src 'self'");
-    expect(directive(csp, 'connect-src')).toBe("connect-src 'self'");
+    expect(directive(csp, 'connect-src')).toBe("connect-src 'self' https://cloudflareinsights.com");
     expect(directive(csp, 'manifest-src')).toBe("manifest-src 'self'");
     expect(directive(csp, 'worker-src')).toBe("worker-src 'self' blob:");
     for (const d of ["base-uri 'none'", "form-action 'none'", "frame-ancestors 'none'", 'upgrade-insecure-requests']) {
