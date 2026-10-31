@@ -206,7 +206,7 @@ test.describe('terminal', () => {
     await expect(a).toHaveText('meowsenger.alxnko.dev', { timeout: 5000 });
     await expect(a).toHaveAttribute('target', '_blank');
     expect(await a.getAttribute('rel')).toContain('noopener');
-    await expect(lines(page)).toContainText('chat with the meowverse');
+    await expect(lines(page)).toContainText('chat with the meowerse');
   });
 
   test('output never renders markup', async ({ page }) => {

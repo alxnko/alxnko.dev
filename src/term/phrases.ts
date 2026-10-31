@@ -29,7 +29,7 @@ const HELLO = /^(hi|hii+|hello|hey|hey there|hello there|hi there|yo|sup|good (m
 const THANKS = /^(thanks|thank you|thx|ty|спасибо|рахмат)$/;
 const CONTACTS = /^(github|telegram|linkedin|instagram)$/;
 /** The first-party promo (owner decision 2026-10-31): one line, a link, no tab opened for you. */
-const MEOWSENGER_RE = /^(meowsenger|meowverse|meowsenger\.alxnko\.dev)$/;
+const MEOWSENGER_RE = /^(meowsenger|meowerse|meowsenger\.alxnko\.dev)$/;
 
 /** Normalises a typed line: lower case, no trailing punctuation, single spaces. */
 const norm = (s: string) => s.trim().toLowerCase().replace(/[!.,]+$/g, '').replace(/[’']/g, '').replace(/\s+/g, ' ');

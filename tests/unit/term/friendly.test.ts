@@ -24,10 +24,10 @@ describe('plain-language lines (command_not_found_handle for people)', () => {
 
   it('meowsenger (first-party promo) answers with one allowlisted link and opens nothing', async () => {
     const { run, opened } = setup();
-    for (const typed of ['meowsenger', 'Meowsenger!', 'meowverse', 'meowsenger.alxnko.dev']) {
+    for (const typed of ['meowsenger', 'Meowsenger!', 'meowerse', 'meowsenger.alxnko.dev']) {
       const lines = await run(typed);
       expect(lines.length, typed).toBe(1);
-      expect(text(lines[0])).toBe('=^..^=  meowsenger: chat with the meowverse at meowsenger.alxnko.dev (or open meowsenger)');
+      expect(text(lines[0])).toBe('=^..^=  meowsenger: chat with the meowerse at meowsenger.alxnko.dev (or open meowsenger)');
       expect(lines[0].filter((s) => s.href).map((s) => s.href)).toEqual(['https://meowsenger.alxnko.dev']);
       expect(lines[0].filter((s) => s.run).map((s) => s.run)).toEqual(['open meowsenger']);
     }
@@ -37,7 +37,7 @@ describe('plain-language lines (command_not_found_handle for people)', () => {
   it('no phrase starts with a command (it could never be reached)', () => {
     const { shell } = setup();
     const samples = ['who are you', 'about', 'tell me about yourself', 'how can i reach you', 'email', 'socials', 'what is this',
-      'what can i do', 'commands', 'menu', 'start', 'i need help', '?', 'show me around', 'demo', 'quit', 'bye', 'log out', 'cls', 'hi', 'hey there', 'thanks', 'github', 'meowsenger', 'meowverse'];
+      'what can i do', 'commands', 'menu', 'start', 'i need help', '?', 'show me around', 'demo', 'quit', 'bye', 'log out', 'cls', 'hi', 'hey there', 'thanks', 'github', 'meowsenger', 'meowerse'];
     for (const p of samples) {
       expect(phrase(p), p).not.toBeNull();
       expect(shell.registry.get(p.split(' ')[0]), p).toBeUndefined();

@@ -62,7 +62,7 @@ export const CONTACTS: readonly Contact[] = [
  */
 export const MEOWSENGER = 'https://meowsenger.alxnko.dev';
 /** Its one-line pitch (a separate export, so the initial bundle carries only the URL). */
-export const MEOWSENGER_PITCH = 'chat with the meowverse';
+export const MEOWSENGER_PITCH = 'chat with the meowerse';
 
 /** The only URLs that may ever render as links or be opened by `open`. */
 export const LINK_ALLOWLIST: ReadonlySet<string> = new Set([

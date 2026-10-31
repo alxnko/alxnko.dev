@@ -572,7 +572,7 @@ test.describe('3D desk: load and redraw cost', () => {
     }
     await expect.poll(reach).toEqual({ focused: true, hidden: false });
     // its accessible name says what and where; the repeated facts above it stay unannounced
-    await expect(page.getByRole('link', { name: 'meowsenger chat with the meowverse meowsenger.alxnko.dev (opens in a new tab)', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('link', { name: 'meowsenger chat with the meowerse meowsenger.alxnko.dev (opens in a new tab)', exact: true })).toHaveCount(1);
     expect(await page.locator('#mon-info dl > div:not(.mp)').evaluateAll((ds) => ds.every((d) => d.getAttribute('aria-hidden') === 'true'))).toBe(true);
     // back at the desk it is out of reach again
     await page.locator('#nav [data-landmark="desk"]').click();

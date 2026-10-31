@@ -106,7 +106,7 @@ test('lite page: the meowsenger promo sits under the contacts, a safe new-tab li
   await page.goto('/?lite');
   const promo = page.getByRole('complementary', { name: 'meowsenger' }).filter({ has: page.locator('.promo-card') });
   await expect(promo).toBeVisible();
-  const a = promo.getByRole('link', { name: 'chat with the meowverse meowsenger.alxnko.dev (opens in a new tab)' });
+  const a = promo.getByRole('link', { name: 'chat with the meowerse meowsenger.alxnko.dev (opens in a new tab)' });
   await expect(a).toHaveAttribute('href', 'https://meowsenger.alxnko.dev');
   await expect(a).toHaveAttribute('target', '_blank');
   expect(await a.getAttribute('rel')).toContain('noopener');
