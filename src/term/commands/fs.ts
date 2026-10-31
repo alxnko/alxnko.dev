@@ -202,7 +202,7 @@ export function fsCommands(env: ShellEnv): Command[] {
       let href: string | undefined;
       const contact = CONTACTS.find((c) => [c.id, c.short, c.label].includes(target.toLowerCase()));
       if (contact) href = contact.href;
-      else if (target == 'meowsenger') href = MEOWSENGER;
+      else if (['meowsenger', 'meowerse'].includes(target.toLowerCase())) href = MEOWSENGER;
       else if (LINK_ALLOWLIST.has(target)) href = target;
       else {
         const n = at(ctx, target);

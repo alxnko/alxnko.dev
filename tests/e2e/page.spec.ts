@@ -113,7 +113,8 @@ test('lite page: the meowsenger promo sits under the contacts, a safe new-tab li
   expect(await a.getAttribute('rel')).toContain('noopener');
   // secondary: after all five contacts, never among them
   const below = await page.evaluate(() => {
-    const last = document.querySelector('#contacts li:last-child')!.getBoundingClientRect();
+    const last = document.querySelector('#contacts li:nth-child(5)')!.getBoundingClientRect(); // the 5th real contact (the 6th li is the hidden 3D-only promo row)
+    if (last.height === 0) return false;
     return document.getElementById('promo')!.getBoundingClientRect().top >= last.bottom;
   });
   expect(below).toBe(true);

@@ -288,8 +288,10 @@ describe('filesystem commands', () => {
   it('open meowsenger opens the promo (allowlisted), not a contact', async () => {
     const { out, opened } = setup();
     expect(await out('open meowsenger')).toBe('opening https://meowsenger.alxnko.dev');
+    expect(await out('open Meowsenger')).toBe('opening https://meowsenger.alxnko.dev');
+    expect(await out('open meowerse')).toBe('opening https://meowsenger.alxnko.dev');
     expect(await out('open https://meowsenger.alxnko.dev')).toBe('opening https://meowsenger.alxnko.dev');
-    expect(opened).toEqual(['https://meowsenger.alxnko.dev', 'https://meowsenger.alxnko.dev']);
+    expect(opened).toEqual(Array(4).fill('https://meowsenger.alxnko.dev'));
     expect(await out('open meowsenger.evil.example')).toBe('open: meowsenger.evil.example: No such file or directory');
     expect(await out('ls monitor')).not.toContain('meowsenger'); // ~/monitor stays the contacts
   });
