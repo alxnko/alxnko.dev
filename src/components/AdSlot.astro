@@ -20,7 +20,7 @@ const u = AD_UNITS[unit];
   <aside id={id} class={`ad ad-${placement} ad-${u.w}x${u.h}`} data-placement={placement} aria-labelledby={`${id}-h`}>
     <p class="ad-label" id={`${id}-h`}><span>sponsored</span><span class="ad-path" aria-hidden="true">~/ad</span></p>
     <div class="ad-frame">
-      <ins class="adsbygoogle ad-unit" data-ad-client={AD_CLIENT} data-ad-slot={u.slot ?? undefined} data-unit={u.name}></ins>
+      <ins class="adsbygoogle ad-unit" data-ad-client={AD_CLIENT} data-ad-slot={u.slot} data-unit={u.name}></ins>
       <div class="ad-sample" role="img" aria-label={`sample advertisement, ${u.w} by ${u.h}`}>
         <span class="ad-sample-tag" aria-hidden="true">sample</span>
         <span class="ad-sample-title" aria-hidden="true">Advertiser creative</span>

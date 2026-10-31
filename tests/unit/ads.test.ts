@@ -41,10 +41,10 @@ describe('ad slot flag', () => {
     expect(head).toMatch(/dataset\.ads=["']preview["']/);
   });
 
-  it('a unit without an id yet renders no data-ad-slot', async () => {
+  it('the phone banner renders the meow-mobile slot id', async () => {
     const c = await AstroContainer.create();
     const html = await c.renderToString(AdSlot, { props: { id: 'p', placement: 'hud', unit: 'banner', mode: 'preview' } });
-    expect(html).not.toContain('data-ad-slot');
+    expect(html).toContain('data-ad-slot="3927785994"');
   });
 });
 
@@ -79,5 +79,14 @@ describe('slot reservation', () => {
     expect(wantsPreview('?3d&adpreview=1')).toBe(true);
     expect(wantsPreview('?adpreview=1&lite')).toBe(true);
     for (const s of ['', '?adpreview', '?adpreview=0', '?adpreview=10', '?xadpreview=1']) expect(wantsPreview(s)).toBe(false);
+  });
+});
+
+describe('AdSense unit ids', () => {
+  it('every unit carries its owner-created slot id', async () => {
+    const { AD_UNITS } = await import('../../src/lib/ads');
+    expect(Object.fromEntries(Object.values(AD_UNITS).map((u) => [u.name, u.slot]))).toEqual({
+      'meow-rect': '5740008220', 'meow-leader': '8242435529', 'meow-mobile': '3927785994',
+    });
   });
 });

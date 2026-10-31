@@ -22,16 +22,15 @@ export interface AdUnit {
   name: string;
   w: number;
   h: number;
-  /** AdSense ad-unit id; null until the owner creates the unit. */
-  slot: string | null;
+  /** AdSense ad-unit id (owner-created display units, 2026-10-31). */
+  slot: string;
 }
 
 /** Fixed-size units only (no responsive/auto sizes): the reserved box is exactly the creative. */
 export const AD_UNITS = {
   rect: { name: 'meow-rect', w: 300, h: 250, slot: '5740008220' },
   leader: { name: 'meow-leader', w: 728, h: 90, slot: '8242435529' },
-  // owner action: create a 320×100 display unit for the phone desk view and fill in its id
-  banner: { name: 'meow-mobile-banner', w: 320, h: 100, slot: null },
+  banner: { name: 'meow-mobile', w: 320, h: 100, slot: '3927785994' },
 } as const satisfies Record<string, AdUnit>;
 
 export type AdUnitKey = keyof typeof AD_UNITS;
