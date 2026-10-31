@@ -1,0 +1,31 @@
+---
+// One fixed-size ad slot. Renders nothing unless the build flag is on (src/lib/ads.ts), and is
+// collapsed (display: none) until a fill is known: today only the ?adpreview=1 sample.
+// The <ins> is what Google's script will fill once consent ships; nothing loads it here.
+import { AD_CLIENT, AD_UNITS, adMode, type AdUnitKey } from '../lib/ads';
+
+interface Props {
+  id: string;
+  /** hud: docked in the 3D desk chrome · lite: a section of the 2D page */
+  placement: 'hud' | 'lite';
+  unit: AdUnitKey;
+  /** Overrides the AD_SLOTS environment variable (tests). */
+  mode?: string;
+}
+const { id, placement, unit, mode = process.env.AD_SLOTS } = Astro.props;
+const on = adMode(mode) !== 'off';
+const u = AD_UNITS[unit];
+---
+{on && (
+  <aside id={id} class={`ad ad-${placement} ad-${u.w}x${u.h}`} data-placement={placement} aria-labelledby={`${id}-h`}>
+    <p class="ad-label" id={`${id}-h`}><span>sponsored</span><span class="ad-path" aria-hidden="true">~/ad</span></p>
+    <div class="ad-frame">
+      <ins class="adsbygoogle ad-unit" data-ad-client={AD_CLIENT} data-ad-slot={u.slot ?? undefined} data-unit={u.name}></ins>
+      <div class="ad-sample" role="img" aria-label={`sample advertisement, ${u.w} by ${u.h}`}>
+        <span class="ad-sample-tag" aria-hidden="true">sample</span>
+        <span class="ad-sample-title" aria-hidden="true">Advertiser creative</span>
+        <span class="ad-sample-size" aria-hidden="true">{u.w} × {u.h} · placeholder creative</span>
+      </div>
+    </div>
+  </aside>
+)}

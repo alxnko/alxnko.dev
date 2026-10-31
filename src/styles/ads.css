@@ -1,0 +1,215 @@
+/* Ad slots. Inlined by AdHead.astro only when the AD_SLOTS build flag is on (src/lib/ads.ts).
+   Rules (owner requirement 2026-10-31 + AdSense policy):
+   - DOM only, never on a 3D screen; the creative is never scaled, clipped, tinted or covered;
+   - collapsed (display: none) unless a fill is known before first paint: no blank box, no nag;
+   - a shown slot's box is exactly the unit's size from its first frame (no layout shift);
+   - labelled "sponsored" in the site's own type; kept clear of the terminal, links and nav. */
+
+.ad {
+  display: none;
+}
+
+/* Google marks an unfilled unit; the slot collapses instead of leaving a hole (live path) */
+.ad:has(ins[data-ad-status="unfilled"]) {
+  display: none !important;
+}
+
+/* the reserved box: the unit's exact size, never responsive */
+.ad-frame {
+  position: relative;
+  box-sizing: content-box;
+  padding: var(--sp-1);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-m);
+}
+
+.ad-unit,
+.ad-sample {
+  display: block;
+  width: var(--ad-w);
+  height: var(--ad-h);
+}
+
+.ad-300x250 { --ad-w: 300px; --ad-h: 250px; }
+.ad-728x90 { --ad-w: 728px; --ad-h: 90px; }
+.ad-320x100 { --ad-w: 320px; --ad-h: 100px; }
+
+.ad-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin: 0 0 var(--sp-2);
+  color: var(--c-fg-muted);
+  font-size: var(--fs-1);
+  line-height: 1.6;
+}
+
+.ad-path {
+  color: var(--c-fg-subtle);
+}
+
+/* ---- preview sample creative (?adpreview=1): an obviously foreign, neutral placeholder ---- */
+.ad-sample {
+  display: none;
+}
+
+:root[data-ads="preview"] .ad-sample {
+  position: absolute;
+  inset: var(--sp-1);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  overflow: hidden;
+  /* advertisers' colours, not ours: the sample must not read as site content */
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0 10px, transparent 10px 20px),
+    linear-gradient(135deg, #3d4f7c 0%, #6a5a9c 55%, #b07a8e 100%);
+  color: #fff;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  text-align: center;
+}
+
+.ad-sample-tag {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #ffd84d;
+  color: #1a1a1a;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ad-sample-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.ad-sample-size {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.ad-320x100 .ad-sample,
+.ad-728x90 .ad-sample {
+  grid-auto-flow: column;
+  gap: 12px;
+}
+
+.ad-320x100 .ad-sample-title { font-size: 15px; }
+.ad-320x100 .ad-sample-size { display: none; }
+
+/* ---- lite page (2D fallback): a sheet section like "contacts", after the content ----------- */
+:root[data-ads] .sheet {
+  grid-template-areas: "id" "term" "ct" "poster" "ad";
+}
+
+.ad-lite {
+  grid-area: ad;
+  justify-self: start;
+  padding-bottom: var(--sp-7);
+}
+
+.ad-lite .ad-label {
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--c-line-strong);
+  margin-bottom: var(--sp-4);
+}
+
+:root[data-ads="preview"]:not([data-boot="3d"]) body[data-mode="page"] .ad-lite {
+  display: block;
+}
+
+@media (min-width: 1024px) {
+  /* left column, straight under the contacts; the right column is unchanged */
+  :root[data-ads] .sheet {
+    grid-template-rows: auto auto 1fr auto;
+    grid-template-areas:
+      "id term"
+      "ct term"
+      "ad term"
+      "ad poster";
+  }
+
+  .ad-lite {
+    align-self: start;
+    padding-top: var(--sp-2);
+  }
+}
+
+/* ---- 3D desk: the HUD's bottom dock, above the hint and the camera nav ---------------------
+   Shown only at the desk view at rest (not flown or looked away: #back hidden), never in view
+   mode or while typing on a phone. Over empty floor and the desk's front edge: clear of the
+   laptop terminal, the monitor's links and the desk paddle (the only 3D hit targets). */
+:root[data-ads="preview"] [data-mode="scene"][data-scene="ready"] .ad-hud {
+  display: block;
+  position: fixed;
+  z-index: var(--z-chrome);
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + var(--sp-5) + 52px + 28px);
+  transform: translateX(-50%);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--d-base) var(--ease), visibility 0s linear var(--d-base);
+}
+
+:root[data-ads="preview"] [data-mode="scene"][data-scene="ready"]:is([data-view="desk"], :not([data-view])):has(#back[hidden]):not([data-noui], [data-typing]) .ad-hud {
+  opacity: 1;
+  visibility: visible;
+  /* the desk arrives first, then the strip settles in */
+  transition: opacity var(--d-slow) var(--ease) var(--d-slow), visibility 0s;
+}
+
+/* over the 3D: no filled panel (R38); the hairline frame and the label carry the room's halo */
+.ad-hud .ad-label {
+  margin-bottom: var(--sp-1);
+  padding-inline: var(--sp-1);
+  color: var(--c-fg-muted);
+  text-shadow: 0 0 1px var(--halo), 0 0 3px var(--halo), 0 0 10px var(--halo-soft);
+}
+
+.ad-hud .ad-frame {
+  border-color: color-mix(in srgb, var(--c-fg-subtle) 55%, transparent);
+  box-shadow: 0 0 0 1px var(--halo-soft), 0 6px 24px -8px var(--halo);
+}
+
+/* day: a pale halo over the dark floor is a smudge; like the hint, the label gets a small
+   frosted chip in the page colour with full-strength ink */
+:root[data-theme="light"] .ad-hud .ad-label {
+  color: var(--c-fg);
+  text-shadow: none;
+}
+
+:root[data-theme="light"] .ad-hud .ad-label > span {
+  padding: 1px 8px;
+  border-radius: var(--r-m);
+  background: color-mix(in srgb, var(--c-bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+:root[data-theme="light"] .ad-hud .ad-frame {
+  border-color: color-mix(in srgb, var(--c-bg) 70%, transparent);
+}
+
+/* one unit per viewport: the leaderboard on wide screens, the banner on phones; neither on
+   short landscape screens, where it would sit on the desk itself */
+@media (max-width: 899px), (max-height: 639px) {
+  .ad-hud.ad-728x90 { display: none !important; }
+}
+
+@media (min-width: 900px), (max-height: 599px) {
+  .ad-hud.ad-320x100 { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ad-hud,
+  :root[data-ads="preview"] [data-mode="scene"][data-scene="ready"]:is([data-view="desk"], :not([data-view])):has(#back[hidden]):not([data-noui], [data-typing]) .ad-hud {
+    transition: none !important;
+  }
+}

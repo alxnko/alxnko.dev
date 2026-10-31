@@ -1,0 +1,19 @@
+---
+// <head> part of the ad slots: emitted only when the build flag is on (src/lib/ads.ts), so a
+// default build carries no ad CSS or script. The script marks the document before first paint,
+// so a slot that will show reserves its box from the first frame (no layout shift); its body is
+// hashed into the CSP by scripts/postbuild-csp.ts and writes no DOM sink (Trusted Types).
+import { adMode, wantsPreview } from '../lib/ads';
+import adCss from '../styles/ads.css?raw';
+import { transform } from 'esbuild';
+
+interface Props { mode?: string }
+const { mode = process.env.AD_SLOTS } = Astro.props;
+const on = adMode(mode) !== 'off';
+const script = on
+  ? (await transform(`try{if((${wantsPreview.toString()})(location.search))document.documentElement.dataset.ads='preview'}catch(e){}`, { minify: true, target: 'es2022' })).code
+  : '';
+const css = on ? (await transform(adCss, { loader: 'css', minify: true })).code : '';
+---
+{on && <script is:inline set:html={script} />}
+{on && <style is:inline set:html={css} />}

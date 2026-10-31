@@ -5,6 +5,7 @@ import Terminal from '../components/Terminal.astro';
 import Contacts from '../components/Contacts.astro';
 import Nav from '../components/Nav.astro';
 import Icon from '../components/Icon.astro';
+import AdSlot from '../components/AdSlot.astro';
 import { SITE } from '../content/site';
 import { readPosters } from '../lib/poster';
 
@@ -53,6 +54,7 @@ const PORTRAIT = '(max-width: 719px)';
         <figcaption><span>fig. 1</span> the desk, baked in blender</figcaption>
       </figure>
     )}
+    <AdSlot id="ad-lite" placement="lite" unit="rect" />
   </main>
   <button id="back" class="back" type="button" hidden aria-keyshortcuts="Escape">
     <span aria-hidden="true">←</span> desk <kbd>esc</kbd>
@@ -64,5 +66,7 @@ const PORTRAIT = '(max-width: 719px)';
     <Icon name="eye" size={18} />
   </button>
   <Nav />
+  <AdSlot id="ad-hud" placement="hud" unit="leader" />
+  <AdSlot id="ad-hud-phone" placement="hud" unit="banner" />
   <p id="hint" class="hint"><span class="hint-fine">type anywhere · drag to look around · scroll to zoom</span><span class="hint-touch">tap a screen · drag to look around · pinch to zoom</span></p>
 </Base>
