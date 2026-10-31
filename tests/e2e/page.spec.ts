@@ -48,7 +48,9 @@ test.describe('page (no 3D)', () => {
     const csp = r.headers()['content-security-policy'];
     expect(csp).toContain("default-src 'none'");
     expect(csp).not.toContain('unsafe-inline');
-    expect(csp).not.toMatch(/https?:\/\//);
+    // Only the two Cloudflare Web Analytics sources (owner decision D7) may name another origin.
+    expect(csp).toContain('https://static.cloudflareinsights.com/beacon.min.js/');
+    expect(csp.replace(' https://static.cloudflareinsights.com/beacon.min.js/', '').replace(' https://cloudflareinsights.com', '')).not.toMatch(/https?:\/\//);
     // Trusted Types are enforced (R83/R85): in the real CSP, no Report-Only header alongside it.
     expect(csp).toContain("require-trusted-types-for 'script'");
     expect(csp).toContain("trusted-types 'none'");
