@@ -86,6 +86,8 @@ const introScript = (await transform(`(${bootstrapConsole.toString()})(${console
     <title>{title}</title>
     <meta name="description" content={description} />
     {index ? <link rel="canonical" href={url} /> : <meta name="robots" content="noindex" />}
+    <!-- AdSense site ownership (verification only; loads no script). Ads/consent ship in later PRs. -->
+    <meta name="google-adsense-account" content="ca-pub-6264955766359992" />
     <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content={dark} media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content={light} media="(prefers-color-scheme: light)" />
