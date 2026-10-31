@@ -537,12 +537,15 @@ test.describe('3D desk: load and redraw cost', () => {
     expect(await focusable()).toBe(0);
     await page.locator('#nav [data-landmark="monitor"]').click();
     await expect.poll(state).toEqual(['false:null', 'false:null']);
-    expect(await focusable()).toBe(7); // the five contacts, the rank link and the meowsenger card
+    // the five contacts, the rank link and meowsenger: the side card on landscape screens, the
+    // sixth contacts row on portrait ones (never both)
+    expect(await focusable()).toBe(7);
     await page.locator('#nav [data-landmark="desk"]').click();
     await expect.poll(state).toEqual(['true:true', 'true:true']);
   });
 
   test('the monitor meowsenger card: a safe link, out of reach (and unannounced) until the camera is at the monitor', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'portrait: the card steps out for the contacts row (the next test)');
     await page.goto('/?3d&test');
     await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
     const card = page.locator('#mon-promo');
@@ -561,22 +564,55 @@ test.describe('3D desk: load and redraw cost', () => {
     // a click from afar flies to the monitor and never opens the link
     const popups: string[] = [];
     page.context().on('page', (p) => popups.push(p.url()));
-    if (!isMobile) {
-      await page.locator('#nav [data-landmark="desk"]').click();
-      await expect(page.locator('#mon-info')).toHaveAttribute('data-dock', 'screen', { timeout: 15_000 });
-      await card.dispatchEvent('click');
-      await expect.poll(() => page.evaluate(() => document.body.dataset.view), { timeout: 15_000 }).toBe('monitor');
-      expect(popups).toEqual([]);
-    } else {
-      await page.locator('#nav [data-landmark="monitor"]').tap();
-    }
+    await page.locator('#nav [data-landmark="desk"]').click();
+    await expect(page.locator('#mon-info')).toHaveAttribute('data-dock', 'screen', { timeout: 15_000 });
+    await card.dispatchEvent('click');
+    await expect.poll(() => page.evaluate(() => document.body.dataset.view), { timeout: 15_000 }).toBe('monitor');
+    expect(popups).toEqual([]);
     await expect.poll(reach).toEqual({ focused: true, hidden: false });
+    // landscape: the portrait-only contacts row stays out of sight and out of the tab order
+    const row = page.locator('#contacts a[data-promo]');
+    await expect(row).toBeHidden();
+    expect(await row.evaluate((a: HTMLElement) => { a.focus(); return document.activeElement === a; })).toBe(false);
     // its accessible name says what and where; the repeated facts above it stay unannounced
     await expect(page.getByRole('link', { name: 'meowsenger chat with the meowerse meowsenger.alxnko.dev (opens in a new tab)', exact: true })).toHaveCount(1);
     expect(await page.locator('#mon-info dl > div:not(.mp)').evaluateAll((ds) => ds.every((d) => d.getAttribute('aria-hidden') === 'true'))).toBe(true);
     // back at the desk it is out of reach again
     await page.locator('#nav [data-landmark="desk"]').click();
     await expect.poll(reach).toEqual({ focused: false, hidden: true });
+  });
+
+  test('portrait phone: meowsenger is a sixth contacts row, gated like the contacts; the side card steps out', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'portrait phone');
+    await page.goto('/?3d&test');
+    await expect(page.locator('body')).toHaveAttribute('data-mode', 'scene', { timeout: 30_000 });
+    const row = page.locator('#contacts a[data-promo="meowsenger"]');
+    await expect(row).toHaveAttribute('href', 'https://meowsenger.alxnko.dev');
+    await expect(row).toHaveAttribute('target', '_blank');
+    expect(await row.getAttribute('rel')).toContain('noopener');
+    const focusable = (q: string) => page.evaluate((q) => {
+      const a = document.querySelector<HTMLElement>(q)!;
+      a.focus();
+      return { focused: document.activeElement === a, hidden: !!a.closest('[aria-hidden="true"], [inert]') };
+    }, q);
+    await expect.poll(() => focusable('#contacts a[data-promo]')).toEqual({ focused: false, hidden: true });
+    // a tap on it from afar flies to the monitor and never opens the link
+    const popups: string[] = [];
+    page.context().on('page', (p) => popups.push(p.url()));
+    await expect(page.locator('#contacts')).toHaveAttribute('data-dock', 'screen', { timeout: 15_000 });
+    await row.dispatchEvent('click');
+    await landed(page, 'monitor');
+    expect(popups).toEqual([]);
+    // at the monitor: visible, in the panel, and the next Tab stop after the last contact
+    await expect(row).toBeVisible();
+    await page.locator('#contacts a[data-contact="email"]').focus();
+    await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.promo)).toBe('meowsenger');
+    await expect(page.getByRole('link', { name: 'meowsenger app: meowsenger.alxnko.dev (opens in a new tab)', exact: true })).toHaveCount(1);
+    // the side pane is off-view on a portrait phone: its card is gone, so nothing focusable hides there
+    await expect(page.locator('#mon-promo')).toBeHidden();
+    expect((await focusable('#mon-promo')).focused).toBe(false);
+    await expect(page.getByRole('link', { name: /meowerse/ })).toHaveCount(0);
   });
 
   test('on a phone at the monitor, every contact link is a comfortable tap target', async ({ page, isMobile }) => {
@@ -586,13 +622,19 @@ test.describe('3D desk: load and redraw cost', () => {
     await page.locator('#nav [data-landmark="monitor"]').tap();
     await landed(page, 'monitor');
     await expect(page.locator('#contacts')).toHaveAttribute('data-dock', 'screen');
-    const boxes = await page.locator('#contacts a').evaluateAll((as) => as.map((a) => a.getBoundingClientRect().toJSON() as DOMRect));
+    const boxes = await page.locator('#contacts a[data-contact]').evaluateAll((as) => as.map((a) => a.getBoundingClientRect().toJSON() as DOMRect));
     expect(boxes.length).toBe(5);
     for (const [i, b] of boxes.entries()) {
       expect(b.height, `link ${i} height`).toBeGreaterThanOrEqual(44);
       expect(b.width).toBeGreaterThanOrEqual(200);
       if (i) expect(b.top).toBeGreaterThanOrEqual(boxes[i - 1].bottom - 1); // no overlap
     }
+    // the meowsenger row (portrait only) comes after them, inside the panel, never crowding them
+    const promo = await page.locator('#contacts a[data-promo]').evaluate((a) => a.getBoundingClientRect().toJSON() as DOMRect);
+    const panel = await page.locator('#contacts').evaluate((a) => a.getBoundingClientRect().toJSON() as DOMRect);
+    expect(promo.height).toBeGreaterThanOrEqual(24);
+    expect(promo.top).toBeGreaterThanOrEqual(boxes[4].bottom - 1);
+    expect(promo.bottom).toBeLessThanOrEqual(panel.bottom + 1);
   });
 
   test('keyboard: Tab from the terminal reaches the contacts, through a named tab stop', async ({ page }) => {

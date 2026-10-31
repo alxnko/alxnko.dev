@@ -9,7 +9,8 @@ test.describe('page (no 3D)', () => {
     await expect(page.locator('#identity')).toContainText('tech lead');
     expect((await page.locator('body').innerText()).toLowerCase()).not.toContain('ait solutions');
     await expect(page.locator('#identity')).toContainText('kyrgyzstan');
-    await expect(page.locator('#contacts a')).toHaveCount(5);
+    // five shown (the 3D portrait-only meowsenger row is in the list but hidden here)
+    await expect(page.locator('#contacts a').filter({ visible: true })).toHaveCount(5);
     for (const href of ['https://github.com/alxnko', 'https://t.me/ALXNK0', 'https://linkedin.com/in/alxnko', 'https://instagram.com/alxnko', 'mailto:contact@alxnko.dev'])
       await expect(page.locator(`#contacts a[href="${href}"]`)).toHaveCount(1);
     await expect(lines(page)).toContainText('alxnko@nitro', { timeout: 5000 });
@@ -116,5 +117,7 @@ test('lite page: the meowsenger promo sits under the contacts, a safe new-tab li
     return document.getElementById('promo')!.getBoundingClientRect().top >= last.bottom;
   });
   expect(below).toBe(true);
-  await expect(page.locator('#contacts a[href*="meowsenger"]')).toHaveCount(0);
+  // the 3D portrait-only contacts row is neither shown nor announced on the lite page
+  await expect(page.locator('#contacts a[href*="meowsenger"]')).toBeHidden();
+  await expect(page.getByRole('region', { name: 'contacts' }).getByRole('link')).toHaveCount(5);
 });

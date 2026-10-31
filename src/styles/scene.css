@@ -277,6 +277,58 @@
   }
 }
 
+/* the meowsenger row (Contacts.astro): only on portrait screens in 3D, where the camera frames
+   the contacts alone and the side pane's card is off-view. It takes a compact fixed height
+   (≥ 24 px tapped on a phone) from the panel's padding and label, so the five contacts keep
+   their full share (44 px each on a 412 px phone, R81); the side card steps out for it. */
+.contacts .ct-promo {
+  display: none;
+}
+
+@media (orientation: portrait) {
+  :is([data-mode="scene"], [data-projecting]) .contacts {
+    padding-block: 4px;
+  }
+
+  :is([data-mode="scene"], [data-projecting]) .contacts .label {
+    padding-bottom: 2px;
+    line-height: 1.1;
+  }
+
+  :is([data-mode="scene"], [data-projecting]) .contacts .ct-promo {
+    display: flex;
+    flex: none;
+    border-bottom: 0;
+  }
+
+  :is([data-mode="scene"], [data-projecting]) .contacts .ct-promo a {
+    flex: 1;
+    height: 80px;
+    padding: 0;
+    /* the key column lines up with the contacts' 5ch at their 46px */
+    grid-template-columns: 138px minmax(0, 1fr) auto;
+    color: var(--ansi-dim);
+    font-size: 30px;
+  }
+
+  :is([data-mode="scene"], [data-projecting]) .contacts .ct-promo .c-key {
+    color: var(--ansi-accent);
+  }
+
+  :is([data-mode="scene"], [data-projecting]) .contacts .ct-tag {
+    padding: 2px 12px;
+    border: 2px solid var(--term-rule, #232326);
+    border-radius: 999px;
+    color: var(--ansi-dim);
+    font-size: 22px;
+    line-height: 1.2;
+  }
+
+  :is([data-mode="scene"], [data-projecting]) .mon-info .mp {
+    display: none;
+  }
+}
+
 /* the monitor stays a dark screen in both themes: hover is a soft gray row, not the page's
    (light-theme) surface colour */
 @media (hover: hover) {
